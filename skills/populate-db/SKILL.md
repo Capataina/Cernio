@@ -20,9 +20,27 @@ Population works from `companies/potential.md` — the output of the discovery s
 
 Before processing, check the database for existing entries with the same website URL to avoid duplicates.
 
-### 2. For each company, find the job board
+### 2. Validate the company is real and worth tracking
 
-This is the core research step. The goal is to find which ATS the company uses and the specific slug needed to query their public API.
+Before spending time on ATS resolution, verify the company is actually a viable target.
+
+**Check the basics:**
+- Does the website load? A dead website means a dead company or a pivot — remove from potential.md and move on.
+- Is there evidence of current activity? Recent blog posts, press releases, job listings, social media activity, or product updates within the last 6-12 months.
+- Is the company still independent? It may have been acquired (check for redirects to a parent company), shut down, or rebranded.
+
+**Assess engineering fit:**
+- Do they have an engineering team? A 5-person company with no engineers isn't going to hire a systems engineer.
+- Do they do technical work that aligns with the profile? A fintech that only does marketing automation isn't relevant even if it's in "fintech."
+- Is there any signal they're hiring or growing? Active careers page, job listings, headcount growth, recent funding.
+
+**If the company fails validation:** Remove it from `companies/potential.md` with a brief note about why (dead website, acquired, too small, not relevant). Don't insert it into the database — the database is for companies worth tracking.
+
+**If the company passes:** Proceed to ATS resolution.
+
+### 3. Find the job board
+
+This is the ATS resolution step. The goal is to find which ATS the company uses and the specific slug needed to query their public API.
 
 **Try deterministic patterns first.** Most ATS providers use predictable URL patterns. From the company name, generate slug candidates (lowercase, hyphenated, common variations) and probe these endpoints:
 
@@ -50,7 +68,7 @@ A slug that returns HTTP 200 with valid JSON containing at least one job is a co
 
 **If no supported ATS is found, mark as bespoke.** Find the company's careers page URL directly and record it. The company is still worth tracking — their jobs just can't be scraped automatically. Common bespoke systems include iCIMS, Taleo, BambooHR, Jobvite, Personio, and custom-built portals.
 
-### 3. Verify the connection
+### 4. Verify the connection
 
 For companies matched to a supported ATS:
 - Fetch the JSON endpoint and confirm it returns parseable job data
@@ -58,7 +76,7 @@ For companies matched to a supported ATS:
 
 A slug that returns 200 but has zero jobs might be valid but the company might not be actively hiring. Still mark it as resolved — the slug works, jobs may appear later.
 
-### 4. Insert into the database
+### 5. Insert into the database
 
 Write the company to the SQLite database with all available fields:
 - Facts: name, website, what they do, discovery source, discovery date
@@ -66,7 +84,7 @@ Write the company to the SQLite database with all available fields:
 - Judgments: why relevant (carried from discovery), relevance updated date
 - Location and sector tags if known
 
-### 5. Update the TUI
+### 6. Update the TUI
 
 As each company is processed, the TUI should reflect the progress. The flow the user sees:
 
@@ -77,7 +95,7 @@ Company in potential.md
   → or "bespoke: workday portal"               (no supported ATS)
 ```
 
-### 6. Clean up potential.md
+### 7. Clean up potential.md
 
 Once a company has been processed and inserted into the database (whether as resolved or bespoke), remove it from `companies/potential.md`. After a full population run, `potential.md` should only contain companies that haven't been processed yet.
 
