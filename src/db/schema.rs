@@ -71,8 +71,9 @@ CREATE TABLE IF NOT EXISTS companies (
                     CHECK (status IN ('potential', 'resolved', 'bespoke')),
     location        TEXT,
     sector_tags     TEXT,
-    ats_provider    TEXT CHECK (ats_provider IN ('greenhouse', 'ashby', 'lever', 'workable', NULL)),
+    ats_provider    TEXT CHECK (ats_provider IN ('greenhouse', 'ashby', 'lever', 'workable', 'smartrecruiters', 'workday', 'eightfold', NULL)),
     ats_slug        TEXT,
+    ats_extra       TEXT,
     ats_verified_at TEXT,
     careers_url     TEXT,
 

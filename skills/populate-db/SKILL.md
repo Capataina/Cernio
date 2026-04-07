@@ -24,19 +24,31 @@ Before processing, check the database for existing entries with the same website
 
 This is the core research step. The goal is to find which ATS the company uses and the specific slug needed to query their public API.
 
-**Try deterministic patterns first.** Most ATS providers use predictable URL patterns. From the company name, generate slug candidates (lowercase, hyphenated, common variations) and probe:
+**Try deterministic patterns first.** Most ATS providers use predictable URL patterns. From the company name, generate slug candidates (lowercase, hyphenated, common variations) and probe these endpoints:
 
-- `https://boards.greenhouse.io/{slug}` — Greenhouse
-- `https://job-boards.greenhouse.io/{slug}` — Greenhouse (alternate)
-- `https://jobs.ashbyhq.com/{slug}` — Ashby
-- `https://jobs.lever.co/{slug}` — Lever
-- `https://apply.workable.com/{slug}` — Workable
+**Tier 1 — Simple slug-based (GET request, slug in URL):**
+
+| ATS | Probe URL | JSON API |
+|-----|-----------|----------|
+| Greenhouse | `boards.greenhouse.io/{slug}` | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` |
+| Greenhouse (alt) | `job-boards.greenhouse.io/{slug}` | same API |
+| Lever | `jobs.lever.co/{slug}` | `api.lever.co/v0/postings/{slug}` |
+| Ashby | `jobs.ashbyhq.com/{slug}` | `api.ashbyhq.com/posting-api/job-board/{slug}` |
+| Workable | `apply.workable.com/{slug}` | `apply.workable.com/api/v1/widget/accounts/{slug}` |
+| SmartRecruiters | `jobs.smartrecruiters.com/{slug}` | `api.smartrecruiters.com/v1/companies/{slug}/postings` |
+
+**Tier 2 — Complex discovery (variable subdomains/site names):**
+
+| ATS | Pattern | Challenge |
+|-----|---------|-----------|
+| Workday | `{company}.{wd1-12}.myworkdayjobs.com/wday/cxs/{company}/{site}/jobs` (POST) | Subdomain number (wd1–wd12) and site name vary per company. Must be discovered via web search or the company's careers page redirect. Store both in `ats_slug` (company identifier) and `ats_extra` (full endpoint path). |
+| Eightfold.ai | `{subdomain}/api/apply/v2/jobs?domain={domain}` | Subdomain is company-specific (e.g. `explore.jobs.netflix.net`). Discovered from the company's careers page. Store subdomain and domain in `ats_extra`. |
 
 A slug that returns HTTP 200 with valid JSON containing at least one job is a confirmed match. Slugs don't always match the company name exactly — Wise is `transferwise` on Greenhouse, Cleo is `cleoai`, DeepMind is `deepmind` not `googledeepmind`. Try obvious variations: the full name, abbreviations, former names, domain name without TLD.
 
 **If deterministic probing fails, search the web.** Search for `"{company name}" careers` or `"{company name}" greenhouse` or `"{company name}" jobs site:greenhouse.io`. The results usually reveal the correct ATS and slug. This is where Claude's judgment comes in — interpreting search results, recognising the right link, and verifying it.
 
-**If no supported ATS is found, mark as bespoke.** Find the company's careers page URL directly and record it. The company is still worth tracking — their jobs just can't be scraped automatically. Common bespoke systems: Workday, iCIMS, Taleo, SmartRecruiters, custom-built portals.
+**If no supported ATS is found, mark as bespoke.** Find the company's careers page URL directly and record it. The company is still worth tracking — their jobs just can't be scraped automatically. Common bespoke systems include iCIMS, Taleo, BambooHR, Jobvite, Personio, and custom-built portals.
 
 ### 3. Verify the connection
 
