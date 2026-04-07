@@ -283,16 +283,26 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**Early implementation.** Database schema is implemented and tested. Three skills are designed. Profile is fully populated. No production pipeline code yet.
+**End of first session.** Core pipeline proven end-to-end: discovery → population → job search → evaluation. Infrastructure in place, scaling architecture designed.
 
 | Component | Status |
 |-----------|--------|
-| Profile (12 files) | Populated with real data, tested profile-scrape against NeuroDrive |
-| SQLite schema | Implemented — companies, jobs, user_decisions tables with migrations and 7 tests |
-| profile-scrape skill | Designed and tested |
-| discover-companies skill | Designed with search-strategies reference |
-| populate-db skill | Designed with full ATS endpoint documentation |
-| Company universe | Empty — discovery not yet run |
-| Search scripts | Not started |
+| Profile (12 files) | Fully populated, tested profile-scrape against NeuroDrive |
+| SQLite schema | 4 tables (companies, company_portals, jobs, user_decisions), 10 tests passing, WAL mode |
+| Lever fetcher (`src/ats/lever.rs`) | Working — `lever-list` and `lever-detail` CLI commands |
+| profile-scrape skill | Designed, tested on NeuroDrive |
+| discover-companies skill | Designed with search-strategies reference, first run produced 73 companies |
+| populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
+| search-jobs skill | Designed with Lever reference, grading rubric (SS–F), tested on Palantir |
+| Company universe | 9 companies in DB (5 S-tier, 2 A-tier, 2 B-tier bespoke), ~65 more in potential.md |
+| Jobs | 25 Palantir London jobs evaluated and graded in DB |
+| Greenhouse/Ashby/other fetchers | Not started — need companies on those platforms first |
+| Pipeline CLI (search --all, pending) | Not started — critical for scaling beyond a few companies |
 | TUI | Not started |
-| Job evaluation | Not started |
+| Export | Not started |
+
+**Next priorities:**
+1. Build the pipeline CLI (`cernio search --company`, `cernio pending`) to move volume work off Claude
+2. Populate more companies from potential.md to encounter Greenhouse/Ashby and build those fetchers
+3. Build Greenhouse fetcher (Cloudflare, XTX, Helsing are all on Greenhouse)
+4. Start the TUI for real-time visibility
