@@ -20,7 +20,7 @@ Before searching, understand what to look for and what's already known.
 
 **Read `profile/`** to understand the user's skills, domains, interests, and preferences. The profile determines which sectors to explore and how to assess relevance. A company is worth discovering if the user's skills and interests would be genuinely valued there — not just if the company is impressive in the abstract.
 
-**Read `companies/`** to see what's already in the universe. Every company in any `companies/*.md` file (potential, greenhouse, ashby, lever, workable, bespoke) is already known. Discovery should not re-discover these. When in doubt, check the website URL — company names can vary across sources but the domain is usually stable.
+**Read the existing universe from the database and `companies/potential.md`.** Query all company names and website URLs from `state/cernio.db` (these are resolved or bespoke companies already in the system), plus any entries still in `companies/potential.md` (discovered but not yet resolved). Discovery should not re-discover any of these. Website URL is the stable dedup key — company names vary across sources but the domain is usually consistent. Pass this list to every agent so they can skip known companies.
 
 ### 2. Divide the search space and dispatch parallel agents
 
