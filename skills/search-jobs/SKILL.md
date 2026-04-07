@@ -55,10 +55,20 @@ Read the full description. Assess against the user's profile:
 - **Dealbreakers** — security clearance requirements the user can't meet, specific credentials, years of experience that are clearly hard requirements (not "nice to haves")?
 - **Could you make a compelling case?** — even with gaps, would the profile tell a coherent story for this role?
 
-Write the evaluation:
-- `strong_fit` — profile aligns well, gaps are minor or addressable in a cover letter
-- `weak_fit` — interesting role but significant gaps; worth watching, maybe not worth applying now
-- `no_fit` — wrong seniority, wrong domain, or dealbreakers present
+### 5b. Grade each role
+
+After reading the full description, assign a grade using the rubric in `references/grading-rubric.md`. The grade considers career ceiling, skill breadth, company signal, technical depth, sponsorship viability, seniority match, domain transferability, growth environment, and tech stack relevance.
+
+| Grade | DB evaluation_status | Action |
+|-------|---------------------|--------|
+| SS | `strong_fit` | Apply immediately, detailed evaluation written |
+| S | `strong_fit` | Strong candidate, detailed evaluation written |
+| A | `weak_fit` | Worth applying, evaluation with noted gaps |
+| B | `weak_fit` | Backup, brief evaluation |
+| C | `no_fit` | Only if desperate, one-line reason |
+| F | `no_fit` | Don't apply, one-line reason |
+
+For roles graded S or above, always provide detailed evaluation with profile alignment and gaps. For A and B, evaluate if the user wants depth. For C and F, the grade and one-line justification is enough.
 
 ### 6. Write results to the database
 

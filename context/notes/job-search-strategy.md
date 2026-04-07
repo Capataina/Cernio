@@ -21,3 +21,13 @@ The discovery skill was designed before the database existed. Now that the datab
 The deduplication check should be: query all company websites from the database, plus any entries still in `potential.md`, and skip anything already known. Website URL is the stable dedup key (company names vary across sources).
 
 **Implication:** The discover-companies skill needs updating to read SQLite before dispatching agents, and each agent needs the existing website list to deduplicate against.
+
+---
+
+## Companies may use multiple ATS platforms
+
+Some companies post jobs on more than one ATS. A company might use Lever for engineering roles and Workday for corporate roles, or Greenhouse for one region and a different system for another. The database currently stores one `ats_provider` and `ats_slug` per company.
+
+This means we might miss jobs if a company splits their listings across platforms. For now this is an accepted limitation — most companies use one primary ATS for engineering roles. If we discover a company appears on multiple platforms during population or search, we should note it and consider whether the schema needs to support multiple ATS entries per company (e.g. a separate `company_ats` junction table).
+
+**Implication for populate-db:** When resolving a company, check more than one provider. A company that resolves on Lever might also have a Greenhouse board. At minimum, note when a company's careers page links to a different ATS than the one we found via slug probing.
