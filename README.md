@@ -121,7 +121,7 @@ The TUI is a live dashboard for the collaborative session, not a standalone appl
 
 Cernio targets five capabilities, each independently useful:
 
-- **Profile management** — a structured personal profile covering education, experience, projects, skills, visa status, and preferences, auto-updatable from GitHub repo links by scraping READMEs, context folders, and code to produce accurate entries without manual editing
+- **Profile management and career coaching** — a structured personal profile auto-updatable from GitHub repo links, plus active gap analysis that tracks what the market asks for vs what the profile offers, identifies the most impactful improvements, and recommends concrete actions to close gaps
 - **Company universe construction** — discovering UK and remote-UK technology employers from authoritative public list sources, deduplicated and tagged by sector, stage, and geography
 - **ATS portal resolution** — deterministic and agent-assisted resolution of each company to its applicant tracking system slug, with graceful fallback for companies on custom portals
 - **Job search and evaluation** — parameterised scripts scan ATS boards at volume, Claude evaluates results against the structured profile, the TUI shows everything in real time
@@ -138,6 +138,7 @@ Each capability is independently completable. A working universe and resolver al
 - **Scripts for volume, Claude for judgment**: parameterised Rust scripts handle the combinatorial work that would be impractical for an LLM. Claude handles the nuanced evaluation that keyword matching cannot do well.
 - **Live visibility**: the TUI shows the entire process in real time — discovery, resolution, search results, evaluation status. No waiting for a pipeline to finish.
 - **Structured profile, not parsed CV**: your profile lives as separate files covering everything that matters in a job application. The tool reads structured data, not extracted keywords from a PDF.
+- **Active career coaching**: evaluating jobs isn't just about finding matches — it's about spotting patterns. If the market consistently asks for something the profile lacks, that's a concrete improvement opportunity. The system tracks gaps and recommends the highest-impact actions to close them.
 - **Export on confirmation**: markdown reports are generated only when the user explicitly triggers them after reviewing results. Nothing is produced automatically.
 - **Discovery is wide, filtering is sharp**: the discovery layer captures everything that meets a low bar. Evaluation is where opinions live.
 - **Graceful degradation**: companies on unsupported ATS or custom portals land in a bespoke tier with a direct link, not in a dropped queue.

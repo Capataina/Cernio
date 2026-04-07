@@ -18,7 +18,7 @@
 | Tauri               | Proficient  | Desktop application shell for Image Browser and Aurix. |
 | React               | Comfortable | Frontend layer for Tauri desktop applications. |
 | Tokio               | Comfortable | Async runtime across Rust projects. |
-| Bevy                | Comfortable | Used in NeuroDrive for the deterministic simulation environment. |
+| Bevy                | Comfortable | 8-subsystem application in NeuroDrive: ECS architecture, fixed-timestep simulation, plugin composition, system ordering sets, world-space debug overlays, UI panels. |
 | Ratatui             | Comfortable | Terminal UI for Cernio's live dashboard. |
 | ONNX Runtime        | Comfortable | Local CLIP inference in Image Browser; LSTM operator contribution to tinygrad. |
 | PyTorch             | Comfortable | ML coursework and experimentation. |
@@ -53,7 +53,8 @@
 | Quantitative risk modelling       | Comfortable | VaR, rolling volatility, fat-finger protection, position bounds — implemented in Aurix and Nyquestro. |
 | Local-first software architecture | Comfortable | Three production projects built on the principle: Image Browser, Aurix, Cernio. |
 | Local ML inference                | Comfortable | CLIP via ONNX Runtime in Image Browser; FFI integration end to end. |
-| Biologically plausible learning   | Comfortable | Hebbian plasticity, STDP, dopamine-modulated reinforcement, sparse plastic graphs — built from first principles in NeuroDrive. |
+| Reinforcement learning            | Comfortable | Handwritten PPO from scratch in NeuroDrive: clipped surrogate objective, GAE, multi-epoch amortised updates, asymmetric actor-critic architecture, reward engineering under entertainment constraints. No framework dependency. |
+| Biologically plausible learning   | Familiar    | Research-level understanding of Hebbian plasticity, STDP, dopamine-modulated reinforcement, sparse plastic graphs — NeuroDrive's biological phase is designed but not yet implemented. |
 | Compiler / runtime concepts       | Familiar    | ONNX operator implementation in tinygrad; early-stage exploration in Xyntra (graph and kernel-fusion compiler). |
 | Network analysis and security     | Familiar    | University coursework using Wireshark, Nmap, tcpdump for DDoS pattern identification. |
 | Linear algebra and optimisation   | Comfortable | Underpins ML, AMM mathematics, and risk modelling work. |

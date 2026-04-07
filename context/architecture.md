@@ -127,6 +127,7 @@ Scripts are generic, stateless, and parameterised. They take inputs, produce out
    └─► Compares against profile preferences
    └─► Writes evaluation status to data store
    └─► TUI updates rows: evaluating → fit/no fit
+   └─► Tracks recurring requirements absent from profile → portfolio-gaps.md
 
 7. User review
    └─► User reviews evaluated results in TUI

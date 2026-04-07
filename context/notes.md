@@ -106,6 +106,92 @@ The `agent-skills` repo contains universal, reusable skills (upkeep-context, cod
 
 ---
 
+### Decision: Claude acts as career coach, not just job finder
+
+Cernio's scope extends beyond discovering and evaluating jobs. Claude should actively track patterns across job descriptions to identify what's strong and what's missing in the profile. If 50 jobs all mention Kubernetes and the profile has zero Kubernetes experience, that's actionable intelligence — not just a filter miss.
+
+**Why:** The better the profile fits the market, the more jobs pass evaluation. Improving the profile is a force multiplier on everything else Cernio does. Entry-level candidates especially benefit because small additions (a certification, an open source contribution, a new tool in an existing project) can open entire categories of roles.
+
+**Implication:** `profile/portfolio-gaps.md` tracks strengths, gaps, and closure opportunities. Claude updates it as a byproduct of job evaluation — every batch of evaluated jobs produces pattern observations. Gap closure recommendations should be concrete and prioritised: "add a Dockerfile to Nyquestro" beats "learn Docker."
+
+---
+
+### Decision: Everything is dynamic and evolves over time
+
+The profile, the resume, the preferences, the company universe — all of it changes as projects grow, new contributions land, new skills are acquired, and market patterns shift. Nothing is static. The system should treat every artefact as a living document that may need updating at any session.
+
+**Implication:** When Claude reads the profile at startup, it should note anything that looks stale or inconsistent with what it knows from scraping repos or evaluating jobs. Proactive suggestions to update are welcome.
+
+---
+
+### Note: Resume uses four main projects
+
+The current resume (LaTeX, stored as `profile/resume.md`) leads with the tinygrad open source contribution, then four projects: Image Browser, Aurix, NeuroDrive, and Nyquestro. Other projects in `projects.md` exist but are incomplete or lower priority. The resume is the public-facing artefact; `projects.md` is the full inventory.
+
+---
+
+### Decision: Profile entries describe what's built, not what's planned
+
+When scraping repos, profile entries should lead with what the code actually demonstrates today. Future goals belong in the summary and project staging description, but technical highlights must be grounded in implemented reality. This avoids interview landmines ("tell me about your STDP implementation" when it doesn't exist yet) and actually sells the work better — concrete engineering is more compelling than aspirational architecture.
+
+**Why:** The NeuroDrive scrape revealed the old entry described biological plasticity as if it was built, while the actual codebase — a handwritten PPO with entertainment-constrained reward engineering, comprehensive analytics, and performance work — was undersold. Leading with reality produced a stronger entry.
+
+**How to apply:** Always distinguish "built and working" from "designed and planned." Both belong in the entry, but technical highlights come from code, not READMEs.
+
+---
+
+### Decision: Discovery is broad, filtering is later
+
+Discovery finds companies that do work aligned with the profile. It does not eliminate companies for visa status, size, funding stage, or any other hard constraint — that filtering happens at the job evaluation stage. A 10-person startup with no public sponsor licence is still worth discovering if they do interesting systems work. Companies can make exceptions on sponsorship, and "can sponsor" is not always publicly disclosed.
+
+**Why:** Premature filtering at discovery time means missing opportunities. A company that looks too small to sponsor might acquire sponsorship capability, or might have a relationship with a larger parent that handles it. Discovery casts wide; the funnel narrows at job search and evaluation.
+
+---
+
+### Decision: Discovery must be creative, not formulaic
+
+Searching "best UK fintech 2026" catches obvious names everyone knows. The real value is finding the 60-person company doing brilliant ML infrastructure work with zero press coverage. This requires looking in unexpected places:
+
+- GitHub orgs building in Rust/ML/infra
+- Contributors to specific Rust crates
+- Niche conference sponsors (QCon London, RustConf, etc.)
+- HN "who's hiring" threads with insider context
+- Engineering blog posts about topics matching the profile
+- LinkedIn: where do people at interesting companies come *from*?
+- Non-obvious sector matches (healthcare AI, climate tech, biotech infrastructure)
+
+The creativity in *where to look* and *how to look sideways* is the skill's entire value. A dumb aggregator search is easy; finding what TrueUp would never surface is the goal.
+
+---
+
+### Decision: Discovery uses heavy parallelisation
+
+A single agent doing 50+ web searches sequentially is too slow and context-limited. Discovery should use a team of parallel agents, each exploring a different sector or source type:
+
+- An orchestrator reads the profile, divides the search space by sector/source, dispatches agents, and deduplicates results against the existing universe
+- Each agent explores its assigned territory independently (AI/ML, fintech, healthcare, developer tools, trading systems, non-obvious sources like GitHub orgs and conference sponsors)
+- Agents return structured results; the orchestrator merges and deduplicates
+
+This is the most complex skill in the system. The quality of companies discovered determines the quality of everything downstream.
+
+---
+
+### Decision: Discovery is separate from resolution and enrichment
+
+Discovery answers "which companies should we be watching?" — it outputs company name, website, what they do, why they're relevant, and where the agent found them. It does not resolve ATS portals or gather detailed enrichment data (funding rounds, headcount, Glassdoor ratings). Those are separate steps that happen after discovery.
+
+Enrichment data (funding, growth signals, hiring velocity) can be noted at discovery time if readily available, but gathering it is not the discovery skill's responsibility.
+
+---
+
+### Reference: TrueUp as a model for discovery
+
+TrueUp (trueup.io) is a tech job meta-aggregator that enriches company profiles with growth signals (funding, headcount trajectory, investor quality, Glassdoor/Blind sentiment, layoff data, hiring velocity). Key differentiator: company intelligence alongside job listings. Tracks 460K+ jobs across 51K+ company profiles. Publishes a weekly "Hot 200" ranking of fastest-growing tech companies.
+
+Cernio's discovery is a personalised version of TrueUp's company intelligence layer — profile-aware from the start, conversational, and focused on finding companies TrueUp would miss (small teams, non-obvious sectors, indirect signals). We don't replicate their automated data pipeline; we compensate with creative search strategies and human-in-the-loop judgment.
+
+---
+
 ### Note: Profile preferences are intentionally flexible
 
 Hard filters like `exclude_sectors` and `tech_must_have` are kept loose because Caner is an entry-level engineer and wants to explore options rather than prematurely narrow the search. This is a deliberate choice, not an oversight.
