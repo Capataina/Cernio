@@ -11,3 +11,4 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/skill-architecture.md` | Project-specific skills in this repo, conversational invocation, research-guided design, upstream agent-skills framework |
 | `notes/job-search-strategy.md` | Job titles are unreliable for filtering, Claude must read full descriptions, discovery must read DB before searching, companies may use multiple ATS |
 | `notes/grading-rubric.md` | Why grades (SS–F) instead of fit/no-fit, critical dimensions (career ceiling, breadth, company signal, sponsorship), rubric feeds career coaching |
+| `notes/populate-db-lessons.md` | Slug guessing unreliable, SmartRecruiters false positives, ATS migrations, unsupported providers, validation catches dead companies |
