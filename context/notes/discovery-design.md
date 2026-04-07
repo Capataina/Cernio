@@ -41,6 +41,8 @@ A single agent doing 50+ web searches sequentially is too slow and context-limit
 
 Typical sectors: AI/ML infrastructure, fintech/payments, trading systems/quant, healthcare AI/biotech, developer tools/compilers/databases, non-obvious sources (GitHub orgs, conference sponsors, engineering blogs).
 
+**Lesson from first run (2026-04-07):** Agents that don't use web search tools default to answering from training knowledge, producing lists of well-known companies everyone already knows. The systems/infra agent that *did* use web searches found non-obvious companies (Flux Computing, Vypercore, lowRISC via CompilerJobs and LLVM Discourse). Every discovery agent must be explicitly instructed to use WebSearch and WebFetch — this is the single biggest quality lever for discovery results.
+
 ---
 
 ## Separate from resolution and enrichment

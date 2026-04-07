@@ -47,10 +47,11 @@ The user may also request targeted discovery: "find me healthcare AI companies i
 - The list of already-known companies (to avoid duplicates)
 - The search strategies reference file for guidance on where to look
 - A clear territory: which sector or source type they own
+- **Explicit instruction to use WebSearch and WebFetch tools.** Agents must perform real web searches, not answer from training knowledge. Discovery from memory produces "top companies everyone already knows" — the well-known names that every job board already surfaces. The skill's value comes from finding companies through live web searches: VC portfolio pages, conference sponsor lists, GitHub contributor profiles, engineering blog posts, HN threads, curated lists. An agent that doesn't search the web is not doing discovery.
 
 **Each agent returns:**
 - A list of discovered companies in the output format defined below
-- Brief notes on which sources were most productive
+- Brief notes on which sources were most productive and which searches yielded unexpected finds
 
 ### 3. Deduplicate and merge
 
