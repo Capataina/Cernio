@@ -71,20 +71,33 @@ CREATE TABLE IF NOT EXISTS companies (
                     CHECK (status IN ('potential', 'resolved', 'bespoke')),
     location        TEXT,
     sector_tags     TEXT,
-    ats_provider    TEXT CHECK (ats_provider IN ('greenhouse', 'ashby', 'lever', 'workable', 'smartrecruiters', 'workday', 'eightfold', NULL)),
-    ats_slug        TEXT,
-    ats_extra       TEXT,
-    ats_verified_at TEXT,
     careers_url     TEXT,
 
     -- Judgments (tied to profile state)
     why_relevant    TEXT NOT NULL,
-    relevance_updated_at TEXT NOT NULL
+    relevance_updated_at TEXT NOT NULL,
+
+    -- Company grade (from populate-db evaluation)
+    grade           TEXT CHECK (grade IS NULL OR grade IN ('S', 'A', 'B', 'C')),
+    grade_reasoning TEXT,
+    graded_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS company_portals (
+    id              INTEGER PRIMARY KEY,
+    company_id      INTEGER NOT NULL REFERENCES companies(id),
+    ats_provider    TEXT NOT NULL CHECK (ats_provider IN ('greenhouse', 'ashby', 'lever', 'workable', 'smartrecruiters', 'workday', 'eightfold')),
+    ats_slug        TEXT NOT NULL,
+    ats_extra       TEXT,
+    verified_at     TEXT,
+    is_primary      INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company_id, ats_provider, ats_slug)
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
     id                  INTEGER PRIMARY KEY,
     company_id          INTEGER NOT NULL REFERENCES companies(id),
+    portal_id           INTEGER REFERENCES company_portals(id),
 
     title               TEXT NOT NULL,
     url                 TEXT NOT NULL UNIQUE,
@@ -98,6 +111,7 @@ CREATE TABLE IF NOT EXISTS jobs (
                         CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit')),
     fit_assessment      TEXT,
     fit_score           REAL,
+    grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
 
     discovered_at       TEXT NOT NULL
 );
@@ -111,9 +125,11 @@ CREATE TABLE IF NOT EXISTS user_decisions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
-CREATE INDEX IF NOT EXISTS idx_companies_ats_provider ON companies(ats_provider);
+CREATE INDEX IF NOT EXISTS idx_companies_grade ON companies(grade);
+CREATE INDEX IF NOT EXISTS idx_portals_company_id ON company_portals(company_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_evaluation_status ON jobs(evaluation_status);
+CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
 CREATE INDEX IF NOT EXISTS idx_user_decisions_job_id ON user_decisions(job_id);
 ";
 
@@ -126,7 +142,6 @@ mod tests {
     fn schema_creates_successfully() {
         let db = Database::open_in_memory().expect("failed to create in-memory db");
 
-        // Verify tables exist by querying sqlite_master.
         let tables: Vec<String> = db
             .conn()
             .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -137,6 +152,7 @@ mod tests {
             .unwrap();
 
         assert!(tables.contains(&"companies".to_string()));
+        assert!(tables.contains(&"company_portals".to_string()));
         assert!(tables.contains(&"jobs".to_string()));
         assert!(tables.contains(&"user_decisions".to_string()));
     }
@@ -239,7 +255,6 @@ mod tests {
         let db = Database::open_in_memory().unwrap();
         let now = "2026-04-07";
 
-        // Insert a job referencing a non-existent company.
         let result = db.conn().execute(
             "INSERT INTO jobs (company_id, title, url, discovered_at)
              VALUES (?1, ?2, ?3, ?4)",
@@ -247,5 +262,99 @@ mod tests {
         );
 
         assert!(result.is_err(), "should reject job with non-existent company_id");
+    }
+
+    #[test]
+    fn company_with_multiple_portals() {
+        let db = Database::open_in_memory().unwrap();
+        let now = "2026-04-07";
+
+        db.conn().execute(
+            "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, why_relevant, relevance_updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["Palantir", "https://palantir.com", "Data analytics", "test", now, "systems engineering", now],
+        ).unwrap();
+
+        let company_id: i64 = db.conn().query_row(
+            "SELECT id FROM companies WHERE website = ?1",
+            params!["https://palantir.com"],
+            |row| row.get(0),
+        ).unwrap();
+
+        // Add two portals for the same company.
+        db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![company_id, "lever", "palantir", 1],
+        ).unwrap();
+
+        db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![company_id, "greenhouse", "palantir-technologies", 0],
+        ).unwrap();
+
+        let portal_count: i64 = db.conn().query_row(
+            "SELECT COUNT(*) FROM company_portals WHERE company_id = ?1",
+            params![company_id],
+            |row| row.get(0),
+        ).unwrap();
+
+        assert_eq!(portal_count, 2);
+    }
+
+    #[test]
+    fn company_grade_constraint() {
+        let db = Database::open_in_memory().unwrap();
+        let now = "2026-04-07";
+
+        // Valid grade should work.
+        db.conn().execute(
+            "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, why_relevant, relevance_updated_at, grade)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["Good Co", "https://good.com", "Good stuff", "test", now, "relevant", now, "S"],
+        ).unwrap();
+
+        // Invalid grade should fail.
+        let result = db.conn().execute(
+            "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, why_relevant, relevance_updated_at, grade)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["Bad Co", "https://bad.com", "Bad stuff", "test", now, "relevant", now, "X"],
+        );
+
+        assert!(result.is_err(), "should reject invalid company grade");
+    }
+
+    #[test]
+    fn portal_uniqueness() {
+        let db = Database::open_in_memory().unwrap();
+        let now = "2026-04-07";
+
+        db.conn().execute(
+            "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, why_relevant, relevance_updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["Test Co", "https://test.com", "Testing", "test", now, "relevant", now],
+        ).unwrap();
+
+        let company_id: i64 = db.conn().query_row(
+            "SELECT id FROM companies WHERE website = ?1",
+            params!["https://test.com"],
+            |row| row.get(0),
+        ).unwrap();
+
+        db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![company_id, "lever", "testco", 1],
+        ).unwrap();
+
+        // Duplicate portal should fail.
+        let result = db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![company_id, "lever", "testco", 0],
+        );
+
+        assert!(result.is_err(), "should reject duplicate portal entry");
     }
 }

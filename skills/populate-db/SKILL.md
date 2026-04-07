@@ -36,7 +36,15 @@ Before spending time on ATS resolution, verify the company is actually a viable 
 
 **If the company fails validation:** Remove it from `companies/potential.md` with a brief note about why (dead website, acquired, too small, not relevant). Don't insert it into the database — the database is for companies worth tracking.
 
-**If the company passes:** Proceed to ATS resolution.
+**If the company passes:** Grade it and proceed to ATS resolution.
+
+### 2b. Grade the company
+
+Assign a grade (S/A/B/C) using the rubric in `references/company-grading-rubric.md`. The grade considers engineering reputation, technical alignment, growth trajectory, sponsorship likelihood, career ceiling, and company stability.
+
+The grade is stored in the database alongside the company and determines monitoring priority — S-tier companies get checked for new jobs first, C-tier companies get checked less often.
+
+Companies that fail validation entirely (dead, acquired, irrelevant) are removed from potential.md without a grade — they never enter the database.
 
 ### 3. Find the job board
 
