@@ -1,0 +1,110 @@
+# Job Search Preferences
+# Hard preferences are non-negotiable — jobs that fail these are eliminated.
+# Soft preferences influence ranking — they make a job more or less attractive.
+
+[hard]
+# Location constraints
+locations = ["London", "Cambridge", "Remote-UK"]
+exclude_locations = []
+
+# Visa and right to work
+# Currently on UK Graduate visa valid until August 2027 — no sponsorship
+# required during this window. After August 2027, Skilled Worker sponsorship
+# will be required to remain in the UK.
+requires_sponsorship = false
+
+# Seniority — primary focus is entry-level. A small secondary band of
+# "junior+" roles is acceptable, but anything requiring 3+ years of formal
+# experience is out of reach without paid work history.
+seniority_min = "internship"
+seniority_max = "junior"
+
+# Role type exclusions
+exclude_role_types = [
+    "consulting",
+    "customer-facing",
+    "management",
+    "sales-engineering",
+    "support-engineering",
+]
+
+# Sector exclusions
+exclude_sectors = [
+    "gambling",
+    "adtech",
+    "consumer-crypto",
+]
+
+# Tech stack must-haves (at least one must appear in the role)
+tech_must_have = []
+
+[soft]
+# Preferred tech stack (higher match = higher ranking)
+tech_preferred = [
+    "rust",
+    "c++",
+    "python",
+    "tokio",
+    "linux",
+    "sqlite",
+    "postgresql",
+    "onnx",
+    "pytorch",
+    "tensorflow",
+]
+
+# Preferred sectors
+sectors_preferred = [
+    "fintech-infrastructure",
+    "trading-systems",
+    "exchange-infrastructure",
+    "payments",
+    "ai-infrastructure",
+    "ml-tooling",
+    "developer-tools",
+    "systems-software",
+    "infrastructure",
+    "compilers",
+    "databases",
+]
+
+# Company size preference — favour large or well-established firms with
+# mature hiring practices and a demonstrated Skilled Worker sponsorship
+# track record, since sponsorship will be needed from August 2027.
+company_size_preferred = "large"
+
+# Remote preference
+remote_preference = "hybrid"
+
+# Compensation expectations (annual, GBP)
+comp_minimum = ""
+comp_preferred = ""
+
+# Other signals that make a role more attractive
+positive_signals = [
+    "skilled-worker-sponsor-licence",
+    "established-graduate-programme",
+    "performance-critical-systems",
+    "low-latency",
+    "compilers",
+    "runtime-engineering",
+    "ml-infrastructure",
+    "open-source",
+    "engineering-led-culture",
+    "modern-codebase",
+    "rust-in-production",
+    "technically-deep-team",
+]
+
+# Signals that make a role less attractive (but not dealbreakers)
+negative_signals = [
+    "no-sponsorship-track-record",
+    "purely-frontend",
+    "purely-application-layer",
+    "generic-full-stack",
+    "wordpress",
+    "agency-work",
+    "heavy-client-interfacing",
+    "legacy-only-codebase",
+    "crunch-culture",
+]
