@@ -1,5 +1,6 @@
 mod ats;
 mod db;
+mod tui;
 
 use db::Database;
 use std::path::Path;
@@ -9,6 +10,7 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     match args.get(1).map(|s| s.as_str()) {
+        Some("tui") => cmd_tui(),
         Some("lever-list") => cmd_lever_list(&args).await,
         Some("lever-detail") => cmd_lever_detail(&args).await,
         Some("db-status") => cmd_db_status(),
@@ -106,10 +108,26 @@ fn cmd_db_status() {
     println!("Cernio database: {count} companies in universe.");
 }
 
+/// Launch the interactive TUI dashboard.
+fn cmd_tui() {
+    let db_path = Path::new("state/cernio.db");
+    if !db_path.exists() {
+        eprintln!("Database not found at state/cernio.db");
+        eprintln!("Run a session to populate the database first.");
+        std::process::exit(1);
+    }
+
+    if let Err(e) = tui::run(db_path) {
+        eprintln!("TUI error: {e}");
+        std::process::exit(1);
+    }
+}
+
 fn print_usage() {
     println!("Usage: cernio <command>");
     println!();
     println!("Commands:");
+    println!("  tui                         Launch the interactive dashboard");
     println!("  lever-list <slug>           List all jobs at a Lever company (JSON)");
     println!("  lever-detail <slug> <id>    Fetch full job description from Lever");
     println!("  db-status                   Show database status");

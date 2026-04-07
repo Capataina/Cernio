@@ -13,3 +13,4 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/grading-rubric.md` | Why grades (SS–F) instead of fit/no-fit, critical dimensions (career ceiling, breadth, company signal, sponsorship), rubric feeds career coaching |
 | `notes/populate-db-lessons.md` | Slug guessing unreliable, SmartRecruiters false positives, ATS migrations, unsupported providers, validation catches dead companies |
 | `notes/scaling-architecture.md` | Moving volume work to scripts, CLI pipeline commands, false negatives are the enemy, Claude evaluates from DB in batches across sessions |
+| `notes/db-maintenance.md` | Clean DB operation (remove F/C grades, stale >14d jobs), ATS verification sweeps, re-evaluation triggers on profile changes |

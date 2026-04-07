@@ -155,7 +155,7 @@ Each capability is independently completable. A working universe and resolver al
 - [x] Milestone 3: Universe Construction (skill designed, first discovery run: 73 companies)
 - [x] Milestone 4: Portal Resolution (skill designed, 7 companies populated with ATS slugs)
 - [ ] Milestone 5: Parameterised Search Scripts (Lever fetcher built, needs pipeline CLI and other providers)
-- [ ] Milestone 6: Data Store and Real-Time TUI (SQLite schema implemented with 10 tests, TUI not started)
+- [ ] Milestone 6: Data Store and Real-Time TUI (SQLite schema with 10 tests, TUI v1 implemented — dashboard, companies, jobs views)
 - [ ] Milestone 7: Job Evaluation Pipeline (grading rubric designed, tested on Palantir — 25 jobs graded)
 - [ ] Milestone 8: Curation, Export, and Bespoke Tier
 

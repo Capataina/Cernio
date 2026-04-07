@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-07. Database schema implemented, three skills designed, profile populated. Pre-production — no job search or TUI yet.
+> Last updated: 2026-04-07 (session 2). TUI v1 implemented with 3 views, 9 Rust source files. Database schema with 4 tables, 10 tests. Four skills designed. Lever fetcher working.
 
 ---
 
@@ -59,7 +59,7 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 | Async runtime | Tokio | Planned (for search scripts) |
 | HTTP | Reqwest | Planned (for ATS API calls) |
 | Serialisation | Serde | Planned (JSON, TOML, JSONL) |
-| TUI | Ratatui | Planned |
+| TUI | Ratatui 0.29 + Crossterm backend | v1 implemented — 3 views, ANSI theme |
 | AI layer | Claude Code skills (conversational invocation) | 3 skills designed |
 
 ---
@@ -69,10 +69,21 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 ```text
 cernio/
 ├── src/
-│   ├── main.rs                 # Entry point, opens DB
-│   └── db/
-│       ├── mod.rs              # Public DB interface
-│       └── schema.rs           # Migration, schema, tests
+│   ├── main.rs                 # Entry point, CLI dispatch
+│   ├── db/
+│   │   ├── mod.rs              # Public DB interface
+│   │   └── schema.rs           # Migration, schema, tests
+│   └── tui/
+│       ├── mod.rs              # Terminal setup, event loop
+│       ├── app.rs              # App state, data models, navigation
+│       ├── handler.rs          # Key event dispatch
+│       ├── theme.rs            # Semantic ANSI colour palette
+│       ├── queries.rs          # DB read queries
+│       └── views/
+│           ├── mod.rs          # Draw dispatcher, tabs, status bar, help
+│           ├── dashboard.rs    # Stats overview
+│           ├── companies.rs    # Company table + detail panel
+│           └── jobs.rs         # Job table + detail panel
 ├── profile/                    # Structured personal profile (read every startup)
 │   ├── personal.md             # Name, contact, links
 │   ├── education.md            # Degrees, modules
@@ -298,11 +309,11 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | Jobs | 25 Palantir London jobs evaluated and graded in DB |
 | Greenhouse/Ashby/other fetchers | Not started — need companies on those platforms first |
 | Pipeline CLI (search --all, pending) | Not started — critical for scaling beyond a few companies |
-| TUI | Not started |
+| TUI (`src/tui/`) | v1 implemented — dashboard, companies, jobs views with detail panels, user decisions, help overlay, auto-refresh. See `context/systems/tui.md` |
 | Export | Not started |
 
 **Next priorities:**
 1. Build the pipeline CLI (`cernio search --company`, `cernio pending`) to move volume work off Claude
 2. Populate more companies from potential.md to encounter Greenhouse/Ashby and build those fetchers
 3. Build Greenhouse fetcher (Cloudflare, XTX, Helsing are all on Greenhouse)
-4. Start the TUI for real-time visibility
+4. TUI v2 — activity/progress view, filtering, sorting (see `context/systems/tui.md` deferred section)
