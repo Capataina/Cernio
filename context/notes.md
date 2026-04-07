@@ -9,3 +9,4 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/data-layer.md` | SQLite as source of truth, field categories (facts/checkpoints/judgments), what lives where, safety |
 | `notes/profile-system.md` | Auto-update from repos, startup reading, career coaching, portfolio gaps, describe built not planned, preferences flexibility |
 | `notes/skill-architecture.md` | Project-specific skills in this repo, conversational invocation, research-guided design, upstream agent-skills framework |
+| `notes/job-search-strategy.md` | Job titles are unreliable for filtering, Claude must read full descriptions, discovery must read DB before searching |
