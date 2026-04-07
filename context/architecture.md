@@ -71,7 +71,8 @@ Claude Code skills handle slow, fuzzy, infrequent work that requires reasoning:
 
 | Skill | Purpose |
 |-------|---------|
-| `discover-companies` | Fetch public list sources, parse tables, deduplicate against universe |
+| `discover-companies` | Profile-aware company discovery with parallel sector agents, creative search strategies, deduplication against universe |
+| `profile-scrape` | Scrape GitHub repos and update profile entries with accurate, evidence-based information |
 | `resolve-portals` | Web search fallback when deterministic slug resolution fails |
 | `enrich-company` | Pull funding, stage, headcount when missing |
 
@@ -91,6 +92,47 @@ Scripts are generic, stateless, and parameterised. They take inputs, produce out
 | `search` | ATS slugs file, search terms, ATS provider | Matching jobs as structured results |
 | `resolve` | Company names, ATS URL patterns | Slug matches with verification status |
 | `export` | Result set, format options | Markdown file with tables and links |
+
+---
+
+## Data Layer
+
+SQLite (`state/cernio.db`) is the single source of truth for all structured data. Markdown files are human-readable views and exports, not the primary store.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  state/cernio.db                         │
+│                                                          │
+│  companies                                               │
+│    id, name, website, location, sector_tags,             │
+│    what_they_do, why_relevant, source,                   │
+│    discovered_date, ats_provider, ats_slug,              │
+│    ats_verified_date, status                             │
+│    (potential → resolved / bespoke)                      │
+│                                                          │
+│  jobs                                                    │
+│    id, company_id, title, url, location,                 │
+│    remote_policy, posted_date, raw_description,          │
+│    parsed_tags, evaluation_status, fit_assessment,       │
+│    fit_score, discovered_date                            │
+│                                                          │
+│  user_decisions                                          │
+│    id, job_id, decision (watching/applied/rejected),     │
+│    date, notes                                           │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+     Rust scripts   Claude      Ratatui TUI
+     write results  writes      reads and
+     and ATS data   evaluations displays live
+```
+
+**What lives in SQLite:** companies (full lifecycle from potential to resolved/bespoke), jobs, evaluations, user decisions.
+
+**What stays in markdown:** `profile/` (human-edited), `companies/potential.md` (initial discovery landing zone before migration to DB), `exports/` (generated on demand).
+
+**Schema is tracked** in a migration file so the database can always be recreated from scratch. The `.db` file itself is gitignored.
 
 ---
 

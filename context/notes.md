@@ -192,6 +192,36 @@ Cernio's discovery is a personalised version of TrueUp's company intelligence la
 
 ---
 
+### Decision: SQLite as the single source of truth for structured data
+
+The company universe, job search results, evaluation status, and user decisions all live in a single SQLite database (`state/cernio.db`). Markdown files become human-readable views and exports, not the source of truth for structured data.
+
+**Why SQLite over other options:**
+- Single file, zero infrastructure — no Docker, no server process, no connection string. As local-first as it gets.
+- 740 companies is trivial for SQLite (handles millions of rows without issue)
+- Full SQL querying, indexing, and fast filtered reads — the TUI can query "all fintech companies sorted by discovery date" instantly
+- Rust has mature support via `rusqlite` (sync) and `sqlx` (async)
+- Backup is trivial: it's a file. Copy it before risky operations.
+- The TUI reads it directly for real-time display with no file parsing or race conditions
+
+**What lives in SQLite:** resolved company universe, ATS slugs and verification status, job search results, evaluation status and fit assessments, user decisions (watching/applied/rejected)
+
+**What stays in markdown:** `profile/` (human-edited, read by Claude), `companies/potential.md` (initial landing zone from discovery before migration to SQLite), `exports/` (generated reports on demand)
+
+**Schema grows organically:** companies are added in small batches as discovery runs across sessions, not bulk-loaded. The database evolves alongside the project.
+
+**Safety:** Schema tracked in a migration file so the database can always be recreated. The `.db` file lives in `state/` (gitignored). Markdown exports serve as human-readable snapshots.
+
+---
+
+### Decision: TUI is a live dashboard for the entire universe, not just jobs
+
+The TUI should have views for the full company lifecycle — potential companies awaiting research, resolved companies with ATS slugs, bespoke companies with careers links, and the full universe sortable and filterable. When Claude researches a company, the TUI row updates in real time (potential → researching → strong fit / weak fit → approved). Same pattern for job search and evaluation.
+
+**Why:** The user wants to watch the entire process unfold — from discovery through research through job evaluation. The TUI is the window into everything Cernio is doing.
+
+---
+
 ### Note: Profile preferences are intentionally flexible
 
 Hard filters like `exclude_sectors` and `tech_must_have` are kept loose because Caner is an entry-level engineer and wants to explore options rather than prematurely narrow the search. This is a deliberate choice, not an oversight.
