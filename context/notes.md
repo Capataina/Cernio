@@ -15,3 +15,4 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/scaling-architecture.md` | Scripts for volume, AI for judgment, every step has one purpose. Batch grading prioritised by signal. False negatives are the enemy. Full plan in `plans/pipeline-separation.md` |
 | `notes/tui-design.md` | Design principles (dynamic/density/mouse-first/grade-primary), bar charts rationale, responsive layout (implemented), session summary approach, scroll behaviour |
 | `notes/db-maintenance.md` | Clean DB operation (remove F/C grades, stale >14d jobs), ATS verification sweeps, re-evaluation triggers on profile changes |
+| `notes/interview-prep-design.md` | Future interview-prep skill: personalised curriculum from SS/S/A jobs + portfolio gaps, LeetCode-style TDD problems, systems practice with integration tests, company-specific prep |
