@@ -1,5 +1,5 @@
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, Wrap};
 use ratatui::Frame;
@@ -8,11 +8,33 @@ use rusqlite::Connection;
 use crate::tui::app::{App, Focus};
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
-    let chunks =
-        Layout::horizontal([Constraint::Percentage(40), Constraint::Fill(1)]).split(area);
+    let is_compact = area.width < 80;
+    let is_narrow = area.width < 100;
 
-    draw_list(frame, app, chunks[0]);
-    draw_detail(frame, app, chunks[1]);
+    if is_compact {
+        // Compact: list only, no detail panel.
+        app.list_area = area;
+        app.detail_area = Rect::default();
+        draw_list(frame, app, area);
+    } else if is_narrow {
+        // Narrow: stacked vertically.
+        let chunks = Layout::vertical([
+            Constraint::Percentage(50),
+            Constraint::Fill(1),
+        ]).split(area);
+        app.list_area = chunks[0];
+        app.detail_area = chunks[1];
+        draw_list(frame, app, app.list_area);
+        draw_detail(frame, app, app.detail_area);
+    } else {
+        // Normal: side-by-side.
+        let chunks =
+            Layout::horizontal([Constraint::Percentage(40), Constraint::Fill(1)]).split(area);
+        app.list_area = chunks[0];
+        app.detail_area = chunks[1];
+        draw_list(frame, app, app.list_area);
+        draw_detail(frame, app, app.detail_area);
+    }
 }
 
 fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -54,7 +76,9 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let rows: Vec<Row> = app
         .companies
         .iter()
-        .map(|c| {
+        .enumerate()
+        .map(|(idx, c)| {
+            let is_multi = app.multi_select_companies.contains(&idx);
             let grade = c.grade.as_deref().unwrap_or("—");
             let grade_style = t.grade_style(c.grade.as_deref());
             let status_style = t.status_style(&c.status);
@@ -78,13 +102,17 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                     "—"
                 });
 
-            Row::new(vec![
-                Cell::from(format!(" {grade:<2}")).style(grade_style),
+            let mut row = Row::new(vec![
+                Cell::from(format!("{}{grade:<2}", if is_multi { "▪" } else { " " })).style(grade_style),
                 Cell::from(c.name.as_str()),
                 Cell::from(c.status.as_str()).style(status_style),
                 Cell::from(jobs_display),
                 Cell::from(ats),
-            ])
+            ]);
+            if is_multi {
+                row = row.style(Style::default().fg(Color::Cyan));
+            }
+            row
         })
         .collect();
 

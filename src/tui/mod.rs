@@ -60,7 +60,15 @@ fn run_loop(
 
         app.tick();
 
-        if event::poll(tick_rate)? {
+        // Drain all pending events to prevent input buffering/lag.
+        // Process up to a reasonable cap to avoid infinite loops from
+        // rapid-fire trackpad momentum events.
+        let mut events_processed = 0u32;
+        while event::poll(if events_processed == 0 {
+            tick_rate
+        } else {
+            Duration::ZERO
+        })? {
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     handler::handle_key(app, key);
@@ -69,6 +77,10 @@ fn run_loop(
                     handler::handle_mouse(app, mouse);
                 }
                 _ => {}
+            }
+            events_processed += 1;
+            if events_processed >= 20 {
+                break; // Cap to prevent runaway processing.
             }
         }
 

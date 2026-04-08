@@ -1,6 +1,7 @@
 mod companies;
 mod dashboard;
 mod jobs;
+mod pipeline;
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
@@ -12,6 +13,11 @@ use super::app::{App, Focus, SortMode, View};
 
 /// Main draw entry point — renders tabs, content area, status bar, and overlays.
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    // Store terminal dimensions for responsive layout.
+    let frame_area = frame.area();
+    app.terminal_width = frame_area.width;
+    app.terminal_height = frame_area.height;
+
     let bottom_height = if app.search_mode { 2 } else { 1 };
 
     let areas = Layout::vertical([
@@ -19,7 +25,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Fill(1),         // content
         Constraint::Length(bottom_height), // status bar (+ search bar)
     ])
-    .split(frame.area());
+    .split(frame_area);
 
     draw_tabs(frame, app, areas[0]);
 
@@ -27,13 +33,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         View::Dashboard => dashboard::draw(frame, app, areas[1]),
         View::Companies => companies::draw(frame, app, areas[1]),
         View::Jobs => jobs::draw(frame, app, areas[1]),
+        View::Pipeline => pipeline::draw(frame, app, areas[1]),
     }
 
     if app.search_mode {
-        // Split bottom area: search bar on top, status bar below.
         let bottom = Layout::vertical([
-            Constraint::Length(1), // search bar
-            Constraint::Length(1), // status bar
+            Constraint::Length(1),
+            Constraint::Length(1),
         ])
         .split(areas[2]);
         draw_search_bar(frame, app, bottom[0]);
@@ -42,12 +48,14 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         draw_status_bar(frame, app, areas[2]);
     }
 
-    // Toasts — ephemeral notifications in the bottom-right.
     draw_toasts(frame, app);
 
-    // Grade picker popup.
     if app.show_grade_picker {
         draw_grade_picker(frame, app);
+    }
+
+    if app.show_bulk_picker {
+        draw_bulk_picker(frame, app);
     }
 
     if app.show_help {
@@ -71,10 +79,15 @@ fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
         format!(" Jobs ({}) ", app.jobs.len())
     };
 
+    let pipeline_count = app.pipeline_watching.len()
+        + app.pipeline_applied.len()
+        + app.pipeline_interview.len();
+
     let titles = vec![
         " Dashboard ".to_string(),
         format!(" Companies ({}) ", app.companies.len()),
         jobs_label,
+        format!(" Pipeline ({}) ", pipeline_count),
     ];
 
     let tabs = Tabs::new(titles)
@@ -107,7 +120,6 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
     let bar = Paragraph::new(line);
     frame.render_widget(bar, area);
 
-    // Set cursor position for blinking cursor effect.
     #[allow(clippy::cast_possible_truncation)]
     let cx = area.x + 3 + cursor_pos as u16;
     if cx < area.x + area.width {
@@ -120,18 +132,15 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut keys: Vec<(&str, &str)> = match (app.view, app.focus) {
         (View::Dashboard, _) => vec![
-            ("1-3", "view"),
             ("j/k", "scroll"),
-            ("D", "clean db"),
+            ("D", "clean"),
             ("?", "help"),
             ("q", "quit"),
         ],
         (View::Companies, Focus::List) => vec![
             ("j/k", "navigate"),
-            ("Enter", "view jobs"),
+            ("Enter", "jobs"),
             ("Tab", "detail"),
-            ("o", "open"),
-            ("y", "copy"),
             ("/", "search"),
             ("?", "help"),
             ("q", "quit"),
@@ -140,23 +149,17 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ("j/k", "scroll"),
             ("Tab", "list"),
             ("o", "open"),
-            ("y", "copy"),
             ("?", "help"),
             ("q", "quit"),
         ],
         (View::Jobs, Focus::List) => {
             let mut k = vec![
                 ("j/k", "navigate"),
-                ("w", "watch"),
-                ("a", "applied"),
-                ("x", "reject"),
+                ("w/a/x/i", "decide"),
                 ("o", "open"),
-                ("y", "copy"),
-                ("s", "sort"),
                 ("/", "search"),
-                ("g", "grade"),
-                ("f", if app.focused_mode { "show all" } else { "focus" }),
-                ("Tab", "detail"),
+                ("f", if app.focused_mode { "all" } else { "focus" }),
+                ("?", "help"),
             ];
             if app.job_filter_company.is_some() {
                 k.push(("Esc", "back"));
@@ -166,17 +169,20 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         }
         (View::Jobs, Focus::Detail) => vec![
             ("j/k", "scroll"),
-            ("w", "watch"),
-            ("a", "applied"),
-            ("x", "reject"),
+            ("w/a/x/i", "decide"),
             ("o", "open"),
-            ("y", "copy"),
             ("Esc", "back"),
+            ("q", "quit"),
+        ],
+        (View::Pipeline, _) => vec![
+            ("j/k", "up/down"),
+            ("h/l", "columns"),
+            ("w/a/i", "move"),
+            ("?", "help"),
             ("q", "quit"),
         ],
     };
 
-    // Build left side (key bindings).
     let mut spans: Vec<Span> = keys
         .drain(..)
         .flat_map(|(key, desc)| {
@@ -187,10 +193,8 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    // Build right side indicators.
     let mut right_parts: Vec<Span> = Vec::new();
 
-    // Sort mode indicator (Jobs view only).
     if app.view == View::Jobs {
         let sort_label = match app.sort_mode {
             SortMode::ByGrade => "grade",
@@ -204,7 +208,6 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    // Search filter indicator.
     if !app.search_query.is_empty() && !app.search_mode {
         let count = app.jobs.len();
         right_parts.push(Span::styled(
@@ -214,7 +217,6 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     if !right_parts.is_empty() {
-        // Push right-aligned indicators by calculating padding.
         let left_len: usize = spans.iter().map(|s| s.content.len()).sum();
         let right_len: usize = right_parts.iter().map(|s| s.content.len()).sum();
         let padding = (area.width as usize).saturating_sub(left_len + right_len);
@@ -265,6 +267,45 @@ fn draw_grade_picker(frame: &mut Frame, app: &App) {
     frame.render_widget(popup, area);
 }
 
+// ── Bulk action picker popup ─────────────────────────────────────
+
+fn draw_bulk_picker(frame: &mut Frame, app: &App) {
+    let area = centered_rect_fixed(36, 5, frame.area());
+
+    let t = &app.theme;
+    let grades = ["SS", "S", "A", "B", "C", "F"];
+
+    let spans: Vec<Span> = grades
+        .iter()
+        .enumerate()
+        .flat_map(|(i, g)| {
+            let style = t.grade_style(Some(g));
+            vec![
+                Span::styled(format!(" {}:{} ", i + 1, g), style),
+                Span::raw(" "),
+            ]
+        })
+        .collect();
+
+    let action = &app.bulk_action;
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(format!("  {action} all jobs of grade:"), t.header)),
+        Line::from(spans),
+        Line::from(""),
+    ];
+
+    let block = Block::bordered()
+        .title(format!(" Bulk {} ", action))
+        .title_style(t.title)
+        .border_style(Style::default().fg(t.border_focused));
+
+    let popup = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(popup, area);
+}
+
 // ── Help overlay ─────────────────────────────────────────────────
 
 fn draw_help_overlay(frame: &mut Frame, app: &App) {
@@ -277,24 +318,33 @@ fn draw_help_overlay(frame: &mut Frame, app: &App) {
         Line::from(Span::styled("  Navigation", t.help_section)),
         Line::from(""),
         help_line(t, "  j / k / ↑ / ↓", "Move selection up/down"),
-        help_line(t, "  g / G", "Jump to top / bottom"),
+        help_line(t, "  g / G", "Jump to top / bottom (Companies)"),
         help_line(t, "  Enter / l / →", "Drill into company jobs"),
         help_line(t, "  Esc / h / ←", "Go back"),
         help_line(t, "  Tab", "Toggle list / detail focus"),
-        help_line(t, "  1  2  3", "Dashboard / Companies / Jobs"),
+        help_line(t, "  1  2  3  4", "Dashboard / Companies / Jobs / Pipeline"),
         Line::from(""),
         Line::from(Span::styled("  Actions", t.help_section)),
         Line::from(""),
         help_line(t, "  w", "Mark job as watching"),
         help_line(t, "  a", "Mark job as applied"),
         help_line(t, "  x", "Mark job as rejected"),
+        help_line(t, "  i", "Mark job as interview"),
         help_line(t, "  o", "Open URL in browser"),
         help_line(t, "  y", "Copy URL to clipboard"),
+        help_line(t, "  e", "Export current view to markdown"),
         help_line(t, "  D", "Clean database (from dashboard)"),
         help_line(t, "  f", "Toggle focused mode (hide F/C)"),
+        help_line(t, "  A", "Toggle show archived items"),
         help_line(t, "  s", "Cycle sort mode"),
         help_line(t, "  /", "Search / filter"),
         help_line(t, "  g", "Override grade (in Jobs view)"),
+        help_line(t, "  [ / ]", "Jump to prev/next grade section"),
+        Line::from(""),
+        Line::from(Span::styled("  Pipeline", t.help_section)),
+        Line::from(""),
+        help_line(t, "  h / l", "Move between columns"),
+        help_line(t, "  w / a / i", "Move card to watching/applied/interview"),
         Line::from(""),
         Line::from(Span::styled("  General", t.help_section)),
         Line::from(""),
@@ -330,7 +380,6 @@ fn help_line<'a>(
     ])
 }
 
-/// Return a centered sub-rect of `area` using percentages.
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let v = Layout::vertical([
         Constraint::Percentage((100 - percent_y) / 2),
@@ -347,7 +396,6 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     .split(v[1])[1]
 }
 
-/// Return a centered sub-rect of `area` using fixed dimensions.
 fn centered_rect_fixed(width: u16, height: u16, area: Rect) -> Rect {
     let x = area.x + area.width.saturating_sub(width) / 2;
     let y = area.y + area.height.saturating_sub(height) / 2;
@@ -369,14 +417,13 @@ fn draw_toasts(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let t = &app.theme;
 
-    // Stack toasts from bottom-right, going up.
     for (i, toast) in app.toasts.iter().enumerate() {
         let width = (toast.message.len() as u16 + 4).min(40);
         let x = area.width.saturating_sub(width + 2);
         let y = area.height.saturating_sub(3 + (i as u16 * 3));
 
         if y < 4 {
-            break; // Don't stack into the tab bar.
+            break;
         }
 
         let toast_area = Rect::new(x, y, width, 3);

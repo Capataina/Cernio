@@ -1,9 +1,10 @@
 use rusqlite::Connection;
 
-use super::app::{CompanyRow, DashboardStats, JobRow, SortMode, TopMatch};
+use super::app::{CompanyRow, DashboardStats, JobRow, PipelineCard, SortMode, TopMatch};
 
-pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
-    let sql = "
+pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow> {
+    let archive_filter = if show_archived { "" } else { "WHERE c.status != 'archived'" };
+    let sql = format!("
         SELECT c.id, c.name, c.website, c.what_they_do, c.status, c.location,
                c.sector_tags, c.grade, c.grade_reasoning, c.why_relevant, c.careers_url,
                (SELECT p.ats_provider FROM company_portals p
@@ -14,15 +15,15 @@ pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id
                 AND j.grade IN ('SS', 'S', 'A'))
         FROM companies c
-        WHERE c.status != 'archived'
+        {archive_filter}
         ORDER BY
             CASE c.grade
                 WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3
                 WHEN 'C' THEN 4 ELSE 5
             END,
-            c.name";
+            c.name");
 
-    let mut stmt = match conn.prepare(sql) {
+    let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
@@ -54,12 +55,19 @@ pub fn fetch_jobs(
     conn: &Connection,
     company_filter: Option<i64>,
     focused: bool,
+    show_archived: bool,
     sort_mode: SortMode,
 ) -> Vec<JobRow> {
     let focus_filter = if focused {
         " AND (j.grade IS NULL OR j.grade NOT IN ('F', 'C'))"
     } else {
         ""
+    };
+
+    let archive_filter = if show_archived {
+        ""
+    } else {
+        " AND j.evaluation_status != 'archived' AND c.status != 'archived'"
     };
 
     let base = format!("
@@ -70,8 +78,7 @@ pub fn fetch_jobs(
                 WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1)
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE j.evaluation_status != 'archived'
-        AND c.status != 'archived'{focus_filter}");
+        WHERE 1=1{archive_filter}{focus_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "
@@ -292,6 +299,47 @@ fn query_groups(conn: &Connection, sql: &str) -> Vec<(String, i64)> {
                 .map(|rows| rows.filter_map(|r| r.ok()).collect())
         })
         .unwrap_or_default()
+}
+
+/// Fetch pipeline cards grouped by decision (watching, applied, interview).
+pub fn fetch_pipeline_cards(
+    conn: &Connection,
+) -> (Vec<PipelineCard>, Vec<PipelineCard>, Vec<PipelineCard>) {
+    let fetch = |decision: &str| -> Vec<PipelineCard> {
+        let sql = "
+            SELECT j.id, j.title, c.name, j.grade
+            FROM jobs j
+            JOIN companies c ON c.id = j.company_id
+            JOIN (
+                SELECT job_id, decision
+                FROM user_decisions
+                WHERE id IN (
+                    SELECT MAX(id) FROM user_decisions GROUP BY job_id
+                )
+            ) ud ON ud.job_id = j.id
+            WHERE ud.decision = ?1
+            AND j.evaluation_status != 'archived'
+            ORDER BY
+                CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+                    WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6 ELSE 7 END,
+                j.title";
+
+        conn.prepare(sql)
+            .and_then(|mut stmt| {
+                stmt.query_map([decision], |row| {
+                    Ok(PipelineCard {
+                        job_id: row.get(0)?,
+                        title: row.get(1)?,
+                        company: row.get(2)?,
+                        grade: row.get(3)?,
+                    })
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            })
+            .unwrap_or_default()
+    };
+
+    (fetch("watching"), fetch("applied"), fetch("interview"))
 }
 
 fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {

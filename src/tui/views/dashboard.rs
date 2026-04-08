@@ -6,57 +6,68 @@ use ratatui::Frame;
 use rusqlite::Connection;
 
 use crate::tui::app::App;
+use crate::tui::widgets::layout::{distribute, BlockSpec};
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+    // Session summary block — show if file exists.
+    let has_summary = std::fs::metadata("state/tui-summary.md").is_ok();
+    let summary_height = if has_summary { 5 } else { 3 };
+
     let rows = Layout::vertical([
-        Constraint::Length(3), // summary line
-        Constraint::Fill(1),  // stats grid
+        Constraint::Length(summary_height), // summary block
+        Constraint::Fill(1),               // stats grid
     ])
     .split(area);
 
-    draw_summary_line(frame, app, rows[0]);
+    draw_summary_block(frame, app, rows[0], has_summary);
 
-    // Two-column layout: left (grade dist + pipeline) and right (action items + top roles).
+    // Two-column layout: left (grade dist + pipeline + session stats) and right (action items + top roles).
     let cols = Layout::horizontal([
         Constraint::Ratio(2, 5),
         Constraint::Fill(1),
     ])
     .split(rows[1]);
 
-    // Left column: grade distribution + pipeline health, sized to content.
-    let left = Layout::vertical([
-        Constraint::Length(left_grade_height(app)),
-        Constraint::Length(left_pipeline_height(app)),
-        Constraint::Fill(1), // absorb any remainder
-    ])
-    .split(cols[0]);
+    // Left column: dynamic layout based on content.
+    let grade_content = left_grade_content_lines(app);
+    let pipeline_content = left_pipeline_content_lines(app);
+    let left_specs = vec![
+        BlockSpec { content_lines: grade_content, min_height: 5, grow_priority: 0 },
+        BlockSpec { content_lines: pipeline_content, min_height: 4, grow_priority: 0 },
+        BlockSpec { content_lines: 6, min_height: 5, grow_priority: 1 }, // session stats grows
+    ];
+    let left_constraints = distribute(&left_specs, cols[0].height);
+    let left = Layout::vertical(left_constraints).split(cols[0]);
 
     draw_grade_distribution(frame, app, left[0]);
     draw_pipeline_health(frame, app, left[1]);
+    draw_session_stats(frame, app, left[2]);
 
-    // Right column: action items (fixed) + top roles (fills remaining).
-    let right = Layout::vertical([
-        Constraint::Length(action_items_height(app)),
-        Constraint::Fill(1),
-    ])
-    .split(cols[1]);
+    // Right column: action items (dynamic) + top roles (grows to fill).
+    let action_content = action_items_content_lines(app);
+    let right_specs = vec![
+        BlockSpec { content_lines: action_content, min_height: 6, grow_priority: 0 },
+        BlockSpec { content_lines: 10, min_height: 5, grow_priority: 1 }, // top roles grows
+    ];
+    let right_constraints = distribute(&right_specs, cols[1].height);
+    let right = Layout::vertical(right_constraints).split(cols[1]);
 
     draw_action_items(frame, app, right[0]);
     draw_top_roles(frame, app, right[1]);
 }
 
-/// Calculate height needed for grade distribution block.
-fn left_grade_height(app: &App) -> u16 {
+/// Content lines for grade distribution block (excluding border).
+fn left_grade_content_lines(app: &App) -> u16 {
     let _s = &app.stats;
     let company_grades = ["S", "A", "B", "C"];
     let job_grades = ["SS", "S", "A", "B", "C", "F"];
     let max_rows = company_grades.len().max(job_grades.len());
-    // 2 for border + 1 header line + rows
-    (max_rows as u16 + 3).min(12)
+    // 1 header line + rows
+    (max_rows as u16 + 1).min(10)
 }
 
-/// Calculate height needed for pipeline health block.
-fn left_pipeline_height(app: &App) -> u16 {
+/// Content lines for pipeline health block (excluding border).
+fn left_pipeline_content_lines(app: &App) -> u16 {
     let s = &app.stats;
     let mut lines = s.ats_coverage.len();
     if s.bespoke_count > 0 {
@@ -66,20 +77,18 @@ fn left_pipeline_height(app: &App) -> u16 {
         lines += 1;
     }
     if lines == 0 {
-        lines = 1; // "No ATS portals resolved yet"
+        lines = 1;
     }
-    // 2 for border
-    (lines as u16 + 2).min(10)
+    (lines as u16).min(8)
 }
 
-/// Calculate height needed for action items block.
-fn action_items_height(app: &App) -> u16 {
+/// Content lines for action items block (excluding border).
+fn action_items_content_lines(app: &App) -> u16 {
     let s = &app.stats;
     let mut lines: u16 = 3; // grade action lines (SS, S, A)
     lines += 1; // blank
     lines += 1; // decision counts
 
-    // Next steps.
     let mut next_count: u16 = 0;
     if s.bespoke_searchable > 0 {
         next_count += 1;
@@ -97,70 +106,75 @@ fn action_items_height(app: &App) -> u16 {
         next_count += 1;
     }
     if next_count > 0 {
-        lines += 2 + next_count; // blank + header + items
+        lines += 2 + next_count;
     }
 
-    // Bespoke company names.
     let bespoke_names = fetch_bespoke_company_names(app);
     if !bespoke_names.is_empty() {
-        lines += 1 + bespoke_names.len() as u16; // header + names
+        lines += 1 + bespoke_names.len() as u16;
     }
 
-    // 2 for border
-    (lines + 2).min(20)
+    lines.min(18)
 }
 
-fn draw_summary_line(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_summary_block(frame: &mut Frame, app: &App, area: Rect, has_summary: bool) {
     let t = &app.theme;
+    let s = &app.stats;
 
-    // Try reading session summary from file.
-    let summary_content = std::fs::read_to_string("state/tui-summary.md").ok();
+    let strong: i64 = s
+        .jobs_by_grade
+        .iter()
+        .filter(|(g, _)| g == "SS" || g == "S")
+        .map(|(_, c)| c)
+        .sum();
 
-    let line = if let Some(ref content) = summary_content {
-        // Use first non-empty line of the summary.
-        let first_line = content
-            .lines()
-            .find(|l| !l.trim().is_empty())
-            .unwrap_or("No summary available");
-        Line::from(vec![
-            Span::raw("  "),
-            Span::styled(first_line, t.stat_value),
-        ])
-    } else {
-        let s = &app.stats;
-        let strong: i64 = s
-            .jobs_by_grade
-            .iter()
-            .filter(|(g, _)| g == "SS" || g == "S")
-            .map(|(_, c)| c)
-            .sum();
+    let pending: i64 = s
+        .jobs_by_eval
+        .iter()
+        .filter(|(e, _)| e == "pending")
+        .map(|(_, c)| c)
+        .sum();
 
-        let pending: i64 = s
-            .jobs_by_eval
-            .iter()
-            .filter(|(e, _)| e == "pending")
-            .map(|(_, c)| c)
-            .sum();
+    let mut lines = vec![Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{}", s.total_companies), t.stat_value),
+        Span::raw(" companies · "),
+        Span::styled(format!("{}", s.total_jobs), t.stat_value),
+        Span::raw(" jobs · "),
+        Span::styled(format!("{strong}"), t.grade_s),
+        Span::raw(" strong matches · "),
+        Span::styled(
+            format!("{pending}"),
+            if pending > 0 { t.eval_evaluating } else { t.dim },
+        ),
+        Span::raw(" pending"),
+    ])];
 
-        Line::from(vec![
-            Span::raw("  "),
-            Span::styled(format!("{}", s.total_companies), t.stat_value),
-            Span::raw(" companies · "),
-            Span::styled(format!("{}", s.total_jobs), t.stat_value),
-            Span::raw(" jobs · "),
-            Span::styled(format!("{strong}"), t.grade_s),
-            Span::raw(" strong matches · "),
-            Span::styled(
-                format!("{pending}"),
-                if pending > 0 { t.eval_evaluating } else { t.dim },
-            ),
-            Span::raw(" pending"),
-        ])
-    };
+    // Show session summary if the file exists.
+    if has_summary {
+        if let Ok(content) = std::fs::read_to_string("state/tui-summary.md") {
+            lines.push(Line::from(""));
+            let summary_lines: Vec<String> = content
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .take(2)
+                .map(|l| l.trim().to_string())
+                .collect();
+            for sl in summary_lines {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(sl, t.dim),
+                ]));
+            }
+        }
+    }
 
     let block = Block::bordered().border_style(Style::default().fg(t.border));
 
-    frame.render_widget(Paragraph::new(line).block(block), area);
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 /// Render a proportional bar using `█` characters scaled to the available width.
@@ -338,6 +352,88 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
 
     let block = Block::bordered()
         .title(" Pipeline Health ")
+        .title_style(t.title)
+        .border_style(Style::default().fg(t.border));
+
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+/// Fill the bottom-left area with session-level stats: decisions, coverage, staleness.
+fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
+    let t = &app.theme;
+    let s = &app.stats;
+
+    let mut lines = Vec::new();
+
+    // Application pipeline.
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{}", s.applied_count), t.decision_applied),
+        Span::raw(" applied · "),
+        Span::styled(format!("{}", s.watching_count), t.decision_watching),
+        Span::raw(" watching · "),
+        Span::styled(format!("{}", s.rejected_count), t.decision_rejected),
+        Span::raw(" rejected"),
+    ]));
+
+    lines.push(Line::from(""));
+
+    // Coverage stats.
+    let resolved: i64 = s.companies_by_status.iter()
+        .filter(|(st, _)| st == "resolved")
+        .map(|(_, c)| *c)
+        .sum();
+    let bespoke = s.bespoke_count;
+    let total = s.total_companies;
+    let coverage_pct = if total > 0 { (resolved + bespoke) * 100 / total } else { 0 };
+
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{resolved}"), t.stat_value),
+        Span::raw(" resolved · "),
+        Span::styled(format!("{bespoke}"), t.status_bespoke),
+        Span::raw(" bespoke · "),
+        Span::styled(format!("{coverage_pct}%"), t.stat_value),
+        Span::raw(" coverage"),
+    ]));
+
+    // Jobs per company.
+    let total_active_companies = s.total_companies.saturating_sub(s.archived_count);
+    let avg_jobs = if total_active_companies > 0 {
+        s.total_jobs / total_active_companies
+    } else {
+        0
+    };
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{avg_jobs}"), t.stat_value),
+        Span::raw(" avg jobs/company"),
+    ]));
+
+    // Grade distribution summary.
+    lines.push(Line::from(""));
+    let ss_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "SS").map(|(_, c)| *c).sum();
+    let s_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "S").map(|(_, c)| *c).sum();
+    let a_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "A").map(|(_, c)| *c).sum();
+    let f_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "F").map(|(_, c)| *c).sum();
+    let hit_rate = if s.total_jobs > 0 {
+        (ss_count + s_count + a_count) * 100 / s.total_jobs
+    } else {
+        0
+    };
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{hit_rate}%"), t.grade_s),
+        Span::raw(" hit rate (SS+S+A) · "),
+        Span::styled(format!("{f_count}"), t.grade_f),
+        Span::raw(" filtered (F)"),
+    ]));
+
+    let block = Block::bordered()
+        .title(" Session Stats ")
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 

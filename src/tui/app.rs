@@ -1,6 +1,8 @@
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use ratatui::layout::Rect;
 use ratatui::widgets::TableState;
 use rusqlite::Connection;
 
@@ -12,6 +14,7 @@ pub enum View {
     Dashboard,
     Companies,
     Jobs,
+    Pipeline,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,8 +31,17 @@ impl View {
             View::Dashboard => 0,
             View::Companies => 1,
             View::Jobs => 2,
+            View::Pipeline => 3,
         }
     }
+}
+
+/// Which column is focused in the Pipeline/Kanban view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PipelineColumn {
+    Watching,
+    Applied,
+    Interview,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +132,7 @@ pub struct App {
     pub show_help: bool,
     pub detail_scroll: u16,
     pub focused_mode: bool,
+    pub show_archived: bool,
     pub frame_count: u64,
     pub toasts: Vec<Toast>,
 
@@ -131,31 +144,54 @@ pub struct App {
     pub job_filter_company: Option<i64>,
     pub job_filter_company_name: Option<String>,
 
+    // ── Multi-select ─────────────────────────────────────────────
+    pub multi_select_jobs: HashSet<usize>,
+    pub multi_select_companies: HashSet<usize>,
+    pub anchor_job: Option<usize>,      // for shift-click range select
+    pub anchor_company: Option<usize>,
+
     pub stats: DashboardStats,
 
     pub db_path: PathBuf,
 
-    // ── TUI v2 additions ─────────────────────────────────────────
-    #[allow(dead_code)]
+    // ── TUI v2/v3 additions ──────────────────────────────────────
     pub dashboard_scroll: u16,
-    #[allow(dead_code)]
     pub search_mode: bool,
-    #[allow(dead_code)]
     pub search_query: String,
-    #[allow(dead_code)]
     pub sort_mode: SortMode,
-    #[allow(dead_code)]
     pub show_grade_picker: bool,
-    #[allow(dead_code)]
+    pub show_bulk_picker: bool,
+    pub bulk_action: String, // "watching", "applied", etc.
     pub total_jobs_unfiltered: i64,
+
+    // ── Rendered area tracking (for mouse hit-testing) ────────────
+    pub list_area: Rect,
+    pub detail_area: Rect,
+    pub terminal_width: u16,
+    pub terminal_height: u16,
+
+    // ── Pipeline/Kanban view ─────────────────────────────────────
+    pub pipeline_column: PipelineColumn,
+    pub pipeline_watching: Vec<PipelineCard>,
+    pub pipeline_applied: Vec<PipelineCard>,
+    pub pipeline_interview: Vec<PipelineCard>,
+    pub pipeline_selections: [usize; 3], // selection index per column
+}
+
+/// A card in the Pipeline/Kanban view.
+pub struct PipelineCard {
+    pub job_id: i64,
+    pub title: String,
+    pub company: String,
+    pub grade: Option<String>,
 }
 
 impl App {
     pub fn new(db_path: &Path) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(db_path)?;
 
-        let companies = queries::fetch_companies(&conn);
-        let jobs = queries::fetch_jobs(&conn, None, false, SortMode::ByGrade);
+        let companies = queries::fetch_companies(&conn, false);
+        let jobs = queries::fetch_jobs(&conn, None, false, false, SortMode::ByGrade);
         let stats = queries::fetch_stats(&conn);
         let total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
 
@@ -169,6 +205,9 @@ impl App {
             job_state.select(Some(0));
         }
 
+        let (pipeline_watching, pipeline_applied, pipeline_interview) =
+            queries::fetch_pipeline_cards(&conn);
+
         Ok(Self {
             running: true,
             view: View::Dashboard,
@@ -177,6 +216,7 @@ impl App {
             show_help: false,
             detail_scroll: 0,
             focused_mode: false,
+            show_archived: false,
             frame_count: 0,
             toasts: Vec::new(),
             companies,
@@ -185,6 +225,10 @@ impl App {
             job_state,
             job_filter_company: None,
             job_filter_company_name: None,
+            multi_select_jobs: HashSet::new(),
+            multi_select_companies: HashSet::new(),
+            anchor_job: None,
+            anchor_company: None,
             stats,
             db_path: db_path.to_path_buf(),
             dashboard_scroll: 0,
@@ -192,7 +236,18 @@ impl App {
             search_query: String::new(),
             sort_mode: SortMode::ByGrade,
             show_grade_picker: false,
+            show_bulk_picker: false,
+            bulk_action: String::new(),
             total_jobs_unfiltered,
+            list_area: Rect::default(),
+            detail_area: Rect::default(),
+            terminal_width: 0,
+            terminal_height: 0,
+            pipeline_column: PipelineColumn::Watching,
+            pipeline_watching,
+            pipeline_applied,
+            pipeline_interview,
+            pipeline_selections: [0; 3],
         })
     }
 
@@ -201,15 +256,21 @@ impl App {
             return;
         };
 
-        self.companies = queries::fetch_companies(&conn);
+        self.companies = queries::fetch_companies(&conn, self.show_archived);
         self.jobs = queries::fetch_jobs(
             &conn,
             self.job_filter_company,
             self.focused_mode,
+            self.show_archived,
             self.sort_mode,
         );
         self.stats = queries::fetch_stats(&conn);
         self.total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
+
+        let (pw, pa, pi) = queries::fetch_pipeline_cards(&conn);
+        self.pipeline_watching = pw;
+        self.pipeline_applied = pa;
+        self.pipeline_interview = pi;
 
         // Re-apply search filter if active.
         if self.search_mode || !self.search_query.is_empty() {
@@ -290,7 +351,173 @@ impl App {
         match self.view {
             View::Companies => (&mut self.company_state, self.companies.len()),
             View::Jobs => (&mut self.job_state, self.jobs.len()),
-            View::Dashboard => (&mut self.company_state, 0), // no-op for dashboard
+            View::Dashboard | View::Pipeline => (&mut self.company_state, 0),
+        }
+    }
+
+    // ── Multi-select ──────────────────────────────────────────────
+
+    /// Toggle an item in the multi-select set (Ctrl+click).
+    pub fn toggle_multi_select(&mut self, index: usize) {
+        let set = match self.view {
+            View::Jobs => &mut self.multi_select_jobs,
+            View::Companies => &mut self.multi_select_companies,
+            _ => return,
+        };
+        if set.contains(&index) {
+            set.remove(&index);
+        } else {
+            set.insert(index);
+        }
+        // Update anchor for future shift-clicks.
+        match self.view {
+            View::Jobs => self.anchor_job = Some(index),
+            View::Companies => self.anchor_company = Some(index),
+            _ => {}
+        }
+    }
+
+    /// Select a range from the anchor to the given index (Shift+click).
+    pub fn range_select(&mut self, to: usize) {
+        let (anchor, set) = match self.view {
+            View::Jobs => (self.anchor_job, &mut self.multi_select_jobs),
+            View::Companies => (self.anchor_company, &mut self.multi_select_companies),
+            _ => return,
+        };
+        let from = anchor.unwrap_or(0);
+        let (lo, hi) = if from <= to { (from, to) } else { (to, from) };
+        for i in lo..=hi {
+            set.insert(i);
+        }
+    }
+
+    /// Clear multi-selection.
+    pub fn clear_multi_select(&mut self) {
+        self.multi_select_jobs.clear();
+        self.multi_select_companies.clear();
+    }
+
+    /// Get the IDs of multi-selected jobs (or just the current selection if none multi-selected).
+    pub fn selected_job_ids(&self) -> Vec<i64> {
+        if self.multi_select_jobs.is_empty() {
+            self.selected_job().map(|j| vec![j.id]).unwrap_or_default()
+        } else {
+            self.multi_select_jobs.iter()
+                .filter_map(|&i| self.jobs.get(i).map(|j| j.id))
+                .collect()
+        }
+    }
+
+    /// Apply a decision to all selected jobs (multi or single).
+    pub fn record_decision_multi(&mut self, decision: &str) {
+        let ids = self.selected_job_ids();
+        if ids.is_empty() { return; }
+
+        let count = ids.len();
+        if let Ok(conn) = Connection::open(&self.db_path) {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            for id in &ids {
+                let _ = conn.execute(
+                    "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![id, decision, now],
+                );
+            }
+        }
+        if count == 1 {
+            let icon = match decision {
+                "watching" => "👁",
+                "applied" => "✓",
+                "rejected" => "✗",
+                "interview" => "→",
+                _ => "·",
+            };
+            self.add_toast(format!("{icon} {decision}"));
+        } else {
+            self.add_toast(format!("{decision} {count} jobs"));
+        }
+        self.multi_select_jobs.clear();
+        self.refresh();
+    }
+
+    // ── Jump-to-grade ──────────────────────────────────────────────
+
+    /// Jump selection to the first job matching the given grade.
+    #[allow(dead_code)]
+    pub fn jump_to_grade(&mut self, grade: &str) {
+        if self.view != View::Jobs {
+            return;
+        }
+        if let Some(idx) = self.jobs.iter().position(|j| j.grade.as_deref() == Some(grade)) {
+            self.job_state.select(Some(idx));
+            self.detail_scroll = 0;
+            self.add_toast(format!("Jumped to {grade}"));
+        } else {
+            self.add_toast(format!("No {grade} jobs"));
+        }
+    }
+
+    /// Jump to the next grade section (from current selection).
+    pub fn jump_next_grade_section(&mut self) {
+        if self.view != View::Jobs || self.jobs.is_empty() {
+            return;
+        }
+        let current_idx = self.job_state.selected().unwrap_or(0);
+        let current_grade = self.jobs.get(current_idx)
+            .and_then(|j| j.grade.as_deref())
+            .unwrap_or("");
+
+        // Find first job with a different grade after current position.
+        if let Some(idx) = self.jobs.iter().enumerate().skip(current_idx + 1)
+            .find(|(_, j)| j.grade.as_deref().unwrap_or("") != current_grade)
+            .map(|(i, _)| i)
+        {
+            let new_grade = self.jobs[idx].grade.as_deref().unwrap_or("—").to_string();
+            self.job_state.select(Some(idx));
+            self.detail_scroll = 0;
+            self.add_toast(format!("→ {new_grade}"));
+        }
+    }
+
+    /// Jump to the previous grade section (from current selection).
+    pub fn jump_prev_grade_section(&mut self) {
+        if self.view != View::Jobs || self.jobs.is_empty() {
+            return;
+        }
+        let current_idx = self.job_state.selected().unwrap_or(0);
+        let current_grade = self.jobs.get(current_idx)
+            .and_then(|j| j.grade.as_deref())
+            .unwrap_or("");
+
+        // Find the start of the current grade section.
+        let section_start = self.jobs.iter().enumerate().take(current_idx)
+            .rev()
+            .find(|(_, j)| j.grade.as_deref().unwrap_or("") != current_grade)
+            .map(|(i, _)| i + 1)
+            .unwrap_or(0);
+
+        if section_start == current_idx || section_start == 0 && current_idx == 0 {
+            // Already at start of section or at top — jump to previous section.
+            if current_idx > 0 {
+                // Go to the start of the previous grade section.
+                let prev_grade = self.jobs.get(current_idx.saturating_sub(1))
+                    .and_then(|j| j.grade.as_deref())
+                    .unwrap_or("");
+                let prev_start = self.jobs.iter().enumerate().take(current_idx)
+                    .rev()
+                    .find(|(_, j)| j.grade.as_deref().unwrap_or("") != prev_grade)
+                    .map(|(i, _)| i + 1)
+                    .unwrap_or(0);
+                let new_grade = self.jobs[prev_start].grade.as_deref().unwrap_or("—").to_string();
+                self.job_state.select(Some(prev_start));
+                self.detail_scroll = 0;
+                self.add_toast(format!("→ {new_grade}"));
+            }
+        } else {
+            // Jump to start of current section.
+            let new_grade = self.jobs[section_start].grade.as_deref().unwrap_or("—").to_string();
+            self.job_state.select(Some(section_start));
+            self.detail_scroll = 0;
+            self.add_toast(format!("→ {new_grade}"));
         }
     }
 
@@ -320,7 +547,7 @@ impl App {
         self.detail_scroll = 0;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.show_archived, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -335,7 +562,7 @@ impl App {
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.show_archived, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -353,7 +580,7 @@ impl App {
                     .as_deref()
                     .or(Some(c.website.as_str()))
             }),
-            View::Dashboard => None,
+            View::Dashboard | View::Pipeline => None,
         };
         if let Some(url) = url {
             let _ = std::process::Command::new("open").arg(url).spawn();
@@ -362,6 +589,7 @@ impl App {
 
     // ── User decisions ───────────────────────────────────────────
 
+    #[allow(dead_code)]
     pub fn record_decision(&mut self, decision: &str) {
         let Some(job) = self.selected_job() else {
             return;
@@ -410,14 +638,13 @@ impl App {
 
     // ── Clipboard ───────────────────────────────────────────────
 
-    #[allow(dead_code)]
     pub fn copy_url_to_clipboard(&self) {
         let url = match self.view {
             View::Jobs => self.selected_job().map(|j| j.url.as_str()),
             View::Companies => self.selected_company().and_then(|c| {
                 c.careers_url.as_deref().or(Some(c.website.as_str()))
             }),
-            View::Dashboard => None,
+            View::Dashboard | View::Pipeline => None,
         };
         if let Some(url) = url {
             if let Ok(mut child) = std::process::Command::new("pbcopy")
@@ -452,9 +679,36 @@ impl App {
         self.refresh();
     }
 
+    // ── Bulk actions ──────────────────────────────────────────────
+
+    /// Mark all visible jobs of a given grade with a decision.
+    pub fn bulk_decision_by_grade(&mut self, grade: &str, decision: &str) {
+        let job_ids: Vec<i64> = self.jobs.iter()
+            .filter(|j| j.grade.as_deref() == Some(grade))
+            .map(|j| j.id)
+            .collect();
+
+        if job_ids.is_empty() {
+            self.add_toast(format!("No {grade} jobs to mark"));
+            return;
+        }
+
+        let count = job_ids.len();
+        if let Ok(conn) = Connection::open(&self.db_path) {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            for id in &job_ids {
+                let _ = conn.execute(
+                    "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![id, decision, now],
+                );
+            }
+        }
+        self.add_toast(format!("{decision} all {count} {grade} jobs"));
+        self.refresh();
+    }
+
     // ── Sort cycling ────────────────────────────────────────────
 
-    #[allow(dead_code)]
     pub fn toggle_sort(&mut self) {
         self.sort_mode = match self.sort_mode {
             SortMode::ByGrade => SortMode::ByCompany,
@@ -474,14 +728,250 @@ impl App {
 
     // ── Viewport scrolling (independent of selection) ───────────
 
-    #[allow(dead_code)]
     pub fn scroll_viewport_down(&mut self, amount: u16) {
-        self.dashboard_scroll = self.dashboard_scroll.saturating_add(amount);
+        // Clamp to a reasonable max based on top roles count.
+        let max_scroll = (self.stats.top_matches.len() as u16).saturating_sub(5);
+        self.dashboard_scroll = self.dashboard_scroll.saturating_add(amount).min(max_scroll);
     }
 
-    #[allow(dead_code)]
     pub fn scroll_viewport_up(&mut self, amount: u16) {
         self.dashboard_scroll = self.dashboard_scroll.saturating_sub(amount);
+    }
+
+    /// Scroll the table viewport, moving the selection along so it stays visible.
+    ///
+    /// Ratatui auto-clamps the offset to keep the selected row on screen.
+    /// If we only change the offset, the selection can fight it. So we move
+    /// both: offset shifts by `lines`, and selection is clamped into the
+    /// visible window.
+    pub fn scroll_table_down(&mut self, lines: usize) {
+        let (state, len) = self.active_list_state();
+        if len == 0 {
+            return;
+        }
+        let offset = state.offset();
+        let new_offset = (offset + lines).min(len.saturating_sub(1));
+        *state.offset_mut() = new_offset;
+
+        // If selection is now above the viewport, push it down.
+        if let Some(selected) = state.selected() {
+            if selected < new_offset {
+                state.select(Some(new_offset));
+            }
+        }
+        self.detail_scroll = 0;
+    }
+
+    /// Scroll the table viewport up, keeping selection within the visible window.
+    pub fn scroll_table_up(&mut self, lines: usize) {
+        // Estimate visible rows from list_area. Fallback to 20.
+        let visible_rows = if self.list_area.height > 3 {
+            (self.list_area.height - 3) as usize // border + header
+        } else {
+            20
+        };
+
+        let (state, len) = self.active_list_state();
+        if len == 0 {
+            return;
+        }
+        let offset = state.offset();
+        let new_offset = offset.saturating_sub(lines);
+        *state.offset_mut() = new_offset;
+
+        // If selection is now below the viewport, pull it up.
+        if let Some(selected) = state.selected() {
+            let max_visible = new_offset + visible_rows.saturating_sub(1);
+            if selected > max_visible {
+                state.select(Some(max_visible.min(len.saturating_sub(1))));
+            }
+        }
+        self.detail_scroll = 0;
+    }
+
+    // ── Pipeline / Kanban navigation ─────────────────────────────
+
+    pub fn pipeline_col_len(&self) -> usize {
+        match self.pipeline_column {
+            PipelineColumn::Watching => self.pipeline_watching.len(),
+            PipelineColumn::Applied => self.pipeline_applied.len(),
+            PipelineColumn::Interview => self.pipeline_interview.len(),
+        }
+    }
+
+    pub fn pipeline_col_index(&self) -> usize {
+        match self.pipeline_column {
+            PipelineColumn::Watching => 0,
+            PipelineColumn::Applied => 1,
+            PipelineColumn::Interview => 2,
+        }
+    }
+
+    pub fn pipeline_next(&mut self) {
+        let len = self.pipeline_col_len();
+        if len == 0 { return; }
+        let idx = self.pipeline_col_index();
+        self.pipeline_selections[idx] = (self.pipeline_selections[idx] + 1).min(len - 1);
+    }
+
+    pub fn pipeline_prev(&mut self) {
+        let idx = self.pipeline_col_index();
+        self.pipeline_selections[idx] = self.pipeline_selections[idx].saturating_sub(1);
+    }
+
+    pub fn pipeline_col_right(&mut self) {
+        self.pipeline_column = match self.pipeline_column {
+            PipelineColumn::Watching => PipelineColumn::Applied,
+            PipelineColumn::Applied => PipelineColumn::Interview,
+            PipelineColumn::Interview => PipelineColumn::Interview,
+        };
+    }
+
+    pub fn pipeline_col_left(&mut self) {
+        self.pipeline_column = match self.pipeline_column {
+            PipelineColumn::Watching => PipelineColumn::Watching,
+            PipelineColumn::Applied => PipelineColumn::Watching,
+            PipelineColumn::Interview => PipelineColumn::Applied,
+        };
+    }
+
+    /// Move the selected card to the target decision column.
+    pub fn pipeline_move_card(&mut self, target: &str) {
+        let col_idx = self.pipeline_col_index();
+        let sel = self.pipeline_selections[col_idx];
+
+        // Check if the current column matches the target — no-op.
+        let current_decision = match self.pipeline_column {
+            PipelineColumn::Watching => "watching",
+            PipelineColumn::Applied => "applied",
+            PipelineColumn::Interview => "interview",
+        };
+        if current_decision == target {
+            self.add_toast(format!("Already in {target}"));
+            return;
+        }
+
+        let card_job_id = match self.pipeline_column {
+            PipelineColumn::Watching => self.pipeline_watching.get(sel).map(|c| c.job_id),
+            PipelineColumn::Applied => self.pipeline_applied.get(sel).map(|c| c.job_id),
+            PipelineColumn::Interview => self.pipeline_interview.get(sel).map(|c| c.job_id),
+        };
+        let Some(job_id) = card_job_id else {
+            self.add_toast("No card selected".to_string());
+            return;
+        };
+
+        if let Ok(conn) = Connection::open(&self.db_path) {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let _ = conn.execute(
+                "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
+                rusqlite::params![job_id, target, now],
+            );
+        }
+        self.add_toast(format!("→ {target}"));
+        self.refresh();
+        // Clamp selection on source column.
+        let new_len = self.pipeline_col_len();
+        if new_len == 0 {
+            self.pipeline_selections[col_idx] = 0;
+        } else if self.pipeline_selections[col_idx] >= new_len {
+            self.pipeline_selections[col_idx] = new_len - 1;
+        }
+    }
+
+    // ── Export ────────────────────────────────────────────────────
+
+    pub fn export_current_view(&mut self) {
+        let content = match self.view {
+            View::Jobs => self.export_jobs_markdown(),
+            View::Companies => self.export_companies_markdown(),
+            View::Pipeline => self.export_pipeline_markdown(),
+            View::Dashboard => self.export_jobs_markdown(), // default to jobs
+        };
+
+        let date = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let suffix = match self.view {
+            View::Jobs => "jobs",
+            View::Companies => "companies",
+            View::Pipeline => "pipeline",
+            View::Dashboard => "jobs",
+        };
+        let dir = Path::new("exports");
+        let _ = std::fs::create_dir_all(dir);
+        let filename = format!("{date}-{suffix}.md");
+        let path = dir.join(&filename);
+
+        match std::fs::write(&path, content) {
+            Ok(_) => self.add_toast(format!("Exported to exports/{filename}")),
+            Err(e) => self.add_toast(format!("Export failed: {e}")),
+        }
+    }
+
+    fn export_jobs_markdown(&self) -> String {
+        let mut out = String::from("# Job Export\n\n");
+        let date = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+        out.push_str(&format!("Generated: {date}\n\n"));
+
+        let grades = ["SS", "S", "A", "B", "C", "F"];
+        for grade in &grades {
+            let jobs_in_grade: Vec<&JobRow> = self.jobs.iter()
+                .filter(|j| j.grade.as_deref() == Some(grade))
+                .collect();
+            if jobs_in_grade.is_empty() { continue; }
+
+            out.push_str(&format!("## {} ({} jobs)\n\n", grade, jobs_in_grade.len()));
+            for j in &jobs_in_grade {
+                let loc = j.location.as_deref().unwrap_or("—");
+                out.push_str(&format!("### {}\n", j.title));
+                out.push_str(&format!("- **Company:** {}\n", j.company_name));
+                out.push_str(&format!("- **Location:** {loc}\n"));
+                out.push_str(&format!("- **URL:** {}\n", j.url));
+                if let Some(assessment) = &j.fit_assessment {
+                    out.push_str(&format!("\n{assessment}\n"));
+                }
+                out.push('\n');
+            }
+        }
+        out
+    }
+
+    fn export_companies_markdown(&self) -> String {
+        let mut out = String::from("# Company Export\n\n");
+        let date = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+        out.push_str(&format!("Generated: {date}\n\n"));
+
+        out.push_str("| Grade | Company | Status | Jobs | ATS |\n");
+        out.push_str("|-------|---------|--------|------|-----|\n");
+        for c in &self.companies {
+            let grade = c.grade.as_deref().unwrap_or("—");
+            let ats = c.ats_provider.as_deref().unwrap_or("—");
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                grade, c.name, c.status, c.job_count, ats
+            ));
+        }
+        out
+    }
+
+    fn export_pipeline_markdown(&self) -> String {
+        let mut out = String::from("# Pipeline Export\n\n");
+        let date = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+        out.push_str(&format!("Generated: {date}\n\n"));
+
+        let sections = [
+            ("Watching", &self.pipeline_watching),
+            ("Applied", &self.pipeline_applied),
+            ("Interview", &self.pipeline_interview),
+        ];
+        for (label, cards) in &sections {
+            out.push_str(&format!("## {} ({})\n\n", label, cards.len()));
+            for card in *cards {
+                let g = card.grade.as_deref().unwrap_or("—");
+                out.push_str(&format!("- **{g}** {} — {}\n", card.title, card.company));
+            }
+            out.push('\n');
+        }
+        out
     }
 
     // ── Database cleanup ─────────────────────────────────────────
