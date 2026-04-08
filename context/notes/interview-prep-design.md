@@ -24,7 +24,7 @@ The skill reads three things to build a curriculum:
 
 ## What it produces
 
-A `learning/` directory (same structure as `upkeep-learning` outputs) containing:
+An `interview-prep/` directory (same structure as `upkeep-learning` outputs) containing:
 
 ### Concept files
 Deep-dive explanations of algorithms, data structures, system design patterns, and domain knowledge relevant to the target jobs. Written to teach, not just reference — worked examples, intuition, complexity analysis, trade-offs.
@@ -71,7 +71,7 @@ The skill should also be invocable with a specific focus: "prep me for trading s
 
 ## Relationship to upkeep-learning
 
-The `upkeep-learning` skill maintains a `learning/` archive for understanding a project's codebase. The `interview-prep` skill maintains a `learning/` archive for understanding the skills needed for target jobs. Same structural pattern (concept files, learning paths, exercises), different content source (job descriptions and portfolio gaps instead of source code).
+The `upkeep-learning` skill maintains a `learning/` archive for understanding a project's codebase. The `interview-prep` skill maintains an `interview-prep/` directory for the skills needed for target jobs. Same structural pattern (concept files, learning paths, exercises), different content source (job descriptions and portfolio gaps instead of source code).
 
 The skill does NOT need background-knowledge files (those are for understanding a repo's domain). It does need concept files, learning paths, and exercises — the three most directly useful components.
 
