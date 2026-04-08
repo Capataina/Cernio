@@ -106,6 +106,13 @@ pub fn run(conn: &Connection, path: &Path, dry_run: bool) {
 
     if dry_run {
         println!("\n  (dry run — nothing was written to the database)");
+    } else if inserted > 0 {
+        // Clear the potential file after successful import.
+        let header = "# Potential Companies\n\n> Imported to database. File cleared automatically after import.\n";
+        match fs::write(path, header) {
+            Ok(_) => println!("  Cleared {} after import", path.display()),
+            Err(e) => eprintln!("  Warning: could not clear {}: {e}", path.display()),
+        }
     }
 }
 
