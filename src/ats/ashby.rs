@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::common::{AtsJob, SlugProbeResult};
+use super::common::{AtsJob, SlugProbeResult, get_with_retry};
 
 const BASE_URL: &str = "https://api.ashbyhq.com/posting-api/job-board";
 
@@ -60,7 +60,7 @@ struct AshbyPostalAddress {
 /// Probe whether an Ashby board exists for this slug.
 pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
     let url = format!("{BASE_URL}/{slug}");
-    let resp = client.get(&url).send().await.ok()?;
+    let resp = get_with_retry(client, &url, 2).await.ok()?;
     if !resp.status().is_success() {
         return None;
     }

@@ -6,6 +6,8 @@ use tokio::sync::Semaphore;
 use crate::ats::common::SlugProbeResult;
 use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
 
+// Note: Lever now has its own probe() function that tries both US and EU endpoints.
+
 /// Generate slug candidates from a company name.
 /// Tries common transformations that ATS providers use.
 fn slug_candidates(name: &str) -> Vec<String> {
@@ -66,19 +68,6 @@ fn slug_candidates(name: &str) -> Vec<String> {
     candidates
 }
 
-/// Probe Lever for a slug (Lever has no dedicated probe endpoint).
-async fn probe_lever(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
-    let postings = lever::fetch_all(client, slug).await.ok()?;
-    if postings.is_empty() {
-        return None;
-    }
-    Some(SlugProbeResult {
-        provider: "lever",
-        slug: slug.to_string(),
-        job_count: postings.len(),
-    })
-}
-
 /// Probe all ATS providers for a company name. Returns all hits.
 async fn probe_all_providers(
     client: &reqwest::Client,
@@ -96,7 +85,7 @@ async fn probe_all_providers(
         // making it slow and noisy. Only probe it if we haven't found anything yet.
         let (gh, lv, ab, wk) = tokio::join!(
             greenhouse::probe(client, slug),
-            probe_lever(client, slug),
+            lever::probe(client, slug),
             ashby::probe(client, slug),
             workable::probe(client, slug),
         );
@@ -160,14 +149,7 @@ pub async fn run(conn: &Connection, dry_run: bool) {
 
         let handle = tokio::spawn(async move {
             let _permit = sem.acquire().await.unwrap();
-            // Try up to 2 rounds of probing — transient failures (timeouts,
-            // rate limits) can cause providers to be missed on the first pass.
-            let mut portals = probe_all_providers(&client, &name_clone).await;
-            if portals.is_empty() {
-                // Second attempt after a brief delay.
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                portals = probe_all_providers(&client, &name_clone).await;
-            }
+            let portals = probe_all_providers(&client, &name_clone).await;
             ResolveResult {
                 id,
                 name: name_clone,

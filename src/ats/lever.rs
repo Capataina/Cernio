@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::common::AtsJob;
+use super::common::{AtsJob, SlugProbeResult, get_with_retry};
 
 const BASE_URL: &str = "https://api.lever.co/v0/postings";
 const BASE_URL_EU: &str = "https://api.eu.lever.co/v0/postings";
@@ -69,6 +69,27 @@ fn base_url(ats_extra: Option<&str>) -> &'static str {
         }
     }
     BASE_URL
+}
+
+/// Probe whether a Lever board exists for this slug.
+/// Tries both US and EU endpoints with retry on timeout/connection errors.
+pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
+    for url_base in [BASE_URL, BASE_URL_EU] {
+        let url = format!("{url_base}/{slug}");
+        let resp = get_with_retry(client, &url, 2).await.ok()?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let postings: Vec<LeverPosting> = resp.json().await.ok()?;
+        if !postings.is_empty() {
+            return Some(SlugProbeResult {
+                provider: "lever",
+                slug: slug.to_string(),
+                job_count: postings.len(),
+            });
+        }
+    }
+    None
 }
 
 /// Fetch all open postings at a company (US endpoint).

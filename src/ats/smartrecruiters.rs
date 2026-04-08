@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::common::{AtsJob, SlugProbeResult};
+use super::common::{AtsJob, SlugProbeResult, get_with_retry};
 
 const BASE_URL: &str = "https://api.smartrecruiters.com/v1/companies";
 
@@ -84,7 +84,7 @@ struct HtmlSection {
 /// ANY slug, even completely fake ones. Only count as a hit if totalFound > 0.
 pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
     let url = format!("{BASE_URL}/{slug}/postings?limit=1");
-    let resp = client.get(&url).send().await.ok()?;
+    let resp = get_with_retry(client, &url, 2).await.ok()?;
     if !resp.status().is_success() {
         return None;
     }

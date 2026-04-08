@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::common::{AtsJob, SlugProbeResult};
+use super::common::{AtsJob, SlugProbeResult, get_with_retry};
 
 const BASE_URL: &str = "https://boards-api.greenhouse.io/v1/boards";
 const BASE_URL_EU: &str = "https://boards-api.eu.greenhouse.io/v1/boards";
@@ -52,11 +52,11 @@ fn base_url(ats_extra: Option<&str>) -> &'static str {
 }
 
 /// Probe whether a Greenhouse board exists for this slug.
+/// Tries both US and EU endpoints with retry on timeout/connection errors.
 pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
-    // Try US first, then EU.
     for url_base in [BASE_URL, BASE_URL_EU] {
         let url = format!("{url_base}/{slug}/jobs");
-        let resp = client.get(&url).send().await.ok()?;
+        let resp = get_with_retry(client, &url, 2).await.ok()?;
         if !resp.status().is_success() {
             continue;
         }
