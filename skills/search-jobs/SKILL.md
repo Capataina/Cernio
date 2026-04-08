@@ -120,20 +120,13 @@ Ask the user if they want to continue grading the next batch or stop here.
 
 ---
 
-## Provider references
-
-The Rust scripts handle all ATS API interactions, so per-provider API documentation is no longer needed for this skill. The reference files below remain in the repository for architectural reference and are used by the scripts themselves:
-
-| Provider | Reference file | Purpose |
-|----------|---------------|---------|
-| Lever | `references/lever.md` | API shape reference for script development |
-| Ashby | `references/ashby.md` | API shape reference for script development |
-
-The grading rubric remains the primary reference for this skill:
+## References
 
 | Reference | File | Purpose |
 |-----------|------|---------|
 | Job grading rubric | `references/grading-rubric.md` | Evaluation dimensions, grading scale, presentation format |
+| Lever API | `references/lever.md` | Lever API shape and response fields |
+| Ashby API | `references/ashby.md` | Ashby API shape and response fields |
 
 ---
 

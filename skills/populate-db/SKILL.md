@@ -42,7 +42,7 @@ Before spending time on ATS resolution, verify each company is a viable target. 
 
 **If the company fails validation:** Remove it from `companies/potential.md` with a brief note about why (dead website, acquired, too small, not relevant). Do not insert it into the database — the database is for companies worth tracking.
 
-**If the company passes:** Proceed to step 3. Grading happens separately via the grade-companies skill.
+**If the company passes:** Proceed to step 3 (ATS resolution). Do not grade companies during this step — grading is a separate pass.
 
 ### 3. Run `cernio resolve` for mechanical ATS probing
 
@@ -82,9 +82,7 @@ Companies that failed mechanical resolution need human-AI judgment. These typica
 2. **Unsupported ATS providers** — iCIMS, Taleo, Personio, Pinpoint HQ, BambooHR, Jobvite, or custom portals. These become `bespoke` with the careers URL preserved.
 3. **Dead or disappeared companies** — No website, no careers page, Companies House shows dissolved. Skip these entirely.
 
-**For detailed AI fallback guidance, use the resolve-portals skill.** It documents the full resolution process: web searching for careers pages, interpreting ATS links, verifying portals, handling SmartRecruiters false positives, and inserting portal entries via SQL.
-
-**Quick reference for the fallback process:**
+**Fallback process:**
 - Use WebSearch for `"{company name}" careers` or `"{company name}" jobs`
 - Visit the careers page and look for ATS URLs in links, iframes, or redirects
 - Extract the slug and verify against the provider's JSON API

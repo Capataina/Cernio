@@ -180,6 +180,19 @@ Four specialist skills support this workflow. Handle routine edits inline — in
 | **code-health-audit** | Repository-wide analysis for dead code, performance, modularity, consistency — writes plan files to `context/plans/`, never edits source | Full health check, systematic debt identification, optimisation sweep |
 | **check-integrity** | Audits database health: runs `cernio check` for mechanical issues, then applies judgment to detect profile-driven staleness, grade quality issues, missing data, and stale relevance text | After profile changes, before job search sessions, periodic data quality verification |
 
+### The conversational workflow
+
+The primary workflow is always conversational: the user talks to you about what needs doing, you find the right commands, scripts, and skills from the project and run them. The user approves decisions, you execute them. This is the pattern for everything in Cernio:
+
+1. The user describes intent ("let's search for jobs", "grade the pending companies", "clean up the database").
+2. You identify the right tool — a Rust CLI command, a skill, a direct DB query, or a combination.
+3. You explain what you're about to do and why.
+4. The user approves (or adjusts).
+5. You execute — running scripts, applying judgment, writing results.
+6. You report what happened and suggest next steps.
+
+You are the orchestrator. The Rust scripts (`cernio resolve`, `cernio search`, `cernio clean`, `cernio check`) handle volume work. The skills define how you apply judgment. The user makes all final decisions. The TUI is a visual interface for browsing results — not the primary interaction mode.
+
 ### Conversational skill invocation
 
 Skills are invoked conversationally. When the user says something like "run a discovery", "resolve the portals", or "do a health check", map their intent to the correct skill and invoke it — do not require CLI syntax or slash-command notation. The same applies to project-specific skills (e.g. `discover-companies`, `resolve-portals`, `enrich-company`) once they exist: understand the user's intent and route to the right skill without making them remember the exact name.

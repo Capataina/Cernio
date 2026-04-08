@@ -117,7 +117,7 @@ Present a structured integrity report to the user, organised by severity:
 ### Profile-Driven Staleness
 - **[Company Name]** (current grade: B, graded 2026-03-15)
   Grade reasoning says "lacks cloud experience" but profile now includes
-  AWS deployment in Nyquestro. Recommend re-evaluation — likely A-tier.
+  AWS deployment in a recent project. Recommend re-evaluation — likely A-tier.
 
 ### Grade Quality Issues
 - **[Company Name]** — grade reasoning is generic ("good company, decent tech").
@@ -132,11 +132,11 @@ Present a structured integrity report to the user, organised by severity:
 ### Relevance Refresh Candidates
 - **[Company Name]** — why_relevant says "found on UK tech list".
   Suggested update: "Infrastructure-focused payments company; core platform
-  work aligns with distributed systems experience from Nyquestro and Paxos."
+  work aligns with distributed systems experience from the profile's projects."
 
 ### Recommendations
 1. Re-grade [Company A] and [Company B] — profile changes directly affect their evaluations
-2. Run grade-companies on the 3 ungraded companies
+2. Grade the 3 ungraded companies
 3. Update why_relevant for 2 companies with generic text
 ```
 
