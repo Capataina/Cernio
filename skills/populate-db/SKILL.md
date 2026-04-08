@@ -1,14 +1,20 @@
 # populate-db
 
-Takes companies from the discovery stage, researches each one to find their job board and ATS system, verifies the connection works, and inserts them into the database as resolved entries. Use when the user says "populate the database", "add these companies", "research these companies", "find their job boards", or after a discovery run has produced companies in `companies/potential.md` that need processing. Not for discovering new companies (that's the discovery skill) or searching for jobs (that's the search scripts).
+Takes companies from the discovery stage, validates them, and uses the Rust pipeline to resolve their ATS portals — then handles AI fallback for companies the script cannot match. Use when the user says "populate the database", "add these companies", "research these companies", or after a discovery run has produced companies in `companies/potential.md` that need processing. Not for discovering new companies (that's discover-companies), not for grading companies (that's grade-companies), not for searching jobs (that's search-jobs).
 
 ---
 
 ## Why this skill exists
 
-Discovery produces a list of promising companies, but a company name and website alone can't be scraped for jobs. To actually search for open roles, we need to know: does this company use Greenhouse, Ashby, Lever, Workable, or something else? What's the specific slug or URL to query? Does the endpoint actually return live job data? Population bridges the gap between "we know this company exists" and "we can programmatically find their open roles."
+Discovery produces a list of promising companies, but a company name and website alone cannot be scraped for jobs. To actually search for open roles, we need to know: does this company use Greenhouse, Ashby, Lever, Workable, or something else? What is the specific slug or URL to query? Population bridges the gap between "we know this company exists" and "we can programmatically find their open roles."
 
-Companies that use a supported ATS become `resolved` in the database — ready for job scraping. Companies on custom portals, Workday, or other unsupported systems become `bespoke` — still tracked with a direct careers page link, but not scrapeable through our scripts.
+This skill is the **orchestration layer**. The mechanical volume work — probing slug patterns against every supported ATS — is handled by the `cernio resolve` Rust script. This skill provides the judgment that the script cannot: validating companies, handling failed resolutions via web search, and presenting results for human review.
+
+---
+
+## Before you start
+
+**Read all `profile/` files.** You need the user's background, skills, career targets, and preferences to assess whether a company is worth tracking. This is non-negotiable — do not skip it.
 
 ---
 
@@ -16,133 +22,107 @@ Companies that use a supported ATS become `resolved` in the database — ready f
 
 ### 1. Read the input
 
-Population works from `companies/potential.md` — the output of the discovery skill. Each entry has a company name, website, and metadata. The skill processes these entries and moves them into the SQLite database.
+Population works from `companies/potential.md` — the output of the discovery skill. Each entry has a company name, website, and metadata. The user may also provide companies directly in conversation.
 
 Before processing, check the database for existing entries with the same website URL to avoid duplicates.
 
-### 2. Validate the company is real and worth tracking
+### 2. Validate companies are real and worth tracking
 
-Before spending time on ATS resolution, verify the company is actually a viable target.
+Before spending time on ATS resolution, verify each company is a viable target. This is where Claude's judgment matters — the script cannot do this.
 
 **Check the basics:**
 - Does the website load? A dead website means a dead company or a pivot — remove from potential.md and move on.
-- Is there evidence of current activity? Recent blog posts, press releases, job listings, social media activity, or product updates within the last 6-12 months.
+- Is there evidence of current activity? Recent blog posts, press releases, job listings, social media activity, or product updates within the last 6–12 months.
 - Is the company still independent? It may have been acquired (check for redirects to a parent company), shut down, or rebranded.
 
 **Assess engineering fit:**
-- Do they have an engineering team? A 5-person company with no engineers isn't going to hire a systems engineer.
-- Do they do technical work that aligns with the profile? A fintech that only does marketing automation isn't relevant even if it's in "fintech."
-- Is there any signal they're hiring or growing? Active careers page, job listings, headcount growth, recent funding.
+- Do they have an engineering team? A 5-person company with no engineers is not going to hire a systems engineer.
+- Do they do technical work that aligns with the profile? A fintech that only does marketing automation is not relevant even if it is in "fintech."
+- Is there any signal they are hiring or growing? Active careers page, job listings, headcount growth, recent funding.
 
-**If the company fails validation:** Remove it from `companies/potential.md` with a brief note about why (dead website, acquired, too small, not relevant). Don't insert it into the database — the database is for companies worth tracking.
+**If the company fails validation:** Remove it from `companies/potential.md` with a brief note about why (dead website, acquired, too small, not relevant). Do not insert it into the database — the database is for companies worth tracking.
 
-**If the company passes:** Grade it and proceed to ATS resolution.
+**If the company passes:** Proceed to step 3. Grading happens separately via the grade-companies skill.
 
-### 2b. Grade the company
+### 3. Run `cernio resolve` for mechanical ATS probing
 
-Assign a grade (S/A/B/C) using the rubric in `references/company-grading-rubric.md`. The grade considers engineering reputation, technical alignment, growth trajectory, sponsorship likelihood, career ceiling, and company stability.
+This is the handoff to the Rust pipeline. The script probes predictable slug patterns against every supported ATS provider — it handles the volume work that does not require judgment.
 
-The grade is stored in the database alongside the company and determines monitoring priority — S-tier companies get checked for new jobs first, C-tier companies get checked less often.
+**CLI reference:**
 
-Companies that fail validation entirely (dead, acquired, irrelevant) are removed from potential.md without a grade — they never enter the database.
+| Command | What it does |
+|---------|-------------|
+| `cernio resolve --dry-run` | Preview which companies will be probed, without making HTTP requests. Use to verify the input looks right. |
+| `cernio resolve` | Execute resolution for all unresolved companies in the database. Probes slug variants against Greenhouse, Lever, Ashby, Workable, SmartRecruiters. |
+| `cernio resolve --company "Palantir"` | Resolve a single company by name. Useful for re-trying one company or processing an ad-hoc addition. |
 
-### 3. Find the job board
+**Workflow:**
+1. Run `cernio resolve --dry-run` first to preview the batch
+2. Review the preview — confirm the company list looks correct
+3. Run `cernio resolve` to execute
+4. Review the output — note which companies resolved and which failed
 
-This is the ATS resolution step. The goal is to find which ATS the company uses and the specific slug needed to query their public API.
+### 4. Review the resolve output
 
-**Try deterministic patterns first.** Most ATS providers use predictable URL patterns. From the company name, generate slug candidates (lowercase, hyphenated, common variations) and probe these endpoints:
+The script reports three outcomes per company:
 
-**Tier 1 — Simple slug-based (GET request, slug in URL):**
+| Outcome | Meaning | Next step |
+|---------|---------|-----------|
+| **Resolved** | Slug found and verified on a supported ATS | Done — the company is ready for job searching |
+| **Failed** | No slug matched on any supported ATS | AI fallback (step 5) |
+| **Error** | HTTP error, timeout, or other failure | Re-try or AI fallback |
 
-| ATS | Probe URL | JSON API |
-|-----|-----------|----------|
-| Greenhouse | `boards.greenhouse.io/{slug}` | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` |
-| Greenhouse (alt) | `job-boards.greenhouse.io/{slug}` | same API |
-| Lever | `jobs.lever.co/{slug}` | `api.lever.co/v0/postings/{slug}` |
-| Ashby | `jobs.ashbyhq.com/{slug}` | `api.ashbyhq.com/posting-api/job-board/{slug}` |
-| Workable | `apply.workable.com/{slug}` | `apply.workable.com/api/v1/widget/accounts/{slug}` |
-| SmartRecruiters | `jobs.smartrecruiters.com/{slug}` | `api.smartrecruiters.com/v1/companies/{slug}/postings` |
+Present the resolve results to the user. For resolved companies, show the ATS provider and slug. For failed companies, explain they need AI fallback.
 
-**Tier 2 — Complex discovery (variable subdomains/site names):**
+### 5. AI fallback for unresolved companies
 
-| ATS | Pattern | Challenge |
-|-----|---------|-----------|
-| Workday | `{company}.{wd1-12}.myworkdayjobs.com/wday/cxs/{company}/{site}/jobs` (POST) | Subdomain number (wd1–wd12) and site name vary per company. Must be discovered via web search or the company's careers page redirect. Store both in `ats_slug` (company identifier) and `ats_extra` (full endpoint path). |
-| Eightfold.ai | `{subdomain}/api/apply/v2/jobs?domain={domain}` | Subdomain is company-specific (e.g. `explore.jobs.netflix.net`). Discovered from the company's careers page. Store subdomain and domain in `ats_extra`. |
+Companies that failed mechanical resolution need human-AI judgment. These typically fall into three buckets:
 
-A slug that returns HTTP 200 with valid JSON containing at least one job is a confirmed match. Slugs don't always match the company name exactly — Wise is `transferwise` on Greenhouse, Cleo is `cleoai`, DeepMind is `deepmind` not `googledeepmind`. Try obvious variations: the full name, abbreviations, former names, domain name without TLD.
+1. **Non-obvious slugs on supported ATS** — The company uses Greenhouse/Lever/Ashby/etc., but their slug is unexpected (a former name, a legal entity, an abbreviation). The careers page reveals the correct URL.
+2. **Unsupported ATS providers** — iCIMS, Taleo, Personio, Pinpoint HQ, BambooHR, Jobvite, or custom portals. These become `bespoke` with the careers URL preserved.
+3. **Dead or disappeared companies** — No website, no careers page, Companies House shows dissolved. Skip these entirely.
 
-**If deterministic probing fails, search the web.** Search for `"{company name}" careers` or `"{company name}" greenhouse` or `"{company name}" jobs site:greenhouse.io`. The results usually reveal the correct ATS and slug. This is where Claude's judgment comes in — interpreting search results, recognising the right link, and verifying it.
+**For detailed AI fallback guidance, use the resolve-portals skill.** It documents the full resolution process: web searching for careers pages, interpreting ATS links, verifying portals, handling SmartRecruiters false positives, and inserting portal entries via SQL.
 
-**If no supported ATS is found, mark as bespoke.** Find the company's careers page URL directly and record it. The company is still worth tracking — their jobs just can't be scraped automatically. Common bespoke systems include iCIMS, Taleo, BambooHR, Jobvite, Personio, and custom-built portals.
+**Quick reference for the fallback process:**
+- Use WebSearch for `"{company name}" careers` or `"{company name}" jobs`
+- Visit the careers page and look for ATS URLs in links, iframes, or redirects
+- Extract the slug and verify against the provider's JSON API
+- If no supported ATS is found, record as `bespoke` with the careers URL
+- If the company appears dead, report findings with evidence
 
-### 4. Verify the connection
+### 6. Present results for user review
 
-For companies matched to a supported ATS:
-- Fetch the JSON endpoint and confirm it returns parseable job data
-- Record the ATS provider, slug, and verification date
-
-A slug that returns 200 but has zero jobs might be valid but the company might not be actively hiring. Still mark it as resolved — the slug works, jobs may appear later.
-
-### 5. Insert into the database
-
-Write the company to the SQLite database with all available fields:
-- Facts: name, website, what they do, discovery source, discovery date
-- Checkpoints: ATS provider, slug, verification date, status (resolved or bespoke), careers URL for bespoke
-- Judgments: why relevant (carried from discovery), relevance updated date
-- Location and sector tags if known
-
-### 6. Update the TUI
-
-As each company is processed, the TUI should reflect the progress. The flow the user sees:
+Before committing anything, present a summary table of all results:
 
 ```
-Company in potential.md
-  → "researching..."     (Claude is probing ATS patterns)
-  → "resolved: greenhouse/wise-transferwise"   (found and verified)
-  → or "bespoke: workday portal"               (no supported ATS)
+| Company        | Result   | ATS        | Slug                     | Source                                |
+|----------------|----------|------------|--------------------------|---------------------------------------|
+| Cloudflare     | resolved | greenhouse | cloudflare               | cernio resolve (mechanical)           |
+| XTX Markets    | resolved | greenhouse | xtxmarketstechnologies   | AI fallback — careers page link       |
+| SurrealDB      | bespoke  | pinpoint   | —                        | surrealdb.pinpointhq.com (unsupported)|
+| Vypercore      | removed  | —          | —                        | Companies House: in liquidation       |
 ```
+
+Wait for user approval before writing to the database. This is a review gate — the user can correct mistakes, skip companies, or ask for re-research.
 
 ### 7. Clean up potential.md
 
-Once a company has been processed and inserted into the database (whether as resolved or bespoke), remove it from `companies/potential.md`. After a full population run, `potential.md` should only contain companies that haven't been processed yet.
-
----
-
-## Slug resolution tips
-
-Company names don't always map cleanly to ATS slugs. Common patterns:
-
-- **Former names:** Wise → `transferwise`, Meta → `facebook`
-- **Abbreviated names:** International Business Machines → `ibm`
-- **Suffixes stripped:** "Acme Ltd" → `acme`, "FooBar Inc." → `foobar`
-- **Spaces to hyphens:** "Jane Street" → `jane-street` or `janestreet`
-- **AI/tech suffixes:** Cleo → `cleoai`, Thought Machine → `thoughtmachine`
-- **Parent companies:** A subsidiary might be under the parent's slug
-
-When the obvious slugs fail, the company's own website often links to their careers page, which reveals the ATS URL in the link target. Check the footer, "Careers" or "Jobs" navigation links, and the page source.
-
----
-
-## Batch processing and parallelisation
-
-When processing many companies at once, the deterministic slug probing can be parallelised — it's just HTTP requests. The web search fallback is slower and requires Claude's judgment, so it runs sequentially for each company that fails deterministic resolution.
-
-A reasonable approach for a batch of 30 companies:
-1. Run deterministic slug probing for all 30 in parallel (fast, scriptable)
-2. Collect the ones that didn't match
-3. Research the unmatched ones individually with web search (Claude judgment)
-
-The Rust `resolve` script handles step 1. Claude handles step 3.
+Once companies have been processed and inserted into the database (whether as resolved or bespoke), remove them from `companies/potential.md`. After a full population run, `potential.md` should only contain companies that have not been processed yet.
 
 ---
 
 ## Quality checklist
 
-Before marking a company as resolved, verify:
+Before presenting results, verify:
 
-- [ ] The ATS slug returns valid JSON with a parseable job listing structure (not a 404, not an HTML page, not an empty response)
-- [ ] The slug is for the right company (not a different company with a similar name)
-- [ ] The company hasn't already been inserted into the database (check website URL)
+- [ ] Every company was validated for activity, independence, and engineering relevance before resolution
+- [ ] The `cernio resolve` script was run before attempting manual resolution (no duplicating the script's work)
+- [ ] Companies that failed mechanical resolution were researched via AI fallback, not just abandoned
+- [ ] Resolved portals return valid JSON from the provider's API (or confirmed zero jobs on a provider that does not give false positives)
+- [ ] SmartRecruiters results have `totalFound > 0` — a zero-result 200 is not evidence of usage
+- [ ] The slug belongs to the correct company, not a different company with a similar name
+- [ ] No duplicate entries — checked existing database entries before inserting
 - [ ] Bespoke companies have a working careers page URL, not just a homepage
-- [ ] The entry in the database has all available fields populated — don't leave location or sector tags empty if they were known from discovery
+- [ ] Results are presented in a summary table for user review before any database writes
+- [ ] Dead companies have evidence cited (Companies House status, 404 website, etc.)

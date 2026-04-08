@@ -58,7 +58,9 @@ pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>) -> Vec<JobRow>
                (SELECT ud.decision FROM user_decisions ud
                 WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1)
         FROM jobs j
-        JOIN companies c ON c.id = j.company_id";
+        JOIN companies c ON c.id = j.company_id
+        WHERE j.evaluation_status != 'archived'
+        AND c.status != 'archived'";
 
     let order = "
         ORDER BY
@@ -89,7 +91,7 @@ pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>) -> Vec<JobRow>
     };
 
     if let Some(id) = company_filter {
-        let sql = format!("{base} WHERE j.company_id = ?1 {order}");
+        let sql = format!("{base} AND j.company_id = ?1 {order}");
         conn.prepare(&sql)
             .and_then(|mut s| {
                 s.query_map([id], map_row)

@@ -34,6 +34,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
             .query_row(
                 "SELECT COUNT(*) FROM jobs
                  WHERE grade = ?1
+                 AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)
                  AND (grade NOT IN ('SS', 'S'))",
                 params![grade],
@@ -52,6 +53,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
             "SELECT COUNT(*) FROM jobs
              WHERE discovered_at < datetime('now', ?1)
              AND grade NOT IN ('SS', 'S')
+             AND evaluation_status != 'archived'
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             params![format!("-{} days", config.stale_days)],
             |row| row.get(0),
@@ -95,13 +97,14 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
     let mut jobs_removed = 0u64;
     let mut jobs_by_grade = Vec::new();
 
-    // Remove jobs by grade (preserving those with user decisions and SS/S).
+    // Archive jobs by grade (preserving those with user decisions and SS/S).
     for grade in &config.remove_job_grades {
         let count = conn
             .execute(
-                "DELETE FROM jobs
+                "UPDATE jobs SET evaluation_status = 'archived'
                  WHERE grade = ?1
                  AND grade NOT IN ('SS', 'S')
+                 AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 params![grade],
             )
@@ -112,12 +115,13 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
         }
     }
 
-    // Remove stale jobs.
+    // Archive stale jobs.
     let stale = conn
         .execute(
-            "DELETE FROM jobs
+            "UPDATE jobs SET evaluation_status = 'archived'
              WHERE discovered_at < datetime('now', ?1)
              AND grade NOT IN ('SS', 'S')
+             AND evaluation_status != 'archived'
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             params![format!("-{} days", config.stale_days)],
         )
@@ -172,7 +176,7 @@ fn archive_companies(conn: &Connection, config: &CleanupConfig) -> u64 {
 }
 
 fn print_report(report: &CleanupReport, dry_run: bool) {
-    let verb = if dry_run { "would remove" } else { "removed" };
+    let verb = if dry_run { "would archive" } else { "archived" };
     let verb_archive = if dry_run { "would archive" } else { "archived" };
 
     println!("── Cleanup Report ──\n");

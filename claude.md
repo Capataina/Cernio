@@ -76,6 +76,42 @@ If sources conflict: `README.md` sets intent, code determines reality, `context/
 
 ---
 
+## Living System Philosophy
+
+Cernio is not a static database with fixed records. Every artefact in the system — profile entries, company grades, job evaluations, search preferences — is alive and changes over time. The system must be designed, operated, and maintained with this assumption.
+
+### Everything breathes
+
+The profile evolves as the user builds new projects, gains new skills, and shifts preferences. Company grades change as the portfolio grows: a company that was C-tier because it required Kubernetes experience may become B-tier once a Kubernetes project is added to the profile. Job evaluations shift when preferences change — a role in Manchester that scored poorly under a London-only filter becomes viable when the user opens up to relocation. The entire system must account for this temporal dimension. No evaluation is permanently settled.
+
+### Skills must never embed profile snapshots
+
+Every skill and agent instruction must direct the agent to read **all files in `profile/`** at runtime. Every file, every time. Hardcoded profile data — visa expiry dates, project names, degree classifications, location preferences — goes stale silently and causes grading errors that are difficult to detect. The profile files are the single source of truth for who the user is. The moment a skill embeds a snapshot (e.g., "the user has a 2:2 from York" baked into the skill text), that snapshot will eventually diverge from reality and produce incorrect evaluations.
+
+This applies to:
+- Skill SKILL.md files — reference `profile/` as a runtime read target, never inline profile facts.
+- Grading rubric reference files — describe evaluation dimensions and weights, not profile specifics.
+- Any agent prompt that evaluates fit — always read the profile fresh.
+
+### Grades are not permanent
+
+Company grades and job evaluations are tied to the current profile state. When the profile changes significantly — a new project added, a new skill acquired, preferences updated, visa status changed — previously assigned grades should be considered potentially stale. The `check-integrity` skill detects this by comparing profile modification dates against `graded_at` timestamps and recommending targeted re-evaluation where the profile change is relevant to the graded entity.
+
+### Preferences evolve
+
+The search filters, location patterns, cleanup thresholds, and other settings in `preferences.toml` should be reviewed and updated as the user's situation changes. A visa status change may open or close location options. A shift in seniority expectations may change which companies are worth monitoring. A new technology interest may expand which job titles to search for. Preferences are living configuration, not set-and-forget constants.
+
+### Archival over deletion
+
+Jobs and companies are archived, never deleted. Archival preserves the record (including grade, reasoning, and evaluation history) while removing the entry from active views and search scope. This serves two critical purposes:
+
+1. **Deduplication**: archived entries prevent the same company or job from being re-discovered and re-graded in future runs, saving significant AI overhead.
+2. **Reversibility**: `cernio unarchive` restores archived entries when circumstances change — a company that was C-tier under the old profile may deserve reassessment after a major portfolio update.
+
+Deletion destroys this history and forces re-evaluation from scratch. Always archive; never delete.
+
+---
+
 ## Implementation Rules
 
 Do not write production code until the user explicitly permits implementation. Planning, review, architecture discussion, and documentation upkeep may happen before permission. Once permitted, implement proportionately and keep the user informed of meaningful trade-offs.
@@ -142,6 +178,7 @@ Four specialist skills support this workflow. Handle routine edits inline — in
 | **upkeep-learning** | Maintains `learning/` — concept files, learning paths, deep-dives, glossary, exercises | Archive needs initialising, new domain area, broadly stale material, exercise expansion |
 | **project-research** | Produces durable research papers in `context/references/` with external research and project grounding | Deep technical investigation, approach comparison needing research, stale research artefact |
 | **code-health-audit** | Repository-wide analysis for dead code, performance, modularity, consistency — writes plan files to `context/plans/`, never edits source | Full health check, systematic debt identification, optimisation sweep |
+| **check-integrity** | Audits database health: runs `cernio check` for mechanical issues, then applies judgment to detect profile-driven staleness, grade quality issues, missing data, and stale relevance text | After profile changes, before job search sessions, periodic data quality verification |
 
 ### Conversational skill invocation
 

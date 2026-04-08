@@ -19,6 +19,7 @@ async fn main() {
         Some("check") => cmd_check(&args).await,
         Some("stats") => cmd_stats(),
         Some("pending") => cmd_pending(&args),
+        Some("unarchive") => cmd_unarchive(&args),
         Some("lever-list") => cmd_lever_list(&args).await,
         Some("lever-detail") => cmd_lever_detail(&args).await,
         Some("db-status") => cmd_stats(),
@@ -188,6 +189,74 @@ fn cmd_pending(args: &[String]) {
     }
 }
 
+/// Unarchive previously archived jobs/companies so they can be re-evaluated.
+fn cmd_unarchive(args: &[String]) {
+    let db = open_db();
+    let conn = db.conn();
+
+    let target = args.get(2).map(|s| s.as_str());
+
+    match target {
+        Some("--jobs") => {
+            let count = conn
+                .execute(
+                    "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
+                     fit_assessment = NULL, fit_score = NULL
+                     WHERE evaluation_status = 'archived'",
+                    [],
+                )
+                .unwrap_or(0);
+            println!("Unarchived {count} jobs (reset to pending for re-grading).");
+        }
+        Some("--companies") => {
+            let count = conn
+                .execute(
+                    "UPDATE companies SET status = 'resolved'
+                     WHERE status = 'archived'
+                     AND id IN (SELECT company_id FROM company_portals)",
+                    [],
+                )
+                .unwrap_or(0);
+            let bespoke = conn
+                .execute(
+                    "UPDATE companies SET status = 'bespoke'
+                     WHERE status = 'archived'
+                     AND id NOT IN (SELECT company_id FROM company_portals)",
+                    [],
+                )
+                .unwrap_or(0);
+            println!("Unarchived {count} companies (restored to resolved), {bespoke} (restored to bespoke).");
+        }
+        Some("--all") => {
+            let jobs = conn
+                .execute(
+                    "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
+                     fit_assessment = NULL, fit_score = NULL
+                     WHERE evaluation_status = 'archived'",
+                    [],
+                )
+                .unwrap_or(0);
+            let companies = conn
+                .execute(
+                    "UPDATE companies SET status = 'resolved'
+                     WHERE status = 'archived'
+                     AND id IN (SELECT company_id FROM company_portals)",
+                    [],
+                )
+                .unwrap_or(0);
+            println!("Unarchived {jobs} jobs and {companies} companies.");
+        }
+        _ => {
+            println!("Usage: cernio unarchive <--jobs|--companies|--all>");
+            println!();
+            println!("Restores archived entries so they can be re-evaluated.");
+            println!("  --jobs        Unarchive all archived jobs (reset to pending)");
+            println!("  --companies   Unarchive all archived companies");
+            println!("  --all         Unarchive everything");
+        }
+    }
+}
+
 // ── Legacy commands (kept for compatibility) ─────────────────────
 
 async fn cmd_lever_list(args: &[String]) {
@@ -270,7 +339,8 @@ fn print_usage() {
     println!("Pipeline commands:");
     println!("  resolve [--company NAME] [--dry-run]     Resolve ATS portals for pending companies");
     println!("  search [--company NAME] [--grade G] [--dry-run]  Search resolved companies for jobs");
-    println!("  clean [--dry-run] [--jobs-only]          Remove stale/low-grade entries");
+    println!("  clean [--dry-run] [--jobs-only]          Archive stale/low-grade entries");
+    println!("  unarchive <--jobs|--companies|--all>     Restore archived entries for re-evaluation");
     println!("  check [--ats-only]                       Run integrity checks");
     println!();
     println!("Info commands:");

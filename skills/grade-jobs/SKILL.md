@@ -1,5 +1,7 @@
 # grade-jobs
 
+**Read ALL files in `profile/` before grading. Every file. Do not skip any — missing context leads to grading errors.** The profile is a living system that changes as the candidate's portfolio grows. Never rely on embedded snapshots or cached assumptions about the profile.
+
 Grades ungraded jobs from the database in prioritised batches, evaluating each against the user's profile across multiple dimensions and writing structured assessments back to the DB. Use when the user says "grade jobs", "evaluate pending jobs", "rate the next batch", "grade ungraded", "what jobs need grading", "evaluate the queue", "process pending jobs", or when the session's purpose is clearing the grading backlog. Not for searching or fetching jobs (that's search-jobs), not for discovering companies (that's discover-companies), and not for grading companies themselves (that's grade-companies).
 
 ---
@@ -12,17 +14,15 @@ The search pipeline deposits hundreds of jobs into the database with `evaluation
 
 ## Before you start
 
-Read all reference files in `references/` before grading begins:
+1. **Read ALL files in `profile/`.** Every single one — `personal.md`, `visa.md`, `education.md`, `experience.md`, `projects.md`, `skills.md`, `preferences.toml`, `portfolio-gaps.md`, `resume.md`, `cover-letter.md`, `interests.md`, `certifications.md`, `languages.md`, `military.md`, `volunteering.md`. The profile-context reference file explains what to extract from each.
+
+2. Read all reference files in `references/`:
 
 | File | What it gives you |
 |------|-------------------|
 | `references/grading-rubric.md` | The full grading rubric: dimensions, weights, grade scale, worked examples, boundary cases |
-| `references/profile-context.md` | Distilled profile: strengths, targets, constraints, dealbreakers, what makes a job exciting |
+| `references/profile-context.md` | Guide to reading and synthesising the profile files for job evaluation |
 | `references/prioritisation-guide.md` | How to order the pending queue so the most promising jobs get graded first |
-
-Also read:
-- `profile/preferences.toml` for hard constraints and soft signals
-- `profile/portfolio-gaps.md` to understand known gaps (and to update it as new patterns emerge)
 
 ---
 
@@ -76,11 +76,11 @@ If you cannot retrieve the description after reasonable effort, grade conservati
 Read the full description. Assess it across every dimension in the grading rubric, with particular attention to the critical dimensions (career ceiling and seniority match) that can force an F grade regardless of other strengths.
 
 The evaluation should answer:
-- Is the seniority achievable given the profile? Look past the title to the actual requirements.
-- Does this role lead somewhere valuable over a 10-15 year trajectory?
-- What profile elements align strongly? What gaps exist?
+- Is the seniority achievable given the candidate's experience level (from `experience.md`) and project depth (from `projects.md`)? Look past the title to the actual requirements.
+- Does this role lead somewhere valuable over a 10-15 year trajectory, relative to the candidate's long-term targets (from `preferences.toml`)?
+- What profile elements align strongly? What gaps exist (cross-reference `portfolio-gaps.md`)?
 - Is there a compelling narrative for why this candidate fits?
-- What is the sponsorship situation?
+- What is the sponsorship situation (based on the timeline from `visa.md`)?
 
 ### 5. Assign a grade and write to DB
 
@@ -127,8 +127,8 @@ As you evaluate jobs, watch for patterns in what strong matches ask for that the
 
 Examples of patterns to watch for:
 - "Every S-tier infrastructure role mentions Kubernetes. The profile has no containerisation experience."
-- "Three trading systems roles asked for FIX protocol experience, which Nyquestro's FIX TCP acceptor partially addresses but isn't highlighted."
-- "Go appears in 60% of platform engineering roles. The profile has no Go."
+- "Three trading systems roles asked for FIX protocol experience — check `projects.md` to see if any project partially addresses this."
+- "Go appears in 60% of platform engineering roles. Check `skills.md` for current Go proficiency."
 
 After each batch, update `profile/portfolio-gaps.md` with any new patterns observed under the "Patterns from Job Evaluations" section. Be specific: name the roles that surfaced the pattern, the skill/tool that was missing, and how frequently it appeared.
 
@@ -169,11 +169,12 @@ For SS and S roles, the full `fit_assessment` from the database should be availa
 
 Before presenting a batch to the user, verify:
 
+- [ ] All files in `profile/` were read before grading began
 - [ ] Every job was graded against the full rubric, not just title-keyword matching
 - [ ] Seniority assessment is based on the description's actual requirements, not the title
 - [ ] Career ceiling reasoning considers the domain's 10-15 year trajectory, not just the immediate role
 - [ ] Company grade was factored into the job grade (a mediocre role at an S-tier company has more signal than the same role at a C-tier company)
-- [ ] Sponsorship was assessed based on company size, sponsor licence status, and description signals, not assumed
+- [ ] Sponsorship was assessed based on company size, sponsor licence status, and description signals — using the timeline from `visa.md`, not assumed dates
 - [ ] SS and S grades have multi-paragraph assessments that would help the user decide whether to apply
 - [ ] C and F grades have a clear, specific reason (not just "not a fit")
 - [ ] Grades were written to the database with correct evaluation_status mapping

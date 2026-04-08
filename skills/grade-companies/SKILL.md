@@ -1,5 +1,7 @@
 # grade-companies
 
+**Read ALL files in `profile/` before grading. Every file. Do not skip any — missing context leads to grading errors.** The profile is a living system that changes as the candidate's portfolio grows. Never rely on embedded snapshots or cached assumptions about the profile.
+
 Grades ungraded companies in the Cernio database against the user's structured profile. Use when asked to "grade companies", "evaluate companies", "rate the universe", "score the database", "assess companies", "grade ungraded", "update company grades", or when a populate-db run has added companies without grades. Not for grading individual jobs (that's the job grading skill), discovering new companies (that's the discovery skill), or populating the database from potential.md (that's populate-db).
 
 ---
@@ -10,12 +12,12 @@ Company grading answers one question: **is this company worth monitoring for job
 
 The Cernio pipeline works in stages: discovery finds companies, population resolves their ATS endpoints, and job search fetches open roles. Grading sits between population and job search as a quality gate. Without it, every company gets equal search priority, and the user drowns in noise from companies that were never going to produce relevant roles.
 
-But grading serves a deeper purpose than filtering. Caner is a strong technical builder with no formal work experience, a 2:2 from York, and a Graduate visa that expires in August 2027. These facts create a strategic landscape where company choice matters more than it would for a candidate with a conventional CV:
+But grading serves a deeper purpose than filtering. The candidate's specific profile — their technical strengths, credential gaps, visa constraints, and career targets — creates a strategic landscape where company choice matters more than it would for a conventional candidate. Read the profile files to understand this landscape:
 
-- **Engineering reputation is weighted high** because company signal on a CV partially compensates for the absence of prior employer names. "Palantir" or "Cloudflare" on a first job opens doors that credentials alone cannot.
-- **Sponsorship capability is weighted high** because there is a hard deadline. A company that cannot or will not sponsor is a career dead-end after August 2027, no matter how interesting the work.
-- **Career ceiling is weighted high** because the long-term target is senior/principal systems engineering at £500K+ compensation. A company where everyone stays at the same level forever limits trajectory regardless of the entry-level experience quality.
-- **Technical alignment is weighted high** because the portfolio is Rust-heavy systems engineering. A company doing enterprise Java or WordPress development wastes the strongest part of the profile.
+- **Engineering reputation is weighted high** because read `experience.md` — if formal work experience is limited, company signal on a CV partially compensates for the absence of prior employer names.
+- **Sponsorship capability is weighted high** because read `visa.md` — there may be a hard deadline after which sponsorship becomes mandatory. A company that cannot or will not sponsor becomes a career dead-end after that date.
+- **Career ceiling is weighted high** because read `preferences.toml` — the long-term target determines what "high ceiling" means. A company where everyone stays at the same level forever limits trajectory regardless of entry-level experience quality.
+- **Technical alignment is weighted high** because read `projects.md` and `skills.md` — the portfolio has specific technical strengths. A company doing work outside those strengths wastes the strongest part of the profile.
 
 The grade captures this multidimensional judgement in a single letter so that downstream processes (job search, TUI display, cleanup) can act on it without re-evaluating the company every time.
 
@@ -25,9 +27,11 @@ The grade captures this multidimensional judgement in a single letter so that do
 
 ### 1. Load context
 
-Read `references/profile-context.md` for the distilled profile used in evaluation. Read `references/grading-rubric.md` for the full rubric with evaluation dimensions, worked examples, and boundary cases.
+First, read ALL files in `profile/` — every single one. See `references/profile-context.md` for what to extract from each file and how to synthesise it for company evaluation.
 
-Both files are essential. The profile context tells you what matters for this specific candidate. The rubric tells you how to apply those priorities systematically.
+Then read `references/grading-rubric.md` for the full rubric with evaluation dimensions, worked examples, and boundary cases.
+
+Both are essential. The profile files tell you what matters for this specific candidate. The rubric tells you how to apply those priorities systematically. The profile-context reference tells you how to bridge the two.
 
 ### 2. Query the database
 
@@ -142,6 +146,7 @@ Sometimes the user will ask to regrade specific companies — perhaps new inform
 
 Before presenting results to the user:
 
+- [ ] All files in `profile/` were read before grading began
 - [ ] Every graded company has a grade_reasoning that explains the evaluation across the high-weight dimensions (engineering reputation, technical alignment, growth trajectory) with specific evidence
 - [ ] Grade reasoning distinguishes this company from adjacent tiers — it is clear why an A is not an S, or why a B is not a C
 - [ ] C-tier companies are flagged for archival and the user understands what archival means

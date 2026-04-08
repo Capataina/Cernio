@@ -2,6 +2,8 @@
 
 A comprehensive rubric for evaluating whether a company is worth monitoring for jobs, and at what priority. The grade captures a multidimensional judgement about career value — not just "do they have relevant jobs" but "would working here advance the long-term trajectory."
 
+**Important:** This rubric references the candidate's profile throughout. All profile facts must come from reading the files in `profile/` — never from hardcoded values in this document. When the rubric says "the candidate's visa situation" or "the portfolio," it means: read `visa.md`, read `projects.md`, etc.
+
 ---
 
 ## Table of Contents
@@ -25,7 +27,7 @@ These dimensions drive the grade. A company that scores well on all three high-w
 
 **What to assess:** Is this company known for strong engineering? Do they invest in engineering as a discipline, not just as a cost centre?
 
-**Why it matters:** Caner has no formal work experience. The name on the first job compensates for the gaps that a 2:2 and zero years of employment create. "I was at Cloudflare" signals competence to future employers in a way that "I was at RandomAgency Ltd" cannot. This premium is highest for the first job and decreases with each subsequent role — but for this evaluation, it is at its peak.
+**Why it matters:** Read `experience.md` to understand the candidate's work history. If formal experience is limited, the name on the first/next employer compensates for credential gaps in a way that an unknown company name cannot. This premium is highest for the first job and decreases with each subsequent role — but the current state of `experience.md` determines how much weight to place here.
 
 **Strong signals:**
 - Active engineering blog with substantive technical posts (not marketing dressed as engineering)
@@ -46,37 +48,21 @@ These dimensions drive the grade. A company that scores well on all three high-w
 
 #### Technical Alignment
 
-**What to assess:** Does the company's core work involve problems that match the profile? Systems engineering, infrastructure, low-latency, data pipelines, ML infrastructure, distributed systems, compilers, runtimes?
+**What to assess:** Does the company's core work involve problems that match the candidate's profile? Read `projects.md` and `skills.md` to understand the candidate's technical centre of gravity, then assess how well this company's engineering problems overlap.
 
-**Why it matters:** The portfolio is heavily systems-oriented: a lock-free matching engine, a Bevy RL environment with handwritten PPO, a DeFi analytics platform, a CLIP-powered image browser with FFI to ONNX Runtime. A company doing enterprise CRUD or WordPress themes would waste this alignment. The best companies are ones where the day-to-day engineering problems resemble what Caner already builds for fun — that is where the portfolio converts most effectively in interviews.
+**Why it matters:** The portfolio is the candidate's primary evidence of capability. A company whose day-to-day engineering problems resemble what the candidate already builds is a company where the portfolio converts most effectively in interviews and where the daily work builds on existing strength. A company doing work entirely outside the candidate's domain wastes this alignment.
 
-**Strong alignment:**
-- Core product is infrastructure (CDN, database, message queue, orchestration, networking)
-- Performance-critical systems (trading, real-time, low-latency, high-throughput)
-- ML infrastructure (training platforms, inference serving, feature stores, model deployment)
-- Developer tools (compilers, runtimes, build systems, debuggers, profilers)
-- Rust, C++, or systems-level Python in production
-- Problems that require thinking about memory, concurrency, latency, or throughput
+**How to assess alignment:** Map the technologies, domains, and problem types from `projects.md` and `skills.md` against the company's engineering work:
 
-**Moderate alignment:**
-- Backend engineering that is technically deep but application-layer (payment processing, identity, fraud detection)
-- Data engineering (pipelines, warehousing, ETL) — relevant but not the strongest match
-- Security engineering — adjacent to systems, and the network security coursework provides a foundation
-- Go or Java backend with systems-level concerns (garbage collection tuning, lock-free structures, protocol implementation)
-
-**Weak alignment:**
-- Primarily frontend or full-stack web development
-- Enterprise software with no performance constraints
-- Consulting/agency work where the tech stack changes per client
-- Marketing technology, CRM, or business intelligence tools
-- Mobile development
-- Work described entirely in business terms with no technical substance visible
+- **Strong alignment:** Core product involves the same problem types, languages, or domains the candidate's projects demonstrate (e.g., if the portfolio shows low-latency systems work, a trading infrastructure company is strongly aligned)
+- **Moderate alignment:** Problem types are adjacent — technically deep but in a different domain (e.g., payment processing, identity, fraud detection, security engineering)
+- **Weak alignment:** Primarily application-layer work, no performance constraints, consulting/agency work, marketing technology, mobile development, or work described entirely in business terms with no technical substance
 
 #### Growth Trajectory
 
 **What to assess:** Is this company growing, stable, or declining? Are they hiring, expanding, or contracting?
 
-**Why it matters:** A growing company is more likely to (a) actually hire entry-level engineers, (b) have budget for sponsorship when the time comes, (c) offer career progression as the company scales, and (d) still exist in 2 years. A declining company may rescind offers, freeze hiring, or shut down the specific team after joining.
+**Why it matters:** Read `visa.md` for the candidate's visa timeline. A growing company is more likely to (a) actually hire at the candidate's level, (b) have budget for sponsorship when the time comes, (c) offer career progression as the company scales, and (d) still exist when the visa timeline demands it. A declining company may rescind offers, freeze hiring, or shut down the specific team after joining.
 
 **Growing signals:**
 - Recent funding round (Series A or later — pre-seed is too early for this purpose)
@@ -106,9 +92,9 @@ These dimensions influence the grade but rarely drive it alone. A company strong
 
 #### Sponsorship Likelihood
 
-**What to assess:** Can and will this company sponsor a Skilled Worker visa when the Graduate visa expires in August 2027?
+**What to assess:** Can and will this company sponsor the required visa when the candidate's current right-to-work expires? Read `visa.md` for the exact visa type, expiry date, and what sponsorship is needed.
 
-**Why it matters:** This is not a soft preference — it is a hard constraint with a deadline. A company that cannot sponsor means leaving the UK or changing jobs within 2 years regardless of how good the role is. Companies that can and do sponsor are materially more valuable than those that theoretically could but have no track record.
+**Why it matters:** This is not a soft preference — it is a hard constraint with a deadline. A company that cannot sponsor means leaving the UK or changing jobs within the visa window regardless of how good the role is. Companies that can and do sponsor are materially more valuable than those that theoretically could but have no track record.
 
 **How to assess:**
 - Check the [UK Sponsor Register](https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers) — this is the definitive source. If they are listed, they have a licence.
@@ -116,18 +102,18 @@ These dimensions influence the grade but rarely drive it alone. A company strong
 - International hiring history: do they employ people from outside the UK/EU? Do job listings mention visa sponsorship?
 - Sector patterns: finance, big tech, and defence/government contractors sponsor routinely. Small startups and agencies rarely do.
 
-**The time factor:** Because the Graduate visa runs until August 2027, there is a ~1.5 year window where sponsorship is not needed. This means a company that is unlikely to sponsor is not automatically C-tier — it could still be a strong first job for 1-2 years, building CV signal before moving to a sponsor-capable employer. But it is a real cost, and the grade should reflect that the exit is forced.
+**The time factor:** Read `visa.md` for the remaining visa window. During that window, sponsorship is not needed — the candidate has unrestricted right to work. This means a company that is unlikely to sponsor is not automatically C-tier — it could still be a strong first job within the visa window, building CV signal before moving to a sponsor-capable employer. But it is a real cost, and the grade should reflect that the exit is forced.
 
 #### Career Ceiling
 
 **What to assess:** How far can an engineer progress at this company? Is there a path from entry-level to senior, staff, and principal?
 
-**Why it matters:** The long-term income target is £500K+, which requires reaching Staff/Principal level at a company that pays at that level, or reaching senior at a top-tier company that pays senior engineers that much. A company with a flat org structure where everyone is "Software Engineer" forever limits trajectory even if the day-to-day work is interesting.
+**Why it matters:** Read `preferences.toml` for the candidate's long-term income and career targets. A company with a flat org structure where everyone is "Software Engineer" forever limits trajectory even if the day-to-day work is interesting.
 
 **High ceiling indicators:**
 - Multiple defined engineering levels (Junior → Mid → Senior → Staff → Principal or equivalent)
 - Evidence of internal promotion (engineers who joined junior and are now senior/staff)
-- Compensation bands that reach into £150K+ for senior and £250K+ for staff (at the top tier)
+- Compensation bands that reach into the candidate's long-term target range
 - IC (individual contributor) track that is parallel to management, not subordinate to it
 
 **Low ceiling indicators:**
@@ -138,9 +124,9 @@ These dimensions influence the grade but rarely drive it alone. A company strong
 
 #### Company Stability
 
-**What to assess:** Will this company exist and be hiring 2 years from now?
+**What to assess:** Will this company exist and be hiring when the candidate needs it to?
 
-**Why it matters:** Joining a company that folds within a year means another job search while burning Graduate visa time. Stability is not about being boring — it is about the company surviving long enough to deliver the career value that justified joining.
+**Why it matters:** Read `visa.md` — joining a company that folds within the visa window means another job search while burning precious visa time. Stability is not about being boring — it is about the company surviving long enough to deliver the career value that justified joining.
 
 **Stable indicators:**
 - Profitable or has clear path to profitability with sufficient runway
@@ -160,9 +146,9 @@ These dimensions break ties between companies that are similar on higher-weight 
 
 | Dimension | What to assess | Notes |
 |-----------|---------------|-------|
-| **CV signal** | Would this company name impress future employers? | Matters most for the first job. "Palantir" > "Form3" > "RandomStartup". |
-| **Location** | London office? Hybrid policy? Commute? | London or Remote-UK is the baseline. Cambridge is acceptable. |
-| **Culture fit** | Engineering-led? Small teams? Autonomy? | Strong preference for engineering-led cultures over sales-led or process-heavy. |
+| **CV signal** | Would this company name impress future employers? | Matters most for a first job (read `experience.md` to determine). |
+| **Location** | Office location? Hybrid policy? Commute? | Read `preferences.toml` for location requirements. |
+| **Culture fit** | Engineering-led? Small teams? Autonomy? | Read `preferences.toml` and `interests.md` for culture preferences. |
 | **Compensation** | Do they pay at or above market? | Hard to assess from outside, but Levels.fyi, Glassdoor, and Blind give signals. |
 
 ---
@@ -176,7 +162,7 @@ Company grades are gentler than job grades — they assess whether a company is 
 | **S** | Excellent company — high priority monitoring | Scores well on all three high-weight dimensions. Strong engineering reputation, clear technical alignment, growing. Medium-weight dimensions are at least decent. This is a company where getting any relevant role would be a career win. |
 | **A** | Good company — regular monitoring | Strong on two of three high-weight dimensions, acceptable on the third. Or strong on all three but with a notable medium-weight weakness (uncertain sponsorship, flat org). Worth tracking actively — good roles will appear here. |
 | **B** | Decent company — worth tracking | Has genuine technical alignment and at least one other high-weight strength, but with clear weaknesses. Maybe small and uncertain, maybe narrow domain, maybe weak on engineering reputation. Still worth having in the database because a good role here is better than no role. |
-| **C** | Marginal — archived | Borderline relevance. The connection to the profile is tenuous, or the company's weaknesses outweigh its strengths for this specific candidate. Archived to prevent noise in job searches, but preserved for deduplication. |
+| **C** | Marginal — archived | Borderline relevance. The connection to the candidate's profile is tenuous, or the company's weaknesses outweigh its strengths for this specific candidate. Archived to prevent noise in job searches, but preserved for deduplication. |
 
 ### The gap between B and C
 
@@ -193,109 +179,111 @@ When in doubt between B and C, lean toward B. The cost of monitoring one extra c
 
 These examples demonstrate the full reasoning chain through every dimension. They are illustrative — each real company should be evaluated fresh based on current evidence, not pattern-matched to these examples.
 
-### Example 1: FAANG — Cloudflare
+**Note:** The examples below reference the candidate's profile generically. When grading real companies, use the actual profile data from `profile/` files.
+
+### Example 1: Tier-1 Infrastructure Company (e.g. Cloudflare)
 
 | Dimension | Assessment |
 |-----------|-----------|
-| Engineering reputation | **Exceptional.** One of the best engineering blogs in the industry. Major OSS projects (Workers, QUIC, Pingora). Engineers are individually well-known. Rust in production at scale. |
-| Technical alignment | **Excellent.** Core product is network infrastructure — CDN, DNS, DDoS mitigation, edge compute. Performance-critical, systems-level, distributed. Directly matches the profile's systems engineering focus. |
+| Engineering reputation | **Exceptional.** One of the best engineering blogs in the industry. Major OSS projects. Engineers are individually well-known. Systems languages in production at scale. |
+| Technical alignment | **Excellent.** Core product is network infrastructure — CDN, DNS, DDoS mitigation, edge compute. Performance-critical, systems-level, distributed. Assess alignment against the candidate's `projects.md`. |
 | Growth trajectory | **Strong.** Publicly traded, consistent revenue growth, expanding product portfolio, actively hiring across engineering. |
-| Sponsorship likelihood | **High.** Large company (3000+ employees), on the UK sponsor register, history of international hiring. London office. |
-| Career ceiling | **High.** Clear IC progression to Staff and Principal. Compensation at senior levels is competitive with FAANG. |
+| Sponsorship likelihood | **High.** Large company (3000+ employees), on the UK sponsor register, history of international hiring. |
+| Career ceiling | **High.** Clear IC progression to Staff and Principal. Compensation at senior levels is competitive. |
 | Stability | **High.** Profitable, public, diversified revenue. |
 
 **Grade: S** — Exemplary across every dimension. Any relevant role here is worth pursuing aggressively.
 
-### Example 2: Fintech Scaleup — Form3
+### Example 2: Fintech Scaleup (e.g. Form3)
 
 | Dimension | Assessment |
 |-----------|-----------|
-| Engineering reputation | **Good.** Known in the payments/fintech engineering community. Engineering blog exists but less prominent than tier-1. Go-heavy engineering team with public talks. |
-| Technical alignment | **Good.** Payment infrastructure — technically deep, involves distributed systems, real-time processing, correctness-critical. Not Rust, but the problem domain (low-latency, high-reliability financial systems) aligns with the systems engineering profile. |
-| Growth trajectory | **Good.** Series C (backed by Goldman Sachs and Lloyds), expanding, actively hiring. |
+| Engineering reputation | **Good.** Known in the payments/fintech engineering community. Engineering blog exists but less prominent. |
+| Technical alignment | **Good.** Payment infrastructure — technically deep, involves distributed systems, real-time processing, correctness-critical. Assess stack overlap against `skills.md`. |
+| Growth trajectory | **Good.** Series C, expanding, actively hiring. |
 | Sponsorship likelihood | **High.** 200+ employees, on the sponsor register, international team. |
-| Career ceiling | **Moderate-good.** Multiple engineering levels, but ceiling is lower than FAANG-scale companies. Comp tops out below the £500K long-term target. |
-| Stability | **Good.** Well-funded, revenue-generating, strong backers. Not yet profitable but has sufficient runway. |
+| Career ceiling | **Moderate-good.** Multiple engineering levels, but ceiling may be lower than the candidate's long-term targets (check `preferences.toml`). |
+| Stability | **Good.** Well-funded, revenue-generating, strong backers. |
 
-**Grade: A** — Strong across most dimensions. The weaker brand recognition and lower comp ceiling compared to S-tier companies keep it at A. A great role here would be a strong first job.
+**Grade: A** — Strong across most dimensions. Weaker brand recognition and potentially lower comp ceiling compared to S-tier keep it at A. A great role here would be a strong first job.
 
-### Example 3: Infrastructure Startup — Coadjute
-
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Unknown/weak signal.** Small company, minimal public engineering presence. No engineering blog, no visible OSS. Hard to assess culture from outside. |
-| Technical alignment | **Moderate.** Real-estate settlement infrastructure — involves some systems-level work (integration, real-time data flow) but the domain is niche and the engineering challenges may be more application-layer than systems-layer. |
-| Growth trajectory | **Moderate.** Funded (Series A), but small team (30-50). Hiring, but at a scale where adding one entry-level engineer is a significant decision. |
-| Sponsorship likelihood | **Low-moderate.** Small company, unlikely to have established sponsorship infrastructure. Might be willing for the right candidate but would be a first-time process. |
-| Career ceiling | **Low.** Team too small for meaningful levels. Career progression would come from the company growing, which is uncertain. |
-| Stability | **Moderate.** Funded but early-stage. Market (proptech/settlement) is real but niche. Survival is not guaranteed. |
-
-**Grade: B** — Genuine technical work and the domain has depth, but weaknesses on reputation, sponsorship, and career ceiling accumulate. Worth monitoring because a well-scoped infrastructure role here could be excellent, but not a priority target.
-
-### Example 4: Defence/Security — Palantir
+### Example 3: Small Infrastructure Startup (e.g. Coadjute)
 
 | Dimension | Assessment |
 |-----------|-----------|
-| Engineering reputation | **Strong.** Known for hiring exceptional engineers and paying well. Engineering-led product development. Technically demanding interview process signals engineering standards. Uses Rust and Java for core systems. |
-| Technical alignment | **Excellent.** Core work is large-scale data infrastructure, distributed systems, and analytical platforms. Performance and correctness are first-class concerns. |
-| Growth trajectory | **Strong.** Public company, growing revenue, expanding government and commercial contracts, actively hiring. |
-| Sponsorship likelihood | **Complex.** Large company with HR infrastructure, on the sponsor register. However, many roles require security clearance (SC/DV), which Caner is not currently eligible for due to nationality and residency requirements. Need to filter for roles that do not require clearance. |
-| Career ceiling | **High.** Clear engineering levels, competitive compensation, strong IC track. Palantir on a CV is a career accelerator. |
-| Stability | **High.** Profitable, public, diversified across government and commercial. |
+| Engineering reputation | **Unknown/weak signal.** Small company, minimal public engineering presence. |
+| Technical alignment | **Moderate.** Niche domain — involves some systems-level work but may be more application-layer. Assess against `projects.md`. |
+| Growth trajectory | **Moderate.** Funded but small team. Hiring at a scale where adding one entry-level engineer is a significant decision. |
+| Sponsorship likelihood | **Low-moderate.** Small company, unlikely to have established sponsorship infrastructure. |
+| Career ceiling | **Low.** Team too small for meaningful levels. |
+| Stability | **Moderate.** Funded but early-stage. |
 
-**Grade: S** — Despite the security clearance complication, the overall profile is exceptional. The clearance issue is a job-level filter (some roles require it, some do not), not a company-level disqualifier. The company is worth maximum monitoring, with clearance requirements checked per role.
+**Grade: B** — Genuine technical work but weaknesses on reputation, sponsorship, and career ceiling accumulate. Worth monitoring because a well-scoped infrastructure role here could be excellent, but not a priority target.
 
-### Example 5: Quant Firm — XTX Markets
-
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Exceptional.** Tech-first market maker — technology is the product, not a support function. Known for paying top-of-market and hiring the strongest engineers. Small team, every engineer works on critical systems. |
-| Technical alignment | **Excellent.** Low-latency trading infrastructure, matching engines, data pipelines, ML for strategy — directly overlaps with Nyquestro's domain. Caner has literally built a matching engine in Rust. |
-| Growth trajectory | **Strong.** Profitable, expanding, actively hiring. Does not raise external funding because it does not need to. |
-| Sponsorship likelihood | **High.** International team, on the sponsor register, accustomed to hiring non-UK talent. |
-| Career ceiling | **Very high.** Quant-tech compensation is the highest in the industry. Senior engineers earn well into the £500K+ range. IC-focused culture. |
-| Stability | **High.** Massively profitable. Survival is not a concern. |
-
-**Grade: S** — One of the strongest possible matches. Technical alignment is near-perfect (Nyquestro is a direct portfolio piece), compensation ceiling is the highest available, and the company is famously engineering-led. The only risk is that entry-level hiring is fiercely competitive.
-
-### Example 6: AI Lab — Anthropic (or equivalent)
+### Example 4: Defence/Security Company with Clearance Complexity (e.g. Palantir)
 
 | Dimension | Assessment |
 |-----------|-----------|
-| Engineering reputation | **Exceptional.** Research lab with world-class engineers. Public contributions to the field, technically demanding hiring bar. |
-| Technical alignment | **Good-excellent.** ML infrastructure, distributed training systems, inference serving — all systems-level problems. The ONNX Runtime work, tinygrad contribution, and NeuroDrive's handwritten PPO demonstrate relevant depth. Alignment is strongest on the infrastructure/systems side of AI, less on the research side. |
-| Growth trajectory | **Strong.** Well-funded, rapidly expanding, high demand for engineering talent. |
-| Sponsorship likelihood | **High.** US-headquartered but with UK/London presence, international hiring is routine. |
-| Career ceiling | **Very high.** AI infrastructure engineering compensation is among the highest in the industry. Clear progression paths. |
-| Stability | **Good.** Well-funded with strong backing. Market risk is low (AI is not going away). Dependency on continued funding is a minor concern for non-profitable labs. |
+| Engineering reputation | **Strong.** Known for hiring exceptional engineers and paying well. Engineering-led product development. |
+| Technical alignment | **Excellent.** Large-scale data infrastructure, distributed systems, analytical platforms. Assess against `projects.md`. |
+| Growth trajectory | **Strong.** Public company, growing revenue, actively hiring. |
+| Sponsorship likelihood | **Complex.** Large company with HR infrastructure, on the sponsor register. However, many roles require security clearance — check `personal.md` and `military.md` for clearance eligibility based on nationality and residency. Need to filter for roles that do not require clearance. |
+| Career ceiling | **High.** Clear engineering levels, competitive compensation, strong IC track. |
+| Stability | **High.** Profitable, public, diversified. |
 
-**Grade: S** — AI infrastructure is a strong match for the systems engineering profile, and the ML background (PPO, ONNX, tinygrad) provides domain credibility. The entry bar is high, but the payoff is exceptional.
+**Grade: S** — Despite the security clearance complication, the overall profile is exceptional. Clearance is a job-level filter (some roles require it, some do not), not a company-level disqualifier.
 
-### Example 7: Bespoke/Niche — Grafana Labs
-
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Strong.** Major OSS company — Grafana, Loki, Tempo, Mimir are widely used. Engineering culture is core to the company identity. Go-heavy but increasingly using Rust for performance-critical components. |
-| Technical alignment | **Good.** Observability infrastructure — involves distributed systems, time-series databases, query engines, high-throughput data ingestion. Systems-level problems, even if the domain is observability rather than trading or ML. |
-| Growth trajectory | **Strong.** Series D+, growing rapidly, large customer base, actively hiring. |
-| Sponsorship likelihood | **High.** 500+ employees, global team, on the sponsor register. Remote-friendly culture with London presence. |
-| Career ceiling | **Good-high.** Engineering-led company with clear levels. Comp is competitive but below top-tier quant/FAANG for senior roles. |
-| Stability | **Good.** Revenue-generating, well-funded, strong market position in observability. |
-
-**Grade: A** — Strong across the board, with genuine technical alignment (infrastructure, distributed systems, performance). The slightly lower comp ceiling and less direct domain overlap (observability vs. trading/ML infrastructure) compared to S-tier companies keep it at A. An excellent place for a first job — strong engineering culture, OSS-first, and the work is genuinely systems-level.
-
-### Example 8: Trading Infrastructure — Adaptive Financial Consulting
+### Example 5: Top Quant Firm (e.g. XTX Markets)
 
 | Dimension | Assessment |
 |-----------|-----------|
-| Engineering reputation | **Good.** Known in the trading infrastructure community. Build Aeron (high-performance messaging) and related tooling. Technically strong team with conference presence. |
-| Technical alignment | **Excellent.** Low-latency messaging, exchange connectivity, trading system infrastructure — directly in the domain of Nyquestro and Tectra. Java/C++ heavy, but the problems (lock-free data structures, protocol design, latency measurement) are the same ones Caner works on in Rust. |
-| Growth trajectory | **Moderate.** Established company, steady rather than explosive growth. Consulting model means revenue is project-dependent. |
-| Sponsorship likelihood | **Moderate.** Medium-sized company, likely on the sponsor register but consulting firms sometimes prefer candidates who do not need sponsorship. |
+| Engineering reputation | **Exceptional.** Tech-first market maker — technology is the product. Known for paying top-of-market and hiring the strongest engineers. |
+| Technical alignment | **Excellent.** Low-latency trading infrastructure, matching engines, data pipelines, ML for strategy. Assess against `projects.md` — if the portfolio includes trading systems or matching engine work, this is a near-perfect match. |
+| Growth trajectory | **Strong.** Profitable, expanding, actively hiring. |
+| Sponsorship likelihood | **High.** International team, on the sponsor register. |
+| Career ceiling | **Very high.** Quant-tech compensation is among the highest in the industry. Check against long-term targets in `preferences.toml`. |
+| Stability | **High.** Massively profitable. |
+
+**Grade: S** — One of the strongest possible matches if the candidate's portfolio includes relevant domain work. The only risk is that entry-level hiring is fiercely competitive.
+
+### Example 6: AI Lab (e.g. Anthropic or equivalent)
+
+| Dimension | Assessment |
+|-----------|-----------|
+| Engineering reputation | **Exceptional.** Research lab with world-class engineers. |
+| Technical alignment | **Good-excellent.** ML infrastructure, distributed training systems, inference serving — all systems-level problems. Check `projects.md` for ML-adjacent work (RL implementations, ONNX experience, ML framework contributions). |
+| Growth trajectory | **Strong.** Well-funded, rapidly expanding. |
+| Sponsorship likelihood | **High.** International hiring is routine. |
+| Career ceiling | **Very high.** AI infrastructure engineering compensation is among the highest. |
+| Stability | **Good.** Well-funded. Market risk is low. |
+
+**Grade: S** — AI infrastructure is a strong match for a systems engineering profile with ML depth. Entry bar is high but payoff is exceptional.
+
+### Example 7: OSS-First Infrastructure Company (e.g. Grafana Labs)
+
+| Dimension | Assessment |
+|-----------|-----------|
+| Engineering reputation | **Strong.** Major OSS company. Engineering culture is core to company identity. |
+| Technical alignment | **Good.** Observability infrastructure — distributed systems, time-series databases, query engines, high-throughput data ingestion. Assess against `projects.md` and `skills.md`. |
+| Growth trajectory | **Strong.** Well-funded, growing rapidly. |
+| Sponsorship likelihood | **High.** Large global team, on the sponsor register. |
+| Career ceiling | **Good-high.** Engineering-led company with clear levels. Comp may be slightly below top-tier firms. |
+| Stability | **Good.** Revenue-generating, well-funded. |
+
+**Grade: A** — Strong across the board, with genuine technical alignment. Slightly lower comp ceiling and less direct domain overlap compared to S-tier keep it at A. Excellent first-job environment.
+
+### Example 8: Trading Infrastructure Consultancy (e.g. Adaptive Financial Consulting)
+
+| Dimension | Assessment |
+|-----------|-----------|
+| Engineering reputation | **Good.** Known in the trading infrastructure community. Technically strong team. |
+| Technical alignment | **Excellent.** Low-latency messaging, exchange connectivity, trading system infrastructure. Assess against `projects.md` for relevant domain work. |
+| Growth trajectory | **Moderate.** Established company, steady growth. Consulting model means revenue is project-dependent. |
+| Sponsorship likelihood | **Moderate.** Medium-sized company, consulting firms sometimes prefer candidates without sponsorship needs. |
 | Career ceiling | **Moderate.** Consulting company structure may limit IC progression compared to product companies. |
-| Stability | **Good.** Established, profitable, niche market with consistent demand. |
+| Stability | **Good.** Established, profitable. |
 
-**Grade: A** — Excellent technical alignment with the trading infrastructure portfolio, but the consulting model introduces career ceiling and growth trajectory concerns that keep it from S-tier. The domain overlap is strong enough that a good role here would directly build on existing project work.
+**Grade: A** — Excellent technical alignment, but consulting model introduces career ceiling and growth trajectory concerns.
 
 ---
 
@@ -303,43 +291,41 @@ These examples demonstrate the full reasoning chain through every dimension. The
 
 These examples demonstrate where the grade boundary lies and why a company falls on one side rather than the other.
 
-### "Looks like an A but is actually a B" — Monzo
+### "Looks like an A but is actually a B" — Consumer Fintech
 
 **Why it looks like A:** Well-known fintech brand, engineering blog, large engineering team, confirmed sponsor, growing. Good CV signal.
 
-**Why it is B:** Technical alignment is moderate — Monzo's engineering challenges are primarily application-layer (mobile banking, microservices, product features) rather than systems-level infrastructure. The tech stack (Go, Kubernetes, cloud-native) is relevant but the day-to-day problems are not the kind of systems engineering the profile is strongest in. A backend role at Monzo is a fine job but would not leverage the portfolio's deepest strengths (low-latency, lock-free concurrency, Rust, ML infrastructure).
+**Why it is B:** Technical alignment is moderate — engineering challenges are primarily application-layer (mobile banking, microservices, product features) rather than systems-level infrastructure. The tech stack is relevant but the day-to-day problems are not the kind of work the candidate's portfolio demonstrates deepest strength in (check `projects.md`).
 
 **The principle:** Brand recognition does not compensate for misaligned technical depth. An A-tier company needs strong technical alignment, not just strong reputation.
 
-### "Looks like a B but is actually an A" — Small Rust Infrastructure Company
+### "Looks like a B but is actually an A" — Small Company with Perfect Technical Fit
 
-Imagine a 50-person company building database infrastructure in Rust, well-funded (Series B), with engineers from Google and Meta, an active engineering blog, and a clear IC ladder to Staff engineer.
+Imagine a 50-person company building infrastructure in the candidate's primary language (check `skills.md`), well-funded, with engineers from top firms, an active engineering blog, and a clear IC ladder.
 
-**Why it looks like B:** Small, relatively unknown, limited CV signal, narrow domain.
+**Why it looks like B:** Small, relatively unknown, limited CV signal.
 
-**Why it is A:** Technical alignment is near-perfect (Rust, infrastructure, performance-critical). Engineering reputation is strong for its size (pedigree of engineers, technical blog). Growth trajectory is good (well-funded, hiring). Sponsorship is plausible (Series B with 50 employees typically has HR infrastructure). The only weakness is CV signal, which is a low-weight tiebreaker, not a high-weight driver.
+**Why it is A:** Technical alignment is near-perfect. Engineering reputation is strong for its size. Growth trajectory is good. The only weakness is CV signal, which is a low-weight tiebreaker, not a high-weight driver.
 
 **The principle:** Company size and brand are tiebreakers, not primary drivers. A small company doing exactly the right technical work with strong engineers can outrank a large company doing tangentially relevant work.
 
 ### "Looks like an S but is actually an A" — Large Consultancy with Tech Division
 
-Consider a major consultancy (Accenture, Deloitte, McKinsey) with a dedicated technology division that does cloud infrastructure, data engineering, and digital transformation.
-
 **Why it looks like S:** Huge brand, definite sponsor, massive scale, good CV signal, stable.
 
-**Why it is A (or even B):** Engineering culture in a consultancy is fundamentally different from a product company. Engineering is a cost centre, not a profit centre. The tech stack changes per client engagement. Career progression is on a consulting ladder (Analyst → Consultant → Manager → Partner), not an engineering ladder (Junior → Senior → Staff → Principal). The work may be technically interesting on some engagements and mind-numbing on others, with limited control over assignment. Technical alignment is unpredictable.
+**Why it is A (or even B):** Engineering culture in a consultancy is fundamentally different from a product company. Engineering is a cost centre, not a profit centre. Career progression is on a consulting ladder, not an engineering ladder. The work may be technically interesting on some engagements and mind-numbing on others.
 
-**The principle:** Size, stability, and sponsorship do not override culture and alignment. A consultancy can be A-tier if the specific division genuinely does deep engineering work, but the consulting model itself is a structural drag on career ceiling and technical growth.
+**The principle:** Size, stability, and sponsorship do not override culture and alignment.
 
 ### "Looks like a C but is actually a B" — Pre-revenue Startup with Exceptional Technical Fit
 
-A 15-person startup building a Rust-based distributed database, pre-revenue, seed-funded, with no sponsorship history.
+A tiny startup building in the candidate's primary language and domain (check `projects.md` and `skills.md`), pre-revenue, seed-funded, with no sponsorship history.
 
 **Why it looks like C:** Tiny, no revenue, sponsorship unlikely, no career ladder, survival uncertain.
 
-**Why it is B:** The technical alignment is exceptional — Rust, distributed systems, database internals. The engineering team, while small, may be doing work that is directly portfolio-relevant. The sponsorship weakness is real but mitigated by the Graduate visa window (can work here for 1-1.5 years without sponsorship). If the company survives and grows, early employee signal is valuable. If it does not, the experience is still technically relevant.
+**Why it is B:** Technical alignment is exceptional. The sponsorship weakness is real but mitigated by the current visa window (check `visa.md` — if there is time remaining on the current visa, the candidate can work here without sponsorship during that period). If the company survives, early employee signal is valuable.
 
-**The principle:** A company with exceptional technical alignment gets the benefit of the doubt at the B/C boundary. The cost of missing a genuinely good role at a company like this is higher than the cost of monitoring one extra small company.
+**The principle:** A company with exceptional technical alignment gets the benefit of the doubt at the B/C boundary.
 
 ---
 
@@ -353,10 +339,10 @@ Some companies should never enter the database. These are not C-tier (marginal b
 | **Acquired and absorbed** | No separate hiring, careers redirect to parent | Remove. If the parent company is interesting, track the parent instead |
 | **No engineering team** | Purely sales, marketing, or business operations | Remove. "We're a tech company" on the website does not mean they have engineers |
 | **Completely unrelated work** | Interior design firm, restaurant chain, law firm | Remove. Sometimes name collisions with tech companies cause false positives in discovery |
-| **Too small to hire entry-level** | 3-5 person company with no funding | Remove. They are not going to hire someone who needs mentorship and onboarding |
-| **Excluded sector** | Gambling, adtech, consumer crypto | Remove. These are hard exclusions in the preferences, not judgement calls |
+| **Too small to hire at candidate's level** | 3-5 person company with no funding | Remove. They are not going to hire someone who needs mentorship and onboarding |
+| **Excluded sector** | Check `preferences.toml` for hard exclusions | Remove. These are hard exclusions, not judgement calls |
 
-The distinction between "C-tier and archived" and "excluded entirely" matters for the database. C-tier companies have a row with grade='C' and status='archived' — they prevent re-discovery. Excluded companies are not inserted at all, so they could theoretically be re-discovered, but the discovery skill should also recognise the same exclusion criteria.
+The distinction between "C-tier and archived" and "excluded entirely" matters for the database. C-tier companies have a row with grade='C' and status='archived' — they prevent re-discovery. Excluded companies are not inserted at all.
 
 ---
 
@@ -367,9 +353,9 @@ Company grade sets a monitoring priority. Job grade determines whether to apply.
 | Scenario | Company Grade | Job Grade | Why it makes sense |
 |----------|:------------:|:---------:|-------------------|
 | Top company, perfect role | S | SS | The dream case. Apply immediately with maximum effort. |
-| Top company, wrong role | S | F | Cloudflare hiring a marketing manager. Company is great, role is irrelevant. |
-| Risky company, perfect role | B | S | 40-person Rust infrastructure startup with a founding engineer role. Company is uncertain but the role is exceptional for growth. |
-| Good company, mediocre role | A | C | Strong fintech with a legacy Java maintenance role. Company is good but the role is a dead end. |
-| Unknown company, strong technical role | B | A | Small observability company with a systems engineer role involving Rust and distributed tracing. Company lacks brand signal but the role itself is technically excellent. |
+| Top company, wrong role | S | F | Great company hiring for a role outside the candidate's profile. Company is great, role is irrelevant. |
+| Risky company, perfect role | B | S | Small startup with a founding engineer role perfectly matching the portfolio. Company is uncertain but the role is exceptional for growth. |
+| Good company, mediocre role | A | C | Strong company with a legacy maintenance role. Company is good but the role is a dead end. |
+| Unknown company, strong technical role | B | A | Small company with a systems engineer role matching the candidate's skills. Company lacks brand signal but the role itself is technically excellent. |
 
 **The key insight:** Company grade determines whether jobs are fetched and shown to the user. Job grade determines whether to apply. A high company grade with no good roles wastes some search time but causes no harm. A low company grade that filters out a great role before it is ever seen is an unrecoverable loss. This is why the B/C boundary matters so much — it is the cutoff between "jobs are visible" and "jobs are invisible."

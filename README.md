@@ -145,6 +145,7 @@ Each capability is independently completable. A working universe and resolver al
 - **Human in the loop for everything external**: Cernio never submits an application, sends an email, or contacts a recruiter. Every action that touches the outside world is performed by you.
 - **Plain text everywhere**: markdown for company files, TOML for preferences, JSONL for job data, SQLite for hot-path queries. Nothing is opaque.
 - **Generic scripts, not hardcoded pipelines**: scripts take parameters and work for any ATS, any search terms, any set of companies. No hardcoded addresses or terms.
+- **Living system, not static database**: grades, evaluations, and preferences evolve with the profile. Nothing is permanent — everything is periodically refreshed as the user's skills and situation change. Skills read the profile fresh at runtime rather than embedding snapshots. Archived entries are preserved for deduplication and reversibility, never deleted.
 
 ---
 

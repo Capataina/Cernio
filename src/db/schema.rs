@@ -38,6 +38,7 @@ impl Database {
     fn migrate(&self) -> Result<()> {
         self.conn.execute_batch(MIGRATION_001)?;
         self.migrate_002_add_archived_status()?;
+        self.migrate_003_add_job_archival()?;
         Ok(())
     }
 
@@ -98,6 +99,117 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
             CREATE INDEX IF NOT EXISTS idx_companies_grade ON companies(grade);
 
+            PRAGMA foreign_keys = ON;
+        ")?;
+
+        Ok(())
+    }
+
+    /// Migration 003: Add 'archived' to jobs evaluation_status CHECK constraint.
+    ///
+    /// Allows jobs to be soft-archived instead of deleted. Archived jobs keep
+    /// their URL in the DB so they aren't re-added on subsequent searches.
+    fn migrate_003_add_job_archival(&self) -> Result<()> {
+        // Test if the constraint already allows 'archived'.
+        // We need a valid company to satisfy the FK, so use a subquery.
+        let has_companies: bool = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM companies", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map(|c| c > 0)
+            .unwrap_or(false);
+
+        if !has_companies {
+            // Fresh DB — MIGRATION_001 will be rewritten to include 'archived' in future.
+            // For now, rebuild the jobs table directly.
+            let needs_migration = true;
+            if needs_migration {
+                self.conn.execute_batch("
+                    PRAGMA foreign_keys = OFF;
+                    DROP TABLE IF EXISTS jobs_new;
+                    CREATE TABLE jobs_new (
+                        id                  INTEGER PRIMARY KEY,
+                        company_id          INTEGER NOT NULL REFERENCES companies(id),
+                        portal_id           INTEGER REFERENCES company_portals(id),
+                        title               TEXT NOT NULL,
+                        url                 TEXT NOT NULL UNIQUE,
+                        location            TEXT,
+                        remote_policy       TEXT,
+                        posted_date         TEXT,
+                        raw_description     TEXT,
+                        parsed_tags         TEXT,
+                        evaluation_status   TEXT NOT NULL DEFAULT 'pending'
+                                            CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit', 'archived')),
+                        fit_assessment      TEXT,
+                        fit_score           REAL,
+                        grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+                        discovered_at       TEXT NOT NULL
+                    );
+                    INSERT OR IGNORE INTO jobs_new SELECT * FROM jobs;
+                    DROP TABLE jobs;
+                    ALTER TABLE jobs_new RENAME TO jobs;
+                    CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
+                    CREATE INDEX IF NOT EXISTS idx_jobs_evaluation_status ON jobs(evaluation_status);
+                    CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
+                    PRAGMA foreign_keys = ON;
+                ")?;
+            }
+            return Ok(());
+        }
+
+        // Test with a real company_id.
+        let company_id: i64 = self.conn.query_row(
+            "SELECT id FROM companies LIMIT 1",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let needs_migration = self
+            .conn
+            .execute(
+                "INSERT INTO jobs (company_id, title, url, evaluation_status, discovered_at)
+                 VALUES (?1, '__migration_test__', '__migration_test__', 'archived', '__test__')",
+                rusqlite::params![company_id],
+            )
+            .is_err();
+
+        if !needs_migration {
+            self.conn.execute(
+                "DELETE FROM jobs WHERE url = '__migration_test__'",
+                [],
+            )?;
+            return Ok(());
+        }
+
+        // Rebuild the jobs table with the updated CHECK constraint.
+        self.conn.execute_batch("
+            PRAGMA foreign_keys = OFF;
+            DROP TABLE IF EXISTS jobs_new;
+            CREATE TABLE jobs_new (
+                id                  INTEGER PRIMARY KEY,
+                company_id          INTEGER NOT NULL REFERENCES companies(id),
+                portal_id           INTEGER REFERENCES company_portals(id),
+                title               TEXT NOT NULL,
+                url                 TEXT NOT NULL UNIQUE,
+                location            TEXT,
+                remote_policy       TEXT,
+                posted_date         TEXT,
+                raw_description     TEXT,
+                parsed_tags         TEXT,
+                evaluation_status   TEXT NOT NULL DEFAULT 'pending'
+                                    CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit', 'archived')),
+                fit_assessment      TEXT,
+                fit_score           REAL,
+                grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+                discovered_at       TEXT NOT NULL
+            );
+            INSERT INTO jobs_new SELECT * FROM jobs;
+            DROP TABLE jobs;
+            ALTER TABLE jobs_new RENAME TO jobs;
+            CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
+            CREATE INDEX IF NOT EXISTS idx_jobs_evaluation_status ON jobs(evaluation_status);
+            CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
             PRAGMA foreign_keys = ON;
         ")?;
 

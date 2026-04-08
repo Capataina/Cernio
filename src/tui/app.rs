@@ -312,20 +312,22 @@ impl App {
 
     pub fn run_cleanup(&mut self) {
         if let Ok(conn) = Connection::open(&self.db_path) {
-            // Remove F and C graded jobs (preserving those with user decisions and SS/S).
+            // Archive F and C graded jobs (preserving those with user decisions and SS/S).
             let _ = conn.execute(
-                "DELETE FROM jobs
+                "UPDATE jobs SET evaluation_status = 'archived'
                  WHERE grade IN ('F', 'C')
                  AND grade NOT IN ('SS', 'S')
+                 AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 [],
             );
 
-            // Remove stale jobs (>14 days, no decision, not SS/S).
+            // Archive stale jobs (>14 days, no decision, not SS/S).
             let _ = conn.execute(
-                "DELETE FROM jobs
+                "UPDATE jobs SET evaluation_status = 'archived'
                  WHERE discovered_at < datetime('now', '-14 days')
                  AND grade NOT IN ('SS', 'S')
+                 AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 [],
             );
