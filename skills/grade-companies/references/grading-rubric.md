@@ -166,17 +166,33 @@ Company grades are gentler than job grades — they assess whether a company is 
 | **B** | Decent — worth tracking | Has genuine relevance and at least one clear strength, but with notable weaknesses. Maybe the tech stack doesn't match, maybe the company is small, maybe the domain is adjacent rather than core. Still worth having in the database because a good role here beats no role. | ~35-40% |
 | **C** | Marginal — archived | The connection to the candidate's profile is genuinely tenuous, OR the company has hard negatives (excluded sector, no engineering team, dissolved). Archived to prevent noise, preserved for dedup. | ~20-25% |
 
+### Hard grade floors — NON-NEGOTIABLE
+
+These are not suggestions. They are rules that OVERRIDE the dimension-based evaluation. If a company matches any of these conditions, the grade floor applies regardless of what the dimension scoring says. These exist because production grading runs have repeatedly made the same errors — penalising world-class employers for irrelevant reasons like tech stack mismatch.
+
+**Floor 1: FAANG-tier and equivalent → minimum A.**
+Companies: Google, Google DeepMind, Meta, Amazon (AWS), Apple, Microsoft, Netflix, Bloomberg, Spotify, Uber, Stripe, Databricks, Snowflake, and any company of equivalent scale, engineering reputation, and sponsorship capability. These are career-defining employers with guaranteed sponsorship, world-class engineering on at least some teams, and CV signal that opens every door. They are minimum A even if the tech stack is completely different, even if the domain is "consumer," even if the specific team is uncertain. The only exception: if the company is in an explicitly excluded sector (gambling, adtech, consumer-crypto — none of these companies are).
+
+**Floor 2: Major UK employers with engineering teams and sponsorship → minimum B.**
+Any company that is: (a) well-known enough that UK engineers would recognise the name, AND (b) large enough (200+ employees) to have established sponsorship infrastructure, AND (c) has a genuine engineering team (not just sales/support). Examples: Monzo, Revolut, Starling Bank, Wise, Checkout.com, Adyen, GoCardless, Form3, ClearBank, Darktrace, Ocado Technology, Palantir. These should never be C unless they fall into an excluded sector. The candidate needs a first job with sponsorship — large UK employers that provide both are inherently valuable.
+
+**Floor 3: Companies in preferred sectors with 100+ employees → minimum B.**
+If a company operates in a preferred sector (fintech-infrastructure, trading-systems, AI-infrastructure, developer-tools, databases, compilers) AND has 100+ employees, it is minimum B. The sector relevance combined with the company's ability to actually hire and potentially sponsor makes it worth monitoring regardless of tech stack.
+
+**Floor 4: Any company with Rust in production → minimum B.**
+If a company uses Rust as a primary production language, it is minimum B. Rust is the candidate's primary language at proficient level. A Rust shop that is small, unknown, or in a non-preferred domain is still worth monitoring because the language match is exceptionally strong and Rust jobs are rare.
+
 ### Anti-inflation rules
 
-These rules prevent the grade drift that occurs when every "good company" becomes S:
+These prevent grade inflation where every decent company becomes S:
 
-1. **Tech stack mismatch alone does NOT make a company C.** A large, well-funded company with strong engineering reputation and guaranteed sponsorship is at minimum B, even if they use Java instead of Rust. The tech stack is a medium-weight dimension, not a dealbreaker. Monzo (Go), Stripe (Ruby/Go), Bloomberg (C++) are all valuable employers regardless of language.
+1. **S requires genuine exceptionality, not just "good across the board."** To earn S, a company must have either (a) near-perfect technical alignment where the candidate's specific projects map directly to the company's core work (matching engines → trading firms, compilers → compiler companies, Rust systems → Rust infrastructure companies), OR (b) an engineering reputation so strong and career ceiling so high that getting hired there would be transformative regardless of the specific role (top quant firms, leading AI labs). "Good company, grows, sponsors" is A-tier, not S.
 
-2. **Large UK employers with guaranteed sponsorship get a floor of B.** Companies like Monzo, Revolut, Starling, Checkout.com, Wise, and Adyen are massive employers with established engineering teams, proven sponsorship track records, and strong CV signal. They should never be C-tier unless they fall into an explicitly excluded sector. Even if their technical alignment is moderate, the sponsorship guarantee, brand recognition, and career ceiling make them worth monitoring.
+2. **Tech stack match is a bonus, not a requirement.** A company using Go, Java, C++, or Python is not penalised for not using Rust. Languages are learned in months. What matters is: does the engineering work involve the same class of problems the candidate's projects demonstrate? Distributed systems are distributed systems regardless of language. Low-latency is low-latency. Financial transaction processing is financial transaction processing.
 
-3. **S requires genuine exceptionality, not just "good across the board."** To earn S, a company must have either (a) near-perfect technical alignment where the candidate's specific projects map directly to the company's core work, OR (b) an engineering reputation so strong that getting hired there would be transformative for the candidate's career regardless of the specific role. "Good company, grows, sponsors" is A-tier, not S.
+3. **"Consumer product" does not mean "consumer-facing role."** Backend infrastructure at Spotify, Monzo, or Uber is systems engineering regardless of what the end user sees. The preference exclusion is for consumer-facing ROLES (consulting, support, sales engineering), not for companies whose product is used by consumers.
 
-4. **The candidate's career stage matters.** With no formal work experience, CV signal from the first employer is disproportionately important. A company with a strong engineering name (even if the tech stack isn't Rust) is more valuable than a tiny Rust startup with no brand recognition. First-job companies should be graded with this lens.
+4. **The candidate's career stage matters above all.** Read `experience.md` — with no formal work experience, the first employer's name IS the professional credential. A strong engineering name on the CV (even at a company using Java) is worth more than a perfect Rust role at a company nobody has heard of. This is the single most important lens for company grading at this career stage.
 
 ### The gap between B and C
 

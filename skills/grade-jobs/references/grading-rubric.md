@@ -49,6 +49,22 @@ F is not "bad." F is "do not waste time." The most common F reasons:
 - Role type dealbreaker (check `preferences.toml` for excluded role types)
 - Security clearance requirement that cannot be met (check `personal.md` and `military.md` for nationality and clearance eligibility)
 
+### Hard grade floors for jobs — NON-NEGOTIABLE
+
+These override dimension-based evaluation. They exist because company-level grading errors (Monzo graded C, Amazon graded B) proved that agents systematically under-weight career-stage factors. Job grading MUST NOT repeat this.
+
+**Floor 1: Graduate/entry-level role at a FAANG-tier employer → minimum A.**
+If the role is explicitly graduate, entry-level, or junior at Google, Meta, Amazon, Apple, Microsoft, Bloomberg, Spotify, Uber, Stripe, Databricks, Snowflake, or equivalent — it is minimum A regardless of team, domain, or tech stack. These are career-defining first jobs with guaranteed sponsorship, mentorship, and CV signal. The only exception: if the role hits a HARD exclusion (consulting, customer-facing, gambling). "The team does internal tooling" or "the stack is Java" are NOT valid reasons to drop below A.
+
+**Floor 2: Graduate/entry-level role at any company with 500+ employees, confirmed sponsorship, and a known engineering team → minimum B.**
+If the role says "graduate," "entry-level," "junior," or "0-2 years" at a large employer with sponsorship capability, it is minimum B. The candidate needs a first job that sponsors — any such role is worth considering. Tech stack, domain, or "not perfectly aligned" are not valid reasons to drop below B.
+
+**Floor 3: Any role explicitly mentioning Rust as a primary language → minimum B.**
+Rust is the candidate's primary language at proficient level. Any role that lists Rust as a production language is minimum B regardless of company size, domain, or other factors. Rust roles are rare enough that every one deserves evaluation.
+
+**Floor 4: Any role at an S-tier company → minimum B.**
+If the company was graded S, every engineering role there is minimum B. Even a narrow or operational role at an S-tier company provides CV signal and the potential for internal mobility. Only F if the seniority is genuinely unachievable (hard 5+ years requirement) or the role is non-engineering.
+
 ### Anti-inflation and anti-deflation rules
 
 These prevent the systematic grading errors observed in production:
