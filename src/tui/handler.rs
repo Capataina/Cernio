@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
 use super::app::{App, Focus, View};
 
@@ -114,6 +114,26 @@ fn handle_job_list(app: &mut App, key: KeyEvent) {
                 app.detail_scroll = 0;
             }
         }
+        _ => {}
+    }
+}
+
+pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
+    if app.show_help {
+        return;
+    }
+
+    match mouse.kind {
+        MouseEventKind::ScrollDown => match (app.view, app.focus) {
+            (View::Dashboard, _) => {}
+            (_, Focus::List) => app.next_in_list(),
+            (_, Focus::Detail) => app.scroll_detail_down(),
+        },
+        MouseEventKind::ScrollUp => match (app.view, app.focus) {
+            (View::Dashboard, _) => {}
+            (_, Focus::List) => app.prev_in_list(),
+            (_, Focus::Detail) => app.scroll_detail_up(),
+        },
         _ => {}
     }
 }

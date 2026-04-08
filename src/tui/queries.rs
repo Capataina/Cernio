@@ -184,6 +184,60 @@ pub fn fetch_stats(conn: &Connection) -> DashboardStats {
         )
         .unwrap_or(0);
 
+    let archived_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM companies WHERE status = 'archived'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let applied_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT job_id) FROM user_decisions WHERE decision = 'applied'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let watching_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT job_id) FROM user_decisions WHERE decision = 'watching'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let rejected_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT job_id) FROM user_decisions WHERE decision = 'rejected'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let bespoke_searchable: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM companies
+             WHERE status = 'bespoke'
+             AND grade IN ('S', 'A')
+             AND id NOT IN (SELECT DISTINCT company_id FROM jobs)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let needs_description: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM jobs
+             WHERE grade IN ('SS', 'S', 'A')
+             AND evaluation_status != 'archived'
+             AND (raw_description IS NULL OR LENGTH(raw_description) < 50)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
     let top_matches = fetch_top_matches(conn);
 
     DashboardStats {
@@ -197,6 +251,12 @@ pub fn fetch_stats(conn: &Connection) -> DashboardStats {
         top_matches,
         pending_companies,
         bespoke_count,
+        archived_count,
+        applied_count,
+        watching_count,
+        rejected_count,
+        bespoke_searchable,
+        needs_description,
     }
 }
 
@@ -211,12 +271,13 @@ fn query_groups(conn: &Connection, sql: &str) -> Vec<(String, i64)> {
 
 fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {
     conn.prepare(
-        "SELECT j.title, c.name, j.grade
+        "SELECT j.title, c.name, j.grade, COALESCE(j.location, c.location)
          FROM jobs j
          JOIN companies c ON c.id = j.company_id
-         WHERE j.grade IN ('SS', 'S', 'A')
+         WHERE j.grade IN ('SS', 'S')
+         AND j.evaluation_status != 'archived'
          ORDER BY
-             CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3 END,
+             CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 END,
              j.title
          LIMIT 10",
     )
@@ -226,6 +287,7 @@ fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {
                 title: row.get(0)?,
                 company: row.get(1)?,
                 grade: row.get(2)?,
+                location: row.get(3)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())

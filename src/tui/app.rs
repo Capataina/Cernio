@@ -77,11 +77,18 @@ pub struct DashboardStats {
     pub top_matches: Vec<TopMatch>,
     pub pending_companies: i64,
     pub bespoke_count: i64,
+    pub archived_count: i64,
+    pub applied_count: i64,
+    pub watching_count: i64,
+    pub rejected_count: i64,
+    pub bespoke_searchable: i64,
+    pub needs_description: i64,
 }
 
 pub struct TopMatch {
     pub title: String,
     pub company: String,
+    pub location: Option<String>,
     pub grade: Option<String>,
 }
 

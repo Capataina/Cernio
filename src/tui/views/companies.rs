@@ -3,6 +3,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, Wrap};
 use ratatui::Frame;
+use rusqlite::Connection;
 
 use crate::tui::app::{App, Focus};
 
@@ -205,15 +206,49 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    // Job summary
+    // Job summary with grade distribution and top roles
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled("  ── Jobs ──", t.header)));
+    lines.push(Line::from(Span::styled(
+        format!("  ── Jobs ({}) ──", c.job_count),
+        t.header,
+    )));
     lines.push(Line::from(""));
     if c.job_count > 0 {
-        lines.push(Line::from(format!(
-            "  {} fetched · {} with strong grades",
-            c.job_count, c.fit_count
-        )));
+        if let Ok(conn) = Connection::open(&app.db_path) {
+            let grade_dist = fetch_company_grade_distribution(&conn, c.id);
+            let top_roles = fetch_company_top_roles(&conn, c.id);
+
+            // Render grade distribution bars
+            let max_count = grade_dist.iter().map(|(_, n)| *n).max().unwrap_or(1).max(1);
+            let bar_width: usize = 20;
+
+            for (grade, count) in &grade_dist {
+                let filled = (*count as usize * bar_width) / max_count as usize;
+                let filled = filled.max(if *count > 0 { 1 } else { 0 });
+                let empty = bar_width - filled;
+                let bar: String =
+                    "█".repeat(filled) + &"░".repeat(empty);
+                let grade_style = t.grade_style(Some(grade.as_str()));
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  {grade:<2} "), grade_style),
+                    Span::raw(format!("{bar} {count:>3}")),
+                ]));
+            }
+
+            // Top roles section
+            if !top_roles.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled("  ── Top Roles ──", t.header)));
+                lines.push(Line::from(""));
+                for (grade, title) in &top_roles {
+                    let grade_style = t.grade_style(Some(grade.as_str()));
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {grade:<3} "), grade_style),
+                        Span::raw(title.clone()),
+                    ]));
+                }
+            }
+        }
     } else {
         lines.push(Line::from(Span::styled("  No jobs fetched yet", t.dim)));
     }
@@ -244,4 +279,77 @@ fn detail_row<'a>(
         Span::styled(format!("  {label:<12}"), t.stat_label),
         value,
     ])
+}
+
+/// Returns grade distribution for a company's jobs as (grade, count) pairs.
+/// Always returns all grades in SS/S/A/B/F order, even if count is zero.
+/// Excludes archived jobs.
+fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(String, i64)> {
+    let sql = "
+        SELECT COALESCE(grade, '—'), COUNT(*)
+        FROM jobs
+        WHERE company_id = ?1
+        AND evaluation_status != 'archived'
+        GROUP BY grade
+        ORDER BY CASE grade
+            WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+            WHEN 'B' THEN 4 WHEN 'F' THEN 5 ELSE 6
+        END";
+
+    let raw: Vec<(String, i64)> = conn
+        .prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([company_id], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    // Build ordered result with all grade buckets
+    let grades = ["SS", "S", "A", "B", "F"];
+    let mut result: Vec<(String, i64)> = grades
+        .iter()
+        .filter_map(|g| {
+            let count = raw
+                .iter()
+                .find(|(k, _)| k == *g)
+                .map(|(_, n)| *n)
+                .unwrap_or(0);
+            if count > 0 {
+                Some((g.to_string(), count))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Include ungraded jobs if any
+    if let Some((_, n)) = raw.iter().find(|(k, _)| k == "—") {
+        if *n > 0 {
+            result.push(("—".to_string(), *n));
+        }
+    }
+
+    result
+}
+
+/// Returns the top 5 best-graded jobs at a company as (grade, title) pairs.
+/// Excludes archived jobs.
+fn fetch_company_top_roles(conn: &Connection, company_id: i64) -> Vec<(String, String)> {
+    let sql = "
+        SELECT grade, title
+        FROM jobs
+        WHERE company_id = ?1
+        AND grade IN ('SS', 'S', 'A')
+        AND evaluation_status != 'archived'
+        ORDER BY
+            CASE grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3 END,
+            title
+        LIMIT 5";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([company_id], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
 }

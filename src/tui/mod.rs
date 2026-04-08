@@ -10,7 +10,9 @@ use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use ratatui::crossterm::event::{self, Event, KeyEventKind};
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
+};
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -22,7 +24,7 @@ pub fn run(db_path: &Path) -> io::Result<()> {
     // Terminal setup
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
@@ -34,7 +36,11 @@ pub fn run(db_path: &Path) -> io::Result<()> {
 
     // Terminal teardown — always runs even if the loop errored.
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableMouseCapture,
+        LeaveAlternateScreen
+    )?;
     terminal.show_cursor()?;
 
     result
@@ -54,10 +60,14 @@ fn run_loop(
         app.tick();
 
         if event::poll(tick_rate)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
                     handler::handle_key(app, key);
                 }
+                Event::Mouse(mouse) => {
+                    handler::handle_mouse(app, mouse);
+                }
+                _ => {}
             }
         }
 

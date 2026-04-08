@@ -13,4 +13,5 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/grading-rubric.md` | Why grades (SS–F) instead of fit/no-fit, critical dimensions (career ceiling, breadth, company signal, sponsorship), rubric feeds career coaching |
 | `notes/populate-db-lessons.md` | Slug guessing unreliable, SmartRecruiters false positives, ATS migrations, unsupported providers, validation catches dead companies |
 | `notes/scaling-architecture.md` | Scripts for volume, AI for judgment, every step has one purpose. Batch grading prioritised by signal. False negatives are the enemy. Full plan in `plans/pipeline-separation.md` |
+| `notes/tui-design.md` | Responsive layouts (full vs compact mode), bar charts over pie charts rationale, fit data simplification, mouse/touchpad support plan |
 | `notes/db-maintenance.md` | Clean DB operation (remove F/C grades, stale >14d jobs), ATS verification sweeps, re-evaluation triggers on profile changes |
