@@ -42,6 +42,18 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             app.detail_scroll = 0;
             return;
         }
+        KeyCode::Char('f') => {
+            if !matches!(app.view, View::Dashboard) {
+                app.focused_mode = !app.focused_mode;
+                app.add_toast(if app.focused_mode {
+                    "Focused mode ON — hiding F/C grades".to_string()
+                } else {
+                    "Focused mode OFF — showing all grades".to_string()
+                });
+                app.refresh();
+            }
+            return;
+        }
         KeyCode::Tab => {
             if !matches!(app.view, View::Dashboard) {
                 app.focus = match app.focus {

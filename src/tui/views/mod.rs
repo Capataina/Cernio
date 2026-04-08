@@ -29,6 +29,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     draw_status_bar(frame, app, areas[2]);
 
+    // Toasts — ephemeral notifications in the bottom-right.
+    draw_toasts(frame, app);
+
     if app.show_help {
         draw_help_overlay(frame, app);
     }
@@ -37,10 +40,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 // ── Tab bar ──────────────────────────────────────────────────────
 
 fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let focused_indicator = if app.focused_mode { " [FOCUSED]" } else { "" };
     let titles = vec![
         format!(" Dashboard "),
         format!(" Companies ({}) ", app.stats.total_companies),
-        format!(" Jobs ({}) ", app.stats.total_jobs),
+        format!(" Jobs ({}){} ", app.stats.total_jobs, focused_indicator),
     ];
 
     let tabs = Tabs::new(titles)
@@ -90,6 +94,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 ("a", "applied"),
                 ("x", "reject"),
                 ("o", "open"),
+                ("f", if app.focused_mode { "show all" } else { "focus" }),
                 ("Tab", "detail"),
             ];
             if app.job_filter_company.is_some() {
@@ -148,6 +153,7 @@ fn draw_help_overlay(frame: &mut Frame, app: &App) {
         help_line(t, "  x", "Mark job as rejected"),
         help_line(t, "  o", "Open URL in browser"),
         help_line(t, "  D", "Clean database (from dashboard)"),
+        help_line(t, "  f", "Toggle focused mode (hide F/C)"),
         Line::from(""),
         Line::from(Span::styled("  General", t.help_section)),
         Line::from(""),
@@ -198,4 +204,34 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         Constraint::Percentage((100 - percent_x) / 2),
     ])
     .split(v[1])[1]
+}
+
+// ── Toast notifications ──────────────────────────────────────────
+
+fn draw_toasts(frame: &mut Frame, app: &App) {
+    if app.toasts.is_empty() {
+        return;
+    }
+
+    let area = frame.area();
+    let t = &app.theme;
+
+    // Stack toasts from bottom-right, going up.
+    for (i, toast) in app.toasts.iter().enumerate() {
+        let width = (toast.message.len() as u16 + 4).min(40);
+        let x = area.width.saturating_sub(width + 2);
+        let y = area.height.saturating_sub(3 + (i as u16 * 3));
+
+        if y < 4 {
+            break; // Don't stack into the tab bar.
+        }
+
+        let toast_area = Rect::new(x, y, width, 3);
+        let block = Block::bordered()
+            .border_style(Style::default().fg(t.border_focused));
+        let text = Paragraph::new(format!(" {} ", toast.message)).block(block);
+
+        frame.render_widget(Clear, toast_area);
+        frame.render_widget(text, toast_area);
+    }
 }

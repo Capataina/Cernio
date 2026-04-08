@@ -87,6 +87,11 @@ pub struct TopMatch {
 
 // ── Application state ────────────────────────────────────────────
 
+pub struct Toast {
+    pub message: String,
+    pub created_at: std::time::Instant,
+}
+
 pub struct App {
     pub running: bool,
     pub view: View,
@@ -94,6 +99,9 @@ pub struct App {
     pub theme: Theme,
     pub show_help: bool,
     pub detail_scroll: u16,
+    pub focused_mode: bool,
+    pub frame_count: u64,
+    pub toasts: Vec<Toast>,
 
     pub companies: Vec<CompanyRow>,
     pub company_state: TableState,
@@ -113,7 +121,7 @@ impl App {
         let conn = Connection::open(db_path)?;
 
         let companies = queries::fetch_companies(&conn);
-        let jobs = queries::fetch_jobs(&conn, None);
+        let jobs = queries::fetch_jobs(&conn, None, false);
         let stats = queries::fetch_stats(&conn);
 
         let mut company_state = TableState::default();
@@ -133,6 +141,9 @@ impl App {
             theme: Theme::default(),
             show_help: false,
             detail_scroll: 0,
+            focused_mode: false,
+            frame_count: 0,
+            toasts: Vec::new(),
             companies,
             company_state,
             jobs,
@@ -150,7 +161,7 @@ impl App {
         };
 
         self.companies = queries::fetch_companies(&conn);
-        self.jobs = queries::fetch_jobs(&conn, self.job_filter_company);
+        self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode);
         self.stats = queries::fetch_stats(&conn);
 
         // Clamp selections so they don't point past the end.
@@ -250,7 +261,7 @@ impl App {
         self.detail_scroll = 0;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company);
+            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -265,7 +276,7 @@ impl App {
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, None);
+            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -305,7 +316,36 @@ impl App {
                 rusqlite::params![job_id, decision, now],
             );
         }
+        let icon = match decision {
+            "watching" => "👁",
+            "applied" => "✓",
+            "rejected" => "✗",
+            _ => "·",
+        };
+        self.add_toast(format!("{icon} Marked as {decision}"));
         self.refresh();
+    }
+
+    // ── Toast notifications ────────────────────────────────────────
+
+    pub fn add_toast(&mut self, message: impl Into<String>) {
+        self.toasts.push(Toast {
+            message: message.into(),
+            created_at: std::time::Instant::now(),
+        });
+    }
+
+    pub fn tick(&mut self) {
+        self.frame_count = self.frame_count.wrapping_add(1);
+        // Remove toasts older than 3 seconds.
+        self.toasts
+            .retain(|t| t.created_at.elapsed() < std::time::Duration::from_secs(3));
+    }
+
+    /// Spinner character for animated status indicators.
+    pub fn spinner_char(&self) -> char {
+        const CHARS: [char; 4] = ['◐', '◑', '◒', '◓'];
+        CHARS[(self.frame_count / 5) as usize % 4]
     }
 
     // ── Database cleanup ─────────────────────────────────────────

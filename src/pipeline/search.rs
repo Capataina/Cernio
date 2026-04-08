@@ -248,7 +248,18 @@ async fn fetch_all_parallel(targets: &[SearchTarget]) -> Vec<FetchResult> {
 
         let handle = tokio::spawn(async move {
             let _permit = sem.acquire().await.unwrap();
-            let jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+            // Try up to 3 times — transient timeouts in parallel batches cause silent 0-job results.
+            let mut jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+            if jobs.is_empty() {
+                // Retry after a brief delay.
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+            }
+            if jobs.is_empty() {
+                // Third attempt.
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+            }
             FetchResult { target, jobs }
         });
 
@@ -279,9 +290,9 @@ fn get_search_targets(conn: &Connection, filters: &SearchFilters) -> Vec<SearchT
     let sql = format!(
         "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug, p.ats_extra
          FROM companies c
-         JOIN company_portals p ON p.company_id = c.id AND p.is_primary = 1
+         JOIN company_portals p ON p.company_id = c.id
          WHERE c.status = 'resolved' AND c.grade IN ({})
-         ORDER BY CASE c.grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 ELSE 4 END, c.name",
+         ORDER BY CASE c.grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 ELSE 4 END, c.name, p.is_primary DESC",
         placeholders.join(", ")
     );
 
@@ -313,9 +324,9 @@ fn get_all_search_targets(conn: &Connection) -> Vec<SearchTarget> {
     conn.prepare(
         "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug, p.ats_extra
          FROM companies c
-         JOIN company_portals p ON p.company_id = c.id AND p.is_primary = 1
+         JOIN company_portals p ON p.company_id = c.id
          WHERE c.status = 'resolved'
-         ORDER BY c.name",
+         ORDER BY c.name, p.is_primary DESC",
     )
     .and_then(|mut stmt| {
         stmt.query_map([], |row| {

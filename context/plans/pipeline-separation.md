@@ -2,7 +2,7 @@
 
 > Restructure the Cernio pipeline so every step has exactly one purpose. Scripts handle volume, AI handles judgment. No step does both.
 
-**Status:** Implemented — pipeline separation complete as of session 3 (2026-04-08). Script pipeline, AI skills, schema migration, and integrity checks all built. Runtime features (batch reporting, portfolio gap tracking during grading) deferred to first real use.
+**Status:** Complete and proven — pipeline run end-to-end as of session 3 continued (2026-04-08). 79 companies resolved, 684 jobs fetched and filtered, 14 SS and 53 S graded. Workday fetcher added (6 ATS providers total). MIGRATION_003 adds job archival. `cernio import` added for bulk ingestion. `check-integrity` AI skill created. Runtime features (batch reporting, portfolio gap tracking during grading) deferred to future sessions.
 
 ---
 
@@ -531,7 +531,7 @@ cernio check --fix        # auto-fix what can be fixed (orphans, etc.)
 - [x] Implement duplicate/missing portal detection
 - [x] Implement profile-change detection (compare file mtimes against `relevance_updated_at`)
 - [x] Implement structured report output
-- [ ] Create `check-integrity` AI skill for re-evaluation and grade quality auditing
+- [x] Create `check-integrity` AI skill for re-evaluation and grade quality auditing
 
 ---
 
@@ -579,9 +579,9 @@ Phase 3: AI skills                                            ✅ DONE
   ├── 3b. Create grade-jobs skill (with smart prioritisation)
   └── 3c. Redesign resolve-portals as AI-fallback-only skill
 
-Phase 4: Integrity (script only)                              ✅ DONE
+Phase 4: Integrity                                             ✅ DONE
   ├── 4a. Implement check-integrity script (mechanical checks)
-  └── 4b. Create check-integrity AI skill (re-evaluation)   ← not created as skill file, script only
+  └── 4b. Create check-integrity AI skill (re-evaluation)   ✅
 
 Phase 5: Integration                                          ✅ DONE
   ├── 5a. Update TUI to exclude archived companies

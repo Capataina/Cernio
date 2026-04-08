@@ -91,24 +91,38 @@ async fn probe_all_providers(
     let mut found_providers = std::collections::HashSet::new();
 
     for slug in &candidates {
-        // Probe all providers in parallel for each slug.
-        let (gh, lv, ab, wk, sr) = tokio::join!(
+        // Probe fast providers in parallel first (Greenhouse, Lever, Ashby, Workable).
+        // SmartRecruiters is probed separately because it returns 200 for ANY slug,
+        // making it slow and noisy. Only probe it if we haven't found anything yet.
+        let (gh, lv, ab, wk) = tokio::join!(
             greenhouse::probe(client, slug),
             probe_lever(client, slug),
             ashby::probe(client, slug),
             workable::probe(client, slug),
-            smartrecruiters::probe(client, slug),
         );
 
-        for result in [gh, lv, ab, wk, sr].into_iter().flatten() {
+        for result in [gh, lv, ab, wk].into_iter().flatten() {
             if found_providers.insert(result.provider.to_string()) {
                 results.push(result);
             }
         }
 
-        // If we've found all 5 providers, stop early.
-        if found_providers.len() >= 5 {
+        // If we've found all 4 fast providers, stop early.
+        if found_providers.len() >= 4 {
             break;
+        }
+    }
+
+    // Only probe SmartRecruiters if we found nothing on faster providers.
+    // SmartRecruiters returns HTTP 200 for any slug (totalFound:0), so every
+    // candidate generates a response — very slow for no value when we already
+    // have a hit.
+    if results.is_empty() {
+        for slug in &candidates {
+            if let Some(result) = smartrecruiters::probe(client, slug).await {
+                results.push(result);
+                break; // One SR hit is enough.
+            }
         }
     }
 

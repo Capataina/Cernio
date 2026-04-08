@@ -50,8 +50,14 @@ pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
     .unwrap_or_default()
 }
 
-pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>) -> Vec<JobRow> {
-    let base = "
+pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>, focused: bool) -> Vec<JobRow> {
+    let focus_filter = if focused {
+        " AND (j.grade IS NULL OR j.grade NOT IN ('F', 'C'))"
+    } else {
+        ""
+    };
+
+    let base = format!("
         SELECT j.id, j.company_id, c.name, j.title, j.url, j.location,
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
                j.fit_score, j.grade, j.raw_description,
@@ -60,7 +66,7 @@ pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>) -> Vec<JobRow>
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
         WHERE j.evaluation_status != 'archived'
-        AND c.status != 'archived'";
+        AND c.status != 'archived'{focus_filter}");
 
     let order = "
         ORDER BY

@@ -1,6 +1,6 @@
 # TUI System
 
-> Last updated: 2026-04-07. v1 implemented — dashboard, companies, jobs views with detail panels and user decisions.
+> Last updated: 2026-04-08. v1 implemented — dashboard, companies, jobs views with detail panels and user decisions. Now displaying real data: 684 jobs (14 SS, 53 S), 79 companies (59 resolved).
 
 ---
 
@@ -61,7 +61,7 @@ Crossterm is re-exported through ratatui — no separate dependency needed. Also
 ### Layout
 
 ```
-┌─ cernio ─── Dashboard │ Companies (9) │ Jobs (25) ──────────────┐
+┌─ cernio ─── Dashboard │ Companies (79) │ Jobs (684) ─────────────┐
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  Content area — varies by active view:                              │

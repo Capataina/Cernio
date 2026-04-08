@@ -61,17 +61,18 @@ Grade S-company jobs with promising titles before B-company jobs with generic ti
 
 ### 3. Get the job description — never grade blind
 
-For each job, check `raw_description` in the database. If it exists, is non-empty, and gives you enough detail to evaluate the role's actual responsibilities, seniority expectations, and technical requirements, use it directly.
+You MUST have the full job description before assigning any grade other than 'skip'. For each job, check `raw_description` in the database. If it exists, is non-empty, and gives you enough detail to evaluate the role's actual responsibilities, seniority expectations, and technical requirements, use it directly.
 
-**If `raw_description` is NULL, empty, too short (under ~100 words), or vague:**
+**If `raw_description` is NULL, empty, under 100 words, or vague:**
 
 1. Use WebFetch on the job's `url` to visit the actual posting page and extract the full description.
 2. Write the fetched description back to the database: `UPDATE jobs SET raw_description = ? WHERE id = ?`
-3. If the job page is behind a login wall or returns no useful content, try WebSearch for the job title + company name to find the listing on LinkedIn, Indeed, Glassdoor, or other job aggregators.
+3. If the job page is behind a login wall or returns no useful content, use WebSearch for the job title + company name to find the listing on LinkedIn, Indeed, Glassdoor, or other job aggregators.
+4. If after all attempts you still cannot find a description, do NOT grade the job — leave it as `pending` and flag it in the batch report. Grading on title alone produces unreliable results and defeats the purpose of the entire grading system.
 
 **Why this matters:** A title like "AI Engineer" at Apple could be anything — cutting-edge ML infrastructure, or QA testing for AI-powered hardware accessories. The description is the only way to know. A "Software Engineer, Platform" could require Angular and Redux (frontend disguised as platform) or Kubernetes and Terraform (actual infrastructure). Titles lie. Descriptions tell the truth.
 
-**Never grade on title alone.** If after all attempts you still cannot find a description, skip the job and flag it for later rather than guessing. A wrong grade is worse than no grade — it either wastes the user's time (false SS) or hides a perfect opportunity (false F).
+**Never grade on title alone.** A wrong grade is worse than no grade — it either wastes the user's time (false SS) or hides a perfect opportunity (false F).
 
 ### 4. Evaluate the job
 
@@ -203,4 +204,5 @@ Before presenting a batch to the user, verify:
 - [ ] C and F grades have a clear, specific reason (not just "not a fit")
 - [ ] Grades were written to the database with correct evaluation_status mapping
 - [ ] Portfolio gap patterns from this batch have been noted (even if no new patterns emerged, confirm you checked)
+- [ ] Every SS/S/A grade was assigned after reading the full job description, not just the title
 - [ ] The batch summary includes a count breakdown and highlights the strongest opportunities

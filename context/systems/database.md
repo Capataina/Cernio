@@ -82,7 +82,7 @@ Individual job listings linked to companies and optionally to a specific portal.
 | `posted_date` | TEXT | — | |
 | `raw_description` | TEXT | — | Full HTML/text from ATS |
 | `parsed_tags` | TEXT | — | Structured extraction (tech stack, seniority, etc.) |
-| `evaluation_status` | TEXT | NOT NULL, DEFAULT 'pending' | `pending`, `evaluating`, `strong_fit`, `weak_fit`, `no_fit` |
+| `evaluation_status` | TEXT | NOT NULL, DEFAULT 'pending' | `pending`, `evaluating`, `strong_fit`, `weak_fit`, `no_fit`, `archived` |
 | `fit_assessment` | TEXT | — | Claude's reasoning for the evaluation |
 | `fit_score` | REAL | — | Numeric fit score |
 | `grade` | TEXT | CHECK IN ('SS','S','A','B','C','F') or NULL | Job-level grade from evaluation |
@@ -118,11 +118,13 @@ The schema is defined as a single `CREATE TABLE IF NOT EXISTS` batch in `MIGRATI
 
 **MIGRATION_002** (session 3): Adds `'archived'` to the `companies.status` CHECK constraint. Uses the table-rebuild approach (create new table with updated CHECK, copy data, drop old, rename) with foreign keys temporarily disabled. This supports C-tier company soft-archival — archived companies are hidden from TUI and excluded from job searches but preserved for deduplication.
 
+**MIGRATION_003** (session 3, continued): Adds `'archived'` to the `jobs.evaluation_status` CHECK constraint. Uses the same table-rebuild approach as MIGRATION_002. This supports job archival — archived jobs are hidden from TUI views and excluded from active queries but preserved in the database for historical tracking.
+
 The database can always be recreated from scratch by deleting `state/cernio.db` and restarting — the migration rebuilds everything. The data is lost, but the schema is code.
 
 ### Tests
 
-11 tests in `src/db/schema.rs`:
+11 tests in `src/db/schema.rs` (includes `archived_status_accepted` test for MIGRATION_003):
 
 | Test | Verifies |
 |------|----------|
@@ -136,6 +138,7 @@ The database can always be recreated from scratch by deleting `state/cernio.db` 
 | `company_with_multiple_portals` | Two portals for same company |
 | `company_grade_constraint` | Invalid grade values rejected |
 | `portal_uniqueness` | Duplicate portal entry rejected |
+| `archived_status_accepted` | 'archived' accepted for both company status and job evaluation_status after MIGRATION_002 and MIGRATION_003 |
 
 ---
 
@@ -149,6 +152,7 @@ The database can always be recreated from scratch by deleting `state/cernio.db` 
 | **Rust scripts** | Write | Insert job search results, update ATS verification |
 | **TUI** | Read + Write | Query companies/jobs with filters and sorts, write user decisions. Polls every 2s via fresh connection |
 | **populate-db skill** | Write | Insert companies, portals, grades after research |
+| **`cernio import`** | Write | Bulk import companies from external sources (CSV/JSON) |
 
 WAL mode ensures the TUI can read concurrently while other processes write.
 
@@ -185,7 +189,7 @@ None at this stage.
 
 ## Planned / Missing / Likely Changes
 
-- Future migrations (`MIGRATION_003`, etc.) will be needed as the schema evolves
+- Future migrations (`MIGRATION_004`, etc.) will be needed as the schema evolves
 - Higher-level query functions in `src/db/mod.rs` will grow as more pipeline operations are added
 - DB cleanup is implemented via `cernio clean` — removes F/C-graded jobs, stale listings >14d, archives C-grade companies
 

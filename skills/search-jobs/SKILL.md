@@ -59,20 +59,20 @@ Present the pending count grouped by company so the user can decide whether to g
 
 ### 4. Search bespoke companies manually
 
-After the script handles ATS-resolved companies, check for bespoke companies in the DB:
+After running `cernio search`, you MUST check for bespoke S and A-tier companies and search for their jobs. These companies include some of the world's best employers whose jobs are invisible to the automated pipeline. Skipping this step means missing opportunities at companies like Arm, Citadel Securities, and other major employers.
+
+Query the bespoke companies:
 
 ```sql
 SELECT name, careers_url, grade FROM companies WHERE status = 'bespoke' AND grade IN ('S', 'A', 'B') ORDER BY CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 END
 ```
 
-For each bespoke company worth searching (S and A tier at minimum):
+For each bespoke company (S and A tier at minimum, B tier when time permits):
 
 1. **Visit their careers page** using WebFetch on the `careers_url` stored in the DB.
 2. **If the careers page doesn't have useful listings**, search for their jobs on external platforms: LinkedIn, Indeed, Glassdoor, BuiltIn, or any other job aggregator the agent can find. Use WebSearch for `"{company name}" jobs london engineer` or similar.
 3. **For major companies** (Apple, Google, Meta, Amazon, Microsoft, etc.) that have custom portals: visit their careers sites, search for relevant roles (engineer, infrastructure, systems, graduate — based on the profile), and extract job listings.
 4. **Insert relevant jobs** into the DB manually with full descriptions. Include the job URL, title, location, and the full description text.
-
-This step is critical because bespoke companies include some of the world's best employers — FAANG, major banks, defence contractors — whose jobs would otherwise be completely invisible to the pipeline.
 
 The agent should be creative about where to find listings. Some sources to consider:
 - The company's own careers page

@@ -51,6 +51,8 @@ fn run_loop(
     loop {
         terminal.draw(|frame| views::draw(frame, app))?;
 
+        app.tick();
+
         if event::poll(tick_rate)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {

@@ -7,7 +7,15 @@ use ratatui::Frame;
 use crate::tui::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let cols = Layout::horizontal([Constraint::Percentage(45), Constraint::Fill(1)]).split(area);
+    let rows = Layout::vertical([
+        Constraint::Length(3), // at-a-glance summary
+        Constraint::Fill(1),  // stats grid
+    ])
+    .split(area);
+
+    draw_summary_line(frame, app, rows[0]);
+
+    let cols = Layout::horizontal([Constraint::Percentage(45), Constraint::Fill(1)]).split(rows[1]);
 
     // Left column: universe + ATS coverage
     let left = Layout::vertical([Constraint::Min(10), Constraint::Fill(1)]).split(cols[0]);
@@ -18,6 +26,43 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let right = Layout::vertical([Constraint::Min(10), Constraint::Fill(1)]).split(cols[1]);
     draw_jobs_summary(frame, app, right[0]);
     draw_top_matches(frame, app, right[1]);
+}
+
+fn draw_summary_line(frame: &mut Frame, app: &App, area: Rect) {
+    let t = &app.theme;
+    let s = &app.stats;
+
+    // Count strong fits.
+    let strong: i64 = s
+        .jobs_by_grade
+        .iter()
+        .filter(|(g, _)| g == "SS" || g == "S")
+        .map(|(_, c)| c)
+        .sum();
+
+    let pending: i64 = s
+        .jobs_by_eval
+        .iter()
+        .filter(|(e, _)| e == "pending")
+        .map(|(_, c)| c)
+        .sum();
+
+    let line = Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{}", s.total_companies), t.stat_value),
+        Span::raw(" companies · "),
+        Span::styled(format!("{}", s.total_jobs), t.stat_value),
+        Span::raw(" jobs · "),
+        Span::styled(format!("{strong}"), t.grade_s),
+        Span::raw(" strong matches · "),
+        Span::styled(format!("{pending}"), if pending > 0 { t.eval_evaluating } else { t.dim }),
+        Span::raw(" pending"),
+    ]);
+
+    let block = Block::bordered()
+        .border_style(Style::default().fg(t.border));
+
+    frame.render_widget(Paragraph::new(line).block(block), area);
 }
 
 fn draw_universe(frame: &mut Frame, app: &App, area: Rect) {
