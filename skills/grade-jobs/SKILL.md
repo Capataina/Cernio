@@ -154,10 +154,18 @@ Job grading should always be parallelised using multiple agents. Split the pendi
 
 **How to split:** Group by company so each agent has context about the companies it's grading. S-tier companies with many jobs should be in the same batch for consistency. Give each agent the job ID, company name, company grade, title, location, and description excerpt from the database.
 
-**Each agent outputs SQL only:**
+**Each agent outputs SQL only, using EXACTLY this format:**
 ```sql
-UPDATE jobs SET grade = 'X', evaluation_status = 'strong_fit'/'weak_fit'/'no_fit', fit_assessment = 'reason' WHERE id = NNN;
+UPDATE jobs SET grade = 'X', evaluation_status = 'strong_fit', fit_assessment = 'reasoning here', fit_score = 0.85 WHERE id = NNN;
 ```
+
+**Critical SQL rules for agents:**
+- Column names are `grade`, `evaluation_status`, `fit_assessment`, `fit_score`. NOT `reasoning`, NOT `assessment`, NOT any variation.
+- `evaluation_status` must be exactly one of: `'strong_fit'` (SS/S), `'weak_fit'` (A/B), `'no_fit'` (C/F)
+- `fit_score` must be a decimal between 0.0 and 1.0 (SS: 0.90-1.00, S: 0.75-0.89, A: 0.60-0.74, B: 0.40-0.59, C: 0.20-0.39, F: 0.00-0.19)
+- Escape single quotes by doubling them: `it''s` not `it's`
+- Every statement must end with a semicolon
+- One UPDATE per line, no multi-line statements
 
 The orchestrator collects all SQL outputs and executes them in a single batch against the database.
 

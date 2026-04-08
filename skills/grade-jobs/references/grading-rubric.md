@@ -32,6 +32,8 @@ Six grades from SS (exceptional) to F (reject). The key to accurate grading is u
 
 SS is not "very good." SS means: if the candidate were offered this role tomorrow, they would accept without hesitation and feel confident it was the right move for the next 2-3 years. The bar is deliberately high because SS roles get the most attention and the most detailed assessment. Inflating SS dilutes the signal the user relies on.
 
+**Grades should be conservative.** Expect roughly: SS ~2-3%, S ~10-15%, A ~25-30%, B ~30-35%, C ~10-15%, F ~10-15% of graded jobs. If more than 20% of jobs are S or above, the bar is too low.
+
 ### The S-A boundary
 
 This is the most consequential grading decision. S means "apply with energy and a tailored application." A means "apply if time permits." The difference is whether the role has a realistic path to being the candidate's best option, or whether it's merely a good option in a lineup of good options.
@@ -46,6 +48,22 @@ F is not "bad." F is "do not waste time." The most common F reasons:
 - Domain dealbreaker (check `preferences.toml` for excluded sectors)
 - Role type dealbreaker (check `preferences.toml` for excluded role types)
 - Security clearance requirement that cannot be met (check `personal.md` and `military.md` for nationality and clearance eligibility)
+
+### Anti-inflation and anti-deflation rules
+
+These prevent the systematic grading errors observed in production:
+
+**1. Tech stack mismatch does NOT justify C or F.** A graduate backend role at Monzo using Go, or at Stripe using Ruby, is still a valuable career opportunity. The tech stack is a medium-weight tiebreaker, not a dealbreaker. Languages are learned in months; company signal, domain experience, and career trajectory compound over years. A role using a different language at a company with excellent engineering reputation and guaranteed sponsorship is worth MORE than a role using the candidate's primary language at an unknown company with no growth prospects.
+
+**2. Graduate programmes at large employers get a floor of B.** A structured graduate programme at any well-funded, reputable company with sponsorship capability should never be C or F (unless the role hits a hard exclusion like consulting or gambling). These programmes are explicitly designed for candidates at this career stage. They provide mentorship, structured onboarding, and a strong CV line. Even if the domain isn't perfectly aligned or the tech stack doesn't match, the career value of a graduate programme at a name-brand employer is substantial. Examples: Graduate SWE at Monzo = minimum A. Graduate SWE at Starling = minimum B. Graduate SWE at any bank with 500+ employees and a sponsor licence = minimum B.
+
+**3. Sponsorship-capable employers with grad hiring get a boost.** Read `visa.md` — the candidate needs Skilled Worker sponsorship from August 2027. Companies that demonstrably sponsor visas and hire graduates are solving two of the candidate's hardest constraints simultaneously. This is a significant positive signal that should push grades UP, not be treated as neutral.
+
+**4. CV signal matters disproportionately for a first job.** Read `experience.md` — with no formal work experience, the first employer's name IS the candidate's professional credential. A generic backend role at Bloomberg is worth more for career trajectory than a perfectly-aligned Rust role at a 5-person startup nobody has heard of. This doesn't mean every big-company role is S-tier, but company signal should be weighted heavily at this career stage.
+
+**5. Do not penalise for "consumer" product if the engineering is deep.** Monzo, Spotify, and Uber are consumer products, but their backend infrastructure involves distributed systems, real-time data pipelines, and performance-critical engineering. "Consumer product" is not the same as "consumer-facing role." A backend infrastructure engineer at Spotify is doing systems engineering regardless of what the end product is.
+
+**6. "Not aligned with target sectors" is NOT a reason for C or F.** The preferred sectors in `preferences.toml` are soft preferences, not hard exclusions. A strong role in a non-preferred sector (e.g., climate tech, healthcare) can still be A-tier if the engineering work is deep, the company is reputable, and the career ceiling is high. Only hard exclusions (gambling, adtech, consumer-crypto, consulting) justify downgrading on sector alone.
 
 ---
 
@@ -431,21 +449,47 @@ These are jobs that look like one grade but are actually another. They test whet
 
 **Lesson:** "Senior" does not automatically mean unachievable. Always read the actual requirements. Many UK companies use "Senior" for their second engineering level.
 
+### Boundary 6: Looks like C, actually A — Graduate role at a "wrong stack" company
+
+**Role:** "Graduate Software Engineer" at Monzo. Go stack, cloud-native, consumer banking product.
+
+**Why it looks like C:** "Consumer banking product, Go not Rust, no trading/compiler/ML alignment, cloud-native is a portfolio gap."
+
+**Why it's actually A:** Monzo is a major UK employer with exceptional engineering reputation (engineering blog, open culture, Go microservices at scale). Graduate programme with structured onboarding and mentorship. Guaranteed Skilled Worker sponsor. The Go backend involves distributed systems, real-time financial processing, and infrastructure engineering — technically deep regardless of the end product being a banking app. CV signal from Monzo opens doors at every other company in the UK. For a candidate with no formal work experience, this is a career-defining first job. Tech stack mismatch (Go vs Rust) is a medium-weight concern that's dwarfed by the career-stage benefits.
+
+**Lesson:** Never penalise a graduate role at a major sponsor-capable employer just because the stack doesn't match. The candidate's career stage makes CV signal, sponsorship, and mentorship far more important than language alignment. This error cost us real opportunities in production — it is the single most important grading mistake to avoid.
+
+### Boundary 7: Looks like B, actually S — Graduate role at a non-obvious infrastructure company
+
+**Role:** "Graduate Engineer" at Form3. Payments infrastructure, Go, 200+ employees.
+
+**Why it looks like B:** "Not a household name, Go not Rust, payments is fintech but not trading systems."
+
+**Why it's actually S:** Form3 processes UK Faster Payments, BACS, CHAPS, and SEPA — this is literally the infrastructure that moves money between banks. The engineering challenges (distributed consensus, strict message ordering, zero-downtime deployments, regulatory compliance) are structurally identical to exchange infrastructure. Confirmed sponsor, active graduate hiring, 200+ employees with strong engineering culture. The payment message ordering problem is the same class of problem as order book management in Nyquestro. This is deep infrastructure at national scale, not a fintech wrapper.
+
+**Lesson:** "Payments" doesn't mean "payment app." Payment rails infrastructure is among the most technically demanding domains in software engineering.
+
 ---
 
 ## Common Misjudgments
 
-These are patterns of grading error to actively avoid.
+These are patterns of grading error to actively avoid. **Every one of these has caused real grading errors in production.**
 
-**Over-weighting tech stack match.** The candidate's primary language in the listing is a positive signal, but a role using a different language in an excellent domain with great career ceiling is worth more than a primary-language role in a dead-end domain. Tech stacks are learned in months; domains take years to build expertise in.
+**Over-weighting tech stack match.** The candidate's primary language in the listing is a positive signal, but a role using a different language in an excellent domain with great career ceiling is worth more than a primary-language role in a dead-end domain. Tech stacks are learned in months; domains take years to build expertise in. **A graduate Go role at Monzo is worth more than a Rust role at a 3-person startup with no funding.** Never make tech stack the deciding factor between B and C.
 
 **Under-weighting career ceiling for entry-level roles.** At 10-15 years of experience, the domain matters more than anything else. A QA automation role at a great company has a lower career ceiling than a systems engineering role at a well-funded startup. The domain trajectory is the most important factor at entry level because you're choosing a path, not just a job.
 
+**Under-weighting CV signal for a first job.** Read `experience.md` — with no formal work experience, the first employer's name IS the professional credential. "Monzo" or "Bloomberg" on a CV gets through screening filters that "Unknown Startup Ltd" does not. This premium is highest for the first job and decreases for subsequent roles. At the current career stage, company signal should be weighted almost as heavily as technical alignment.
+
 **Assuming "no sponsorship mention" means "won't sponsor."** Many companies sponsor but don't mention it in job descriptions. Large companies with international workforces almost always sponsor. Only penalise sponsorship when there are active negative signals at a small company with no visible sponsor licence.
+
+**Treating "consumer product" as "consumer-facing role."** The preference exclusion is for customer-facing ROLES (consulting, support, sales engineering), not for companies that make consumer products. A backend infrastructure engineer at Spotify is doing systems engineering. A platform engineer at Uber is building distributed systems. The end product being consumer-facing does not make the engineering role consumer-facing.
 
 **Grade inflation from enthusiasm.** A role that hits personal interest buttons (check `interests.md`) is exciting but must still be graded on the full rubric. Enthusiasm is a signal that the application will be strong — it doesn't change the grade. An unachievable dream role is still F.
 
 **Grade deflation from unfamiliarity.** A role in a domain you haven't encountered before deserves research, not dismissal. If you don't know the ceiling of a domain, look it up before grading. Don't default to B because the domain is unfamiliar.
+
+**Penalising graduate programmes for being "too broad."** Graduate rotation programmes deliberately expose new engineers to multiple areas. "You'll rotate across three teams in your first year" is breadth — a high-weight POSITIVE signal, not a weakness. Do not downgrade because the specific team placement is uncertain.
 
 ---
 
