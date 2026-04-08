@@ -9,8 +9,12 @@ Scrapes a GitHub repository and updates the user's structured profile with accur
 **STOP. Before scraping any repository, you MUST read these files in full:**
 
 1. **Every file in `profile/`** — all files, no exceptions. You need to know the current state of the profile to identify what has changed and what needs updating. Without reading the existing profile, you cannot compare new findings against current entries.
+2. **`references/scraping-methodology.md`** — how to extract information from a repo: which sources to read, in what order, how to assess technical depth, how to gauge project status honestly, and how to handle multi-repo scrapes.
+3. **`references/profile-format.md`** — the exact format and quality standard for profile entries. What good technical highlights look like vs generic filler. Proficiency level definitions. What files to update and what files to never touch.
 
-**Do not begin scraping until the mandatory read is complete.**
+**When delegating scraping to subagents:** embed the FULL TEXT of both reference files and the current content of `profile/projects.md` and `profile/skills.md` in each agent's prompt. Agents cannot read these files themselves.
+
+**Do not begin scraping until all mandatory reads are complete.**
 
 ---
 
@@ -89,9 +93,13 @@ Report back to the user with:
 
 Before presenting results, verify:
 
+- [ ] Both reference files (`references/scraping-methodology.md` and `references/profile-format.md`) were read before scraping began
 - [ ] Every factual claim in the profile entry (tech stack, status, architecture) is grounded in something you actually read in the repo, not inferred or assumed
-- [ ] Technical highlights are specific and concrete, not generic descriptions of the project type
-- [ ] Proficiency levels in `skills.md` are justified by what the code demonstrates, not inflated
-- [ ] The project status reflects the repo's actual activity, not its aspirational README
+- [ ] Technical highlights are specific and concrete — every sentence names a specific technique, data structure, algorithm, or design decision. Apply the depth test from `references/scraping-methodology.md`: "Could this sentence describe hundreds of other projects, or is it specific to this one?"
+- [ ] Technical highlights describe what's BUILT, not what's PLANNED — aspirational features from the README that aren't in the code do not belong
+- [ ] The dependency manifest was read and tech stack reflects actual dependencies, not just README claims
+- [ ] Proficiency levels in `skills.md` follow the definitions in `references/profile-format.md` — Proficient requires deep repeated use across multiple projects, not just "used it"
+- [ ] The project status reflects the repo's actual activity (check `pushed_at` date), not its aspirational README
 - [ ] If the project already had an entry, changes are proportionate — you updated what drifted without rewriting what was already accurate
 - [ ] The user's voice and framing is preserved where the existing entry was already good
+- [ ] Cross-references checked: new skills added to `skills.md`, gap closures noted in `portfolio-gaps.md`
