@@ -57,7 +57,33 @@ Run `cernio pending` to list jobs that have been fetched but not yet graded. The
 
 Present the pending count grouped by company so the user can decide whether to grade everything or focus on specific companies.
 
-### 4. Grade jobs against the profile
+### 4. Search bespoke companies manually
+
+After the script handles ATS-resolved companies, check for bespoke companies in the DB:
+
+```sql
+SELECT name, careers_url, grade FROM companies WHERE status = 'bespoke' AND grade IN ('S', 'A', 'B') ORDER BY CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 END
+```
+
+For each bespoke company worth searching (S and A tier at minimum):
+
+1. **Visit their careers page** using WebFetch on the `careers_url` stored in the DB.
+2. **If the careers page doesn't have useful listings**, search for their jobs on external platforms: LinkedIn, Indeed, Glassdoor, BuiltIn, or any other job aggregator the agent can find. Use WebSearch for `"{company name}" jobs london engineer` or similar.
+3. **For major companies** (Apple, Google, Meta, Amazon, Microsoft, etc.) that have custom portals: visit their careers sites, search for relevant roles (engineer, infrastructure, systems, graduate — based on the profile), and extract job listings.
+4. **Insert relevant jobs** into the DB manually with full descriptions. Include the job URL, title, location, and the full description text.
+
+This step is critical because bespoke companies include some of the world's best employers — FAANG, major banks, defence contractors — whose jobs would otherwise be completely invisible to the pipeline.
+
+The agent should be creative about where to find listings. Some sources to consider:
+- The company's own careers page
+- LinkedIn Jobs (`linkedin.com/jobs`)
+- Indeed (`indeed.co.uk`)
+- Glassdoor (`glassdoor.co.uk`)
+- BuiltIn (`builtin.com`)
+- AngelList/Wellfound for startups
+- Any sector-specific job board the agent knows about
+
+### 5. Grade jobs against the profile
 
 This is where the skill's core value lies — the script fetches, Claude evaluates.
 
@@ -94,7 +120,7 @@ For each ungraded job, read the full description from the database and evaluate 
 
 Write grades and evaluations back to the database as each job is assessed.
 
-### 5. Report and continue
+### 6. Report and continue
 
 After grading a batch, present results grouped by grade for scannability:
 
@@ -134,7 +160,7 @@ Ask the user if they want to continue grading the next batch or stop here.
 
 When scanning multiple companies, the `cernio search` script handles the fetching in bulk. The grading step processes jobs sequentially by company to keep evaluation context clean — Claude thinks about one company's culture and role structure at a time.
 
-For large batches (50+ pending jobs), offer to grade in batches of 10–15 with user review between batches. This prevents context fatigue and lets the user steer.
+For large batches, the orchestrator decides batch size based on signal strength. Grade everything important first — all graduate roles, all roles at S-tier companies with promising titles. Be generous with inclusion; defer only the clearly low-signal jobs.
 
 ---
 

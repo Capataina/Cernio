@@ -59,17 +59,19 @@ priority = company_grade x title_promise x role_type_alignment
 
 Grade S-company jobs with promising titles before B-company jobs with generic titles. The user sees actionable results early instead of waiting for the full queue to clear.
 
-### 3. Get the job description
+### 3. Get the job description — never grade blind
 
-For each job, check `raw_description` in the database. If it exists and is non-empty, use it directly.
+For each job, check `raw_description` in the database. If it exists, is non-empty, and gives you enough detail to evaluate the role's actual responsibilities, seniority expectations, and technical requirements, use it directly.
 
-If `raw_description` is NULL or empty, fetch the description from the job's URL. Use the appropriate ATS provider endpoint or fetch the page directly. Write the fetched description back to the database:
+**If `raw_description` is NULL, empty, too short (under ~100 words), or vague:**
 
-```sql
-UPDATE jobs SET raw_description = ? WHERE id = ?
-```
+1. Use WebFetch on the job's `url` to visit the actual posting page and extract the full description.
+2. Write the fetched description back to the database: `UPDATE jobs SET raw_description = ? WHERE id = ?`
+3. If the job page is behind a login wall or returns no useful content, try WebSearch for the job title + company name to find the listing on LinkedIn, Indeed, Glassdoor, or other job aggregators.
 
-If you cannot retrieve the description after reasonable effort, grade conservatively based on title and company context alone, and note in the assessment that the description was unavailable.
+**Why this matters:** A title like "AI Engineer" at Apple could be anything — cutting-edge ML infrastructure, or QA testing for AI-powered hardware accessories. The description is the only way to know. A "Software Engineer, Platform" could require Angular and Redux (frontend disguised as platform) or Kubernetes and Terraform (actual infrastructure). Titles lie. Descriptions tell the truth.
+
+**Never grade on title alone.** If after all attempts you still cannot find a description, skip the job and flag it for later rather than guessing. A wrong grade is worse than no grade — it either wastes the user's time (false SS) or hides a perfect opportunity (false F).
 
 ### 4. Evaluate the job
 
@@ -110,14 +112,21 @@ The `fit_assessment` field carries the reasoning. Scale depth by grade:
 
 ### 6. Batch discipline
 
-Grade approximately 30 jobs per session. After each batch:
+The orchestrator decides how many jobs to grade in each batch based on the queue and signal strength. There is no fixed number. The guiding principle: **grade everything important, not a random slice.**
 
-1. Report progress: "Graded 30/142 pending. Breakdown: 2 SS, 4 S, 8 A, 6 B, 3 C, 7 F."
+When deciding what to include in a batch:
+- **Always include:** Every job with clear high-signal indicators (entry-level/graduate titles at S-tier companies, roles explicitly mentioning technologies from the profile, roles at companies with exceptional domain alignment). If there are 70 graduate roles, grade all 70 — they're all high priority.
+- **Include generously:** When uncertain whether a job should be in this batch or deferred, include it. The cost of grading an extra job is a few minutes. The cost of deferring a perfect opportunity is potentially missing an application deadline.
+- **Defer strategically:** Senior roles at B-tier companies, roles with generic titles and no clear signal, roles at companies with weaker alignment. These can wait for a later batch.
+
+After each batch:
+
+1. Report progress: "Graded X/Y pending. Breakdown: N SS, N S, N A, N B, N C, N F."
 2. Summarise highlights: name the SS and S roles with one-line reasons.
 3. Note any portfolio gap patterns observed (see below).
 4. Ask the user whether to continue with the next batch or stop.
 
-If the pending count is small (under 15), grade them all without asking.
+If the pending count is manageable, grade everything in one pass. Grading is largely a one-time cost per job — once done, the user has a stable, browsable, actionable list.
 
 ---
 
