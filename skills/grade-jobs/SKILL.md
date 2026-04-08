@@ -181,16 +181,50 @@ If the pending count is manageable, grade everything in one pass. Grading is lar
 
 ---
 
-## Portfolio gap tracking
+## Portfolio gap tracking — MANDATORY after every batch
 
-As you evaluate jobs, watch for patterns in what strong matches ask for that the profile lacks. This is one of the most valuable outputs of the grading process.
+**This is not optional.** Updating `profile/portfolio-gaps.md` after every grading batch is one of the most valuable outputs of the entire grading process. The patterns you spot across dozens of job descriptions — skills the market consistently asks for that the profile lacks — directly drive what the user should build or learn next. If the file isn't being updated, the career coaching loop is broken.
 
-Examples of patterns to watch for:
-- "Every S-tier infrastructure role mentions Kubernetes. The profile has no containerisation experience."
-- "Three trading systems roles asked for FIX protocol experience — check `projects.md` to see if any project partially addresses this."
-- "Go appears in 60% of platform engineering roles. Check `skills.md` for current Go proficiency."
+### What to track
 
-After each batch, update `profile/portfolio-gaps.md` with any new patterns observed under the "Patterns from Job Evaluations" section. Be specific: name the roles that surfaced the pattern, the skill/tool that was missing, and how frequently it appeared.
+As you evaluate each job, maintain a running tally of:
+
+1. **Technologies that appear repeatedly in SS/S/A roles but are absent from `profile/skills.md`:**
+   - Count how many roles mention each technology
+   - Note which companies and role types ask for it
+   - Example: "Kubernetes appeared in 12 of 30 S-tier infrastructure roles. Not in skills.md."
+
+2. **Domain knowledge that strong roles expect but the profile doesn't demonstrate:**
+   - Example: "4 trading systems roles asked for FIX protocol experience. Nyquestro uses a custom binary protocol but doesn't implement FIX."
+
+3. **Experience patterns that recur as requirements:**
+   - Example: "8 roles mentioned 'production incident management' or 'on-call experience'. No production operations evidence in the profile."
+
+4. **Strengths the profile has that the market values:**
+   - Don't only track gaps — track what converts well. If Rust keeps appearing in SS/S roles, that's a confirmed strength worth noting.
+   - Example: "Rust appeared in 6 SS-tier roles. The profile's Rust depth is a genuine differentiator."
+
+### How to update portfolio-gaps.md
+
+After each batch, write to the "Patterns from Job Evaluations" section of `profile/portfolio-gaps.md`. Each entry should follow this format:
+
+```markdown
+- **[Skill/Technology/Domain]** — appeared in N of M graded roles at [grade levels].
+  Roles: [2-3 specific role names that asked for it]. Companies: [company names].
+  Profile status: [not present / partially addressed by X / strength].
+  Impact: [how this gap affects grading — are roles being downgraded because of it?]
+  Closure opportunity: [specific, actionable suggestion if it's a gap]
+```
+
+Also update the "Known Gaps" and "Current Strengths" sections if the batch reveals:
+- A new gap not previously identified
+- A gap that has been closed by a recent project
+- A new strength confirmed by market demand
+
+### When to update
+
+- **After every grading batch, no exceptions.** Even if no new patterns emerged, confirm in the batch report that you checked. "No new portfolio gap patterns in this batch" is an acceptable update — silently skipping is not.
+- **At minimum, update the "Patterns from Job Evaluations" section** with any observations, even if the other sections don't need changing.
 
 ---
 
@@ -238,6 +272,6 @@ Before presenting a batch to the user, verify:
 - [ ] SS and S grades have multi-paragraph assessments that would help the user decide whether to apply
 - [ ] C and F grades have a clear, specific reason (not just "not a fit")
 - [ ] Grades were written to the database with correct evaluation_status mapping
-- [ ] Portfolio gap patterns from this batch have been noted (even if no new patterns emerged, confirm you checked)
+- [ ] `profile/portfolio-gaps.md` has been updated with patterns from this batch — technologies, domains, and experience areas that SS/S/A roles asked for. If no new patterns emerged, the batch report explicitly states "no new portfolio gap patterns observed." The file must never be silently skipped.
 - [ ] Every SS/S/A grade was assigned after reading the full job description, not just the title
 - [ ] The batch summary includes a count breakdown and highlights the strongest opportunities

@@ -113,7 +113,25 @@ WHERE (j.description IS NULL OR j.description = '')
   AND j.status != 'archived';
 ```
 
-### 6. Relevance refresh
+### 6. Portfolio gap staleness check
+
+Check whether `profile/portfolio-gaps.md` is being maintained as grading runs happen:
+
+- Read the "Patterns from Job Evaluations" section. If it's empty or has no entries despite graded jobs existing in the database, flag this as a critical gap — the career coaching loop is broken.
+- Count graded jobs in the database. If there are 50+ graded jobs and the "Patterns from Job Evaluations" section has zero entries, the grade-jobs skill has not been updating portfolio-gaps.md.
+- Check whether the "Known Gaps" section still reflects reality — profile changes may have closed gaps that are still listed as open.
+- Check whether the "Current Strengths" section captures strengths confirmed by market demand during grading.
+
+Report this prominently in the integrity report:
+
+```
+### Portfolio Gap Tracking
+- ⚠  "Patterns from Job Evaluations" section is empty despite 684 graded jobs
+  Recommendation: Run a portfolio gap analysis across graded SS/S/A jobs
+- ⚠  "Known Gaps" section may be stale — last updated before session 3
+```
+
+### 7. Relevance refresh
 
 For companies where `why_relevant` is generic (e.g., "interesting tech company", "found on fintech list") or stale (references profile details that have changed), draft updated relevance statements that connect the company to the current profile specifically.
 
