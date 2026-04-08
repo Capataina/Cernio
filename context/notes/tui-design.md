@@ -1,159 +1,49 @@
 # TUI Design Decisions
 
-Design decisions and future plans for the terminal UI.
+Rationale and principles behind TUI design choices. For the full implementation plan, see `context/plans/tui-v3.md`.
 
 ---
 
-## Responsive layouts for different terminal sizes
+## Core design principles
 
-The TUI should eventually support multiple rendering modes based on terminal dimensions:
+1. **Dynamic over hardcoded.** Bars, blocks, and layouts size to percentages of their container, never fixed character counts. Think `Percentage(80)` not `Length(25)`. This adapts to any terminal size and makes adding new content trivial.
 
-- **Full mode** (wide terminal, 120+ columns): The detailed layout with side-by-side panels, full stats blocks, scrollable top roles list, job distribution charts in company detail
-- **Compact mode** (narrow terminal, <120 columns): Proportional stacked bars instead of full stat blocks, condensed labels, single-column layout where needed
+2. **Density over whitespace.** Empty space is wasted. If a block has leftover room, fill it with content. If content is shorter than its container, shrink the container.
 
-This is a future enhancement — for now, the full layout is the only mode. The compact rendering (proportional stacked bars like `SS━━S━━━━A━━━━━━B━━━━━━━━━C━F━━`) is a good fallback for small windows.
+3. **Mouse-first, keyboard-enhanced.** Mouse and touchpad should be completely natural. Keyboard shortcuts are power-user accelerators.
+
+4. **Grade is the primary metric.** `evaluation_status` (strong_fit/weak_fit/no_fit) is just a coarser bucketing of `grade`. Display grade only, never evaluation_status.
 
 ---
 
 ## Why bar charts over pie charts
 
-Terminal pie charts (via braille-character circles on ratatui's Canvas) look like blobs — rectangular terminal cells distort circles into ovals, small slices (SS = 17/712) become unreadable dots, and you can't label segments clearly. Bar charts are the stronger terminal visualisation: each bar is a labelled, coloured row with exact values, proportional width shows distribution, and they work at any size.
+Terminal pie charts (braille circles) look like blobs. Rectangular cells distort circles, small slices become unreadable, and you can't label segments. Bar charts are the strongest terminal visualisation — labelled, coloured, proportional, readable at any size.
+
+---
+
+## Responsive layout strategy
+
+- **Full mode** (120+ columns): side-by-side master/detail, full stats blocks, wide bars
+- **Compact mode** (<100 columns): single-column layout, list above detail
+- **Minimal mode** (<80 columns): abbreviated labels, no detail panel
+
+Future enhancement — currently only full mode exists.
 
 ---
 
 ## Fit data simplification
 
-The `evaluation_status` field (strong_fit / weak_fit / no_fit) is a coarser bucketing of `grade` (SS/S → strong_fit, A/B → weak_fit, C/F → no_fit). It adds no information beyond the grade. The TUI should lean on grade as the primary metric and de-emphasise evaluation_status in display.
-
-Future possibility: split into two dimensions — **role quality** (how good is the job) and **accessibility** (can you get it). A job could be quality S but accessibility "stretch". This would require a schema change.
+`evaluation_status` adds no information beyond `grade`. Remove from display everywhere. Future possibility: split into **role quality** and **accessibility** as separate dimensions. Would require schema change.
 
 ---
 
-## Mouse and touchpad support
+## Session summary approach
 
-MacBook touchpad two-finger scroll generates the same events as mouse scroll wheel. Crossterm captures these natively.
-
-### Current state (broken)
-
-- Scroll wheel moves selection one entry at a time — feels like teleporting through the list rather than scrolling a window. The expected behaviour is viewport scrolling: the visible window moves through the list smoothly, like scrolling a webpage. Currently each scroll tick calls `next_in_list()` which jumps selection by 1 — on a trackpad with momentum scrolling this flies through hundreds of entries instantly.
-- Click-to-select is NOT implemented yet. Only scroll events are handled.
-- Click-on-tab is NOT implemented yet.
-
-### Correct implementation
-
-**Scroll should move the viewport, not the selection.** Ratatui's `TableState` has an `offset()` method that controls which row is at the top of the visible area. Scroll events should adjust the offset, not the selected row. The selection should stay where it is until the user explicitly moves it with j/k or clicks.
-
-**For trackpad momentum scrolling:** batch scroll events — if multiple scroll events arrive within a short window (e.g. 50ms), treat them as a single larger scroll. This prevents the "flies through the list" problem with MacBook trackpads.
-
-**Click-to-select:** On left click, calculate which row was clicked based on `mouse.row` relative to the table's rendered area. Set selection to that row.
-
-**Click-on-tab:** On left click in the tab bar area (row < 3), determine which tab was clicked based on `mouse.column` and switch view.
+No API key available — summaries are generated by Claude during conversation and written to `state/tui-summary.md`. The TUI reads this file at startup. CLAUDE.md instructs: update the summary before the user launches the TUI.
 
 ---
 
-## Dashboard empty space problem
+## Scroll behaviour
 
-The current dashboard has massive empty space in:
-- Grade Distribution block (left side, bottom half empty)
-- Action Items block (right side, bottom half empty)
-- Pipeline Health block (left bottom, two thirds empty)
-
-### Root cause
-
-The layout uses fixed `Constraint::Min(12)` for the top blocks which forces them to take at least 12 rows even when they have 6-8 rows of content. Then `Constraint::Fill(1)` gives the bottom blocks all remaining space, most of which is empty.
-
-### Fix
-
-1. Use `Constraint::Length(N)` based on actual content height instead of `Constraint::Min(12)`
-2. OR: fill the empty space with useful content — the blocks should expand their content to use available space, not leave it blank
-3. The Grade Distribution block should have wider bars (use more of the horizontal space)
-4. Pipeline Health should have proportional bars showing ATS distribution visually, not just numbers
-5. Action Items should include more detail — list the bespoke companies by name, show which jobs need descriptions
-6. Top Roles should take more vertical space and show more entries
-
-### Pipeline Health bars
-
-Pipeline Health currently shows just text: `greenhouse 34 (54%)`. It should show proportional bars:
-
-```
-greenhouse  ████████████████████████████ 34 (54%)
-ashby       ██████████████░░░░░░░░░░░░░ 14 (22%)
-workable    ███████░░░░░░░░░░░░░░░░░░░░  7 (11%)
-lever       ██████░░░░░░░░░░░░░░░░░░░░░  6 (10%)
-workday     ██░░░░░░░░░░░░░░░░░░░░░░░░░  2  (3%)
-```
-
-This fills the horizontal space and makes the distribution instantly visible.
-
-### Grade Distribution improvements
-
-The bars are currently only 6 characters wide — they should expand to fill available width. With a 45% column width on a 120-column terminal, that's ~50 usable characters. The bars should be ~20-25 characters wide with the grade label and count flanking them.
-
----
-
-## Top Roles pane (dashboard bottom-right)
-
-### Current problems
-- Only shows ~10 SS roles with company on a second line — wastes vertical space
-- Not scrollable — can't see beyond what fits on screen
-- Takes 2 lines per entry (title + company on separate lines)
-
-### Fix
-- Show ALL SS, S, and A roles (not just 10 SS)
-- Single-line format: `SS  SWE Workers Observability — Cloudflare`
-- Make the pane scrollable with j/k when dashboard is focused
-- This turns the dashboard from a static stats page into an interactive browseable list of actionable roles
-
----
-
-## Company detail — full job list
-
-### Current problem
-- Only shows "Top Roles" (top 5 SS/S/A jobs) in the company detail panel
-- No way to see all jobs at a company without drilling into the Jobs tab
-
-### Fix
-- Show the full job list for the selected company in the detail panel, below the grade distribution chart
-- Each job on one line: `SS  SWE Workers Observability`
-- Scrollable — the detail panel already supports scroll with j/k and mouse
-- This makes the company detail panel a complete view of what that company offers
-
----
-
-## Mouse focus should follow scroll target
-
-### Current problem
-- Mouse scroll only works on the focused pane (list or detail)
-- User must press Tab to switch focus before scrolling the other pane
-- This feels broken — you expect to scroll whichever pane your cursor is over
-
-### Fix
-- Detect which pane the mouse cursor is in based on `mouse.column` relative to the list/detail split point
-- If mouse is over the list pane, scroll the list regardless of current focus
-- If mouse is over the detail pane, scroll the detail regardless of current focus
-- This makes mouse interaction feel natural — no need to Tab first
-- Keyboard focus (Tab) still controls which pane gets j/k keypresses
-
----
-
-## Jobs tab empty space
-
-### Current problem
-- The detail panel in jobs view has a lot of empty space below the fit assessment
-- The "Evaluation: strong fit" line is redundant with the grade (SS already implies strong fit)
-
-### Fix
-- Remove the "Evaluation" line — grade tells the whole story
-- If the job has a description, show a truncated preview below the fit assessment (first ~200 chars)
-- This fills the empty space with useful information and helps the user decide whether to click "o" to open the full listing
-
----
-
-## General empty space strategy
-
-Every block and pane should follow this principle: **if there's empty space, either shrink the container or fill it with useful content.** Specific tactics:
-
-1. **Dynamic block heights** — use `Constraint::Length(content_lines + 2)` instead of `Constraint::Min(N)` for blocks with fixed content
-2. **Expandable content** — blocks with variable content (like Top Roles) should grow to fill available space
-3. **No orphan blocks** — if a section only has 3 lines of content, don't give it a 15-line block
-4. **Density over whitespace** — information density is a feature in a dashboard, not a problem
+Mouse/touchpad scroll should move the viewport (offset), not jump through entries. The selection stays in place. Momentum scrolling on MacBook trackpads should be batched to prevent flying through hundreds of entries. Mouse scroll targets whichever pane the cursor is over, regardless of keyboard focus.
