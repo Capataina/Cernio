@@ -88,3 +88,72 @@ This fills the horizontal space and makes the distribution instantly visible.
 ### Grade Distribution improvements
 
 The bars are currently only 6 characters wide — they should expand to fill available width. With a 45% column width on a 120-column terminal, that's ~50 usable characters. The bars should be ~20-25 characters wide with the grade label and count flanking them.
+
+---
+
+## Top Roles pane (dashboard bottom-right)
+
+### Current problems
+- Only shows ~10 SS roles with company on a second line — wastes vertical space
+- Not scrollable — can't see beyond what fits on screen
+- Takes 2 lines per entry (title + company on separate lines)
+
+### Fix
+- Show ALL SS, S, and A roles (not just 10 SS)
+- Single-line format: `SS  SWE Workers Observability — Cloudflare`
+- Make the pane scrollable with j/k when dashboard is focused
+- This turns the dashboard from a static stats page into an interactive browseable list of actionable roles
+
+---
+
+## Company detail — full job list
+
+### Current problem
+- Only shows "Top Roles" (top 5 SS/S/A jobs) in the company detail panel
+- No way to see all jobs at a company without drilling into the Jobs tab
+
+### Fix
+- Show the full job list for the selected company in the detail panel, below the grade distribution chart
+- Each job on one line: `SS  SWE Workers Observability`
+- Scrollable — the detail panel already supports scroll with j/k and mouse
+- This makes the company detail panel a complete view of what that company offers
+
+---
+
+## Mouse focus should follow scroll target
+
+### Current problem
+- Mouse scroll only works on the focused pane (list or detail)
+- User must press Tab to switch focus before scrolling the other pane
+- This feels broken — you expect to scroll whichever pane your cursor is over
+
+### Fix
+- Detect which pane the mouse cursor is in based on `mouse.column` relative to the list/detail split point
+- If mouse is over the list pane, scroll the list regardless of current focus
+- If mouse is over the detail pane, scroll the detail regardless of current focus
+- This makes mouse interaction feel natural — no need to Tab first
+- Keyboard focus (Tab) still controls which pane gets j/k keypresses
+
+---
+
+## Jobs tab empty space
+
+### Current problem
+- The detail panel in jobs view has a lot of empty space below the fit assessment
+- The "Evaluation: strong fit" line is redundant with the grade (SS already implies strong fit)
+
+### Fix
+- Remove the "Evaluation" line — grade tells the whole story
+- If the job has a description, show a truncated preview below the fit assessment (first ~200 chars)
+- This fills the empty space with useful information and helps the user decide whether to click "o" to open the full listing
+
+---
+
+## General empty space strategy
+
+Every block and pane should follow this principle: **if there's empty space, either shrink the container or fill it with useful content.** Specific tactics:
+
+1. **Dynamic block heights** — use `Constraint::Length(content_lines + 2)` instead of `Constraint::Min(N)` for blocks with fixed content
+2. **Expandable content** — blocks with variable content (like Top Roles) should grow to fill available space
+3. **No orphan blocks** — if a section only has 3 lines of content, don't give it a 15-line block
+4. **Density over whitespace** — information density is a feature in a dashboard, not a problem
