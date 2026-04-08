@@ -1,10 +1,14 @@
+use std::sync::Arc;
+
 use rusqlite::{params, Connection};
+use tokio::sync::Semaphore;
 
 use crate::ats::common::AtsJob;
 use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
 use crate::config::SearchFilters;
 
 /// A resolved company with its portal info, ready for job fetching.
+#[derive(Clone)]
 struct SearchTarget {
     company_id: i64,
     company_name: String,
@@ -13,7 +17,14 @@ struct SearchTarget {
     slug: String,
 }
 
+/// Result of fetching jobs for one company.
+struct FetchResult {
+    target: SearchTarget,
+    jobs: Vec<AtsJob>,
+}
+
 /// Run the search pipeline for all resolved companies above the grade threshold.
+/// Fetches from all companies in parallel, then filters and inserts sequentially.
 pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
     let targets = get_search_targets(conn, filters);
 
@@ -28,22 +39,24 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
         filters.min_company_grade
     );
 
-    let client = reqwest::Client::new();
+    // Fetch all companies in parallel.
+    let fetch_results = fetch_all_parallel(&targets).await;
+
+    // Filter and insert sequentially (needs DB access).
     let mut total_fetched = 0u64;
     let mut total_after_location = 0u64;
     let mut total_after_exclusion = 0u64;
     let mut total_after_inclusion = 0u64;
     let mut total_new = 0u64;
 
-    for target in &targets {
-        let jobs = fetch_jobs(&client, &target.provider, &target.slug).await;
-        let fetched = jobs.len();
+    for result in &fetch_results {
+        let fetched = result.jobs.len();
         total_fetched += fetched as u64;
 
-        // Filter chain.
-        let after_location: Vec<_> = jobs
-            .into_iter()
-            .filter(|j| filters.passes_location(&target.provider, &j.all_locations))
+        let after_location: Vec<_> = result
+            .jobs
+            .iter()
+            .filter(|j| filters.passes_location(&result.target.provider, &j.all_locations))
             .collect();
         total_after_location += after_location.len() as u64;
 
@@ -59,7 +72,6 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
             .collect();
         total_after_inclusion += after_inclusion.len() as u64;
 
-        // Dedup against existing DB entries.
         let new_jobs: Vec<_> = after_inclusion
             .into_iter()
             .filter(|j| !job_exists(conn, &j.url))
@@ -69,13 +81,18 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
 
         let status = if new_count > 0 { "✓" } else { "·" };
         println!(
-            "  {status} {:<25} {fetched:>4} fetched → {new_count:>3} new",
-            target.company_name,
+            "  {status} {:<30} {fetched:>4} fetched → {new_count:>3} new",
+            result.target.company_name,
         );
 
         if !dry_run {
             for job in &new_jobs {
-                insert_job(conn, target.company_id, target.portal_id, job);
+                insert_job(
+                    conn,
+                    result.target.company_id,
+                    result.target.portal_id,
+                    job,
+                );
             }
         }
     }
@@ -103,7 +120,11 @@ pub async fn run_single(
     let all_targets = get_search_targets(conn, filters);
     let targets: Vec<_> = all_targets
         .into_iter()
-        .filter(|t| t.company_name.to_lowercase().contains(&company_name.to_lowercase()))
+        .filter(|t| {
+            t.company_name
+                .to_lowercase()
+                .contains(&company_name.to_lowercase())
+        })
         .collect();
 
     if targets.is_empty() {
@@ -111,7 +132,7 @@ pub async fn run_single(
         return;
     }
 
-    let client = reqwest::Client::new();
+    let client = crate::http::build_client();
 
     for target in &targets {
         println!("Searching {}...", target.company_name);
@@ -119,7 +140,7 @@ pub async fn run_single(
         println!("  Fetched {} jobs", jobs.len());
 
         let filtered: Vec<_> = jobs
-            .into_iter()
+            .iter()
             .filter(|j| filters.passes_location(&target.provider, &j.all_locations))
             .filter(|j| filters.passes_exclusion(&j.title))
             .filter(|j| filters.passes_inclusion(&j.title))
@@ -135,8 +156,11 @@ pub async fn run_single(
             println!("  Inserted into database.");
         } else {
             println!("  (dry run — not inserted)");
-            for job in &filtered {
+            for job in filtered.iter().take(10) {
                 println!("    - {}", job.title);
+            }
+            if filtered.len() > 10 {
+                println!("    ... and {} more", filtered.len() - 10);
             }
         }
     }
@@ -172,14 +196,14 @@ pub async fn run_by_grade(
 
     println!("Searching {} {grade}-tier companies...\n", targets.len());
 
-    let client = reqwest::Client::new();
+    let fetch_results = fetch_all_parallel(&targets).await;
     let mut total_new = 0u64;
 
-    for target in &targets {
-        let jobs = fetch_jobs(&client, &target.provider, &target.slug).await;
-        let filtered: Vec<_> = jobs
-            .into_iter()
-            .filter(|j| filters.passes_location(&target.provider, &j.all_locations))
+    for result in &fetch_results {
+        let filtered: Vec<_> = result
+            .jobs
+            .iter()
+            .filter(|j| filters.passes_location(&result.target.provider, &j.all_locations))
             .filter(|j| filters.passes_exclusion(&j.title))
             .filter(|j| filters.passes_inclusion(&j.title))
             .filter(|j| !job_exists(conn, &j.url))
@@ -188,11 +212,16 @@ pub async fn run_by_grade(
         let count = filtered.len();
         total_new += count as u64;
         let status = if count > 0 { "✓" } else { "·" };
-        println!("  {status} {:<25} {count:>3} new", target.company_name);
+        println!("  {status} {:<30} {count:>3} new", result.target.company_name);
 
         if !dry_run {
             for job in &filtered {
-                insert_job(conn, target.company_id, target.portal_id, job);
+                insert_job(
+                    conn,
+                    result.target.company_id,
+                    result.target.portal_id,
+                    job,
+                );
             }
         }
     }
@@ -203,11 +232,49 @@ pub async fn run_by_grade(
     }
 }
 
+// ── Parallel fetching ────────────────────────────────────────────
+
+/// Fetch jobs from all targets in parallel, with a concurrency limit.
+async fn fetch_all_parallel(targets: &[SearchTarget]) -> Vec<FetchResult> {
+    let client = crate::http::build_client();
+    let semaphore = Arc::new(Semaphore::new(8)); // Max 8 concurrent ATS fetches.
+    let mut handles = Vec::new();
+
+    for target in targets {
+        let client = client.clone();
+        let sem = semaphore.clone();
+        let target = target.clone();
+
+        let handle = tokio::spawn(async move {
+            let _permit = sem.acquire().await.unwrap();
+            let jobs = fetch_jobs(&client, &target.provider, &target.slug).await;
+            FetchResult { target, jobs }
+        });
+
+        handles.push(handle);
+    }
+
+    let mut results = Vec::new();
+    for handle in handles {
+        if let Ok(result) = handle.await {
+            results.push(result);
+        }
+    }
+
+    // Sort by company name for clean output.
+    results.sort_by(|a, b| a.target.company_name.cmp(&b.target.company_name));
+    results
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 fn get_search_targets(conn: &Connection, filters: &SearchFilters) -> Vec<SearchTarget> {
     let grades = filters.included_grades();
-    let placeholders: Vec<String> = grades.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+    let placeholders: Vec<String> = grades
+        .iter()
+        .enumerate()
+        .map(|(i, _)| format!("?{}", i + 1))
+        .collect();
     let sql = format!(
         "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug
          FROM companies c
@@ -264,17 +331,18 @@ fn get_all_search_targets(conn: &Connection) -> Vec<SearchTarget> {
 }
 
 async fn fetch_jobs(client: &reqwest::Client, provider: &str, slug: &str) -> Vec<AtsJob> {
-    let result = match provider {
-        "greenhouse" => greenhouse::fetch_all(client, slug).await,
-        "lever" => fetch_lever_normalised(client, slug).await,
-        "ashby" => ashby::fetch_all(client, slug).await,
-        "workable" => workable::fetch_all(client, slug).await,
-        "smartrecruiters" => smartrecruiters::fetch_all(client, slug).await,
-        _ => {
-            eprintln!("    Unknown provider: {provider}");
-            return Vec::new();
+    // Retry up to 2 times to handle transient failures.
+    let result = crate::http::with_retry(2, || async {
+        match provider {
+            "greenhouse" => greenhouse::fetch_all(client, slug).await,
+            "lever" => fetch_lever_normalised(client, slug).await,
+            "ashby" => ashby::fetch_all(client, slug).await,
+            "workable" => workable::fetch_all(client, slug).await,
+            "smartrecruiters" => smartrecruiters::fetch_all(client, slug).await,
+            _ => Ok(Vec::new()),
         }
-    };
+    })
+    .await;
 
     result.unwrap_or_else(|e| {
         eprintln!("    Error fetching from {provider}/{slug}: {e}");
@@ -303,13 +371,11 @@ async fn fetch_lever_normalised(
                 location: p.categories.location,
                 all_locations,
                 remote_policy: p.workplace_type,
-                posted_date: p
-                    .created_at
-                    .map(|ts| {
-                        chrono::DateTime::from_timestamp_millis(ts as i64)
-                            .map(|dt| dt.format("%Y-%m-%d").to_string())
-                            .unwrap_or_default()
-                    }),
+                posted_date: p.created_at.map(|ts| {
+                    chrono::DateTime::from_timestamp_millis(ts as i64)
+                        .map(|dt| dt.format("%Y-%m-%d").to_string())
+                        .unwrap_or_default()
+                }),
                 description: None,
             }
         })

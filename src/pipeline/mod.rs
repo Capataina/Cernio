@@ -1,4 +1,5 @@
+pub mod check;
+pub mod clean;
+pub mod import;
 pub mod resolve;
 pub mod search;
-pub mod clean;
-pub mod check;

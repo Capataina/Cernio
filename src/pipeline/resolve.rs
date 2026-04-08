@@ -1,8 +1,10 @@
-use rusqlite::{params, Connection};
+use std::sync::Arc;
 
-use crate::ats::{ashby, greenhouse, smartrecruiters, workable};
+use rusqlite::{params, Connection};
+use tokio::sync::Semaphore;
+
 use crate::ats::common::SlugProbeResult;
-use crate::ats::lever;
+use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
 
 /// Generate slug candidates from a company name.
 /// Tries common transformations that ATS providers use.
@@ -36,6 +38,25 @@ fn slug_candidates(name: &str) -> Vec<String> {
     // Try just the first word (e.g. "Helsing GmbH" → "helsing").
     if let Some(first) = lower.split_whitespace().next() {
         candidates.push(first.to_string());
+    }
+
+    // Strip parenthetical suffixes: "Man Group (AHL)" → "mangroup"
+    if let Some(paren_pos) = lower.find('(') {
+        let without_paren = lower[..paren_pos].trim();
+        candidates.push(without_paren.replace(' ', ""));
+        candidates.push(without_paren.replace(' ', "-"));
+    }
+
+    // Strip slashes: "Refinitiv / LSEG" → "refinitiv"
+    if let Some(slash_pos) = lower.find('/') {
+        let first_part = lower[..slash_pos].trim();
+        candidates.push(first_part.replace(' ', ""));
+        candidates.push(first_part.replace(' ', "-"));
+    }
+
+    // Strip ".co" suffix: "Copper.co" → "copper"
+    if let Some(stripped) = lower.strip_suffix(".co") {
+        candidates.push(stripped.replace(' ', ""));
     }
 
     // Deduplicate while preserving order.
@@ -84,12 +105,24 @@ async fn probe_all_providers(
                 results.push(result);
             }
         }
+
+        // If we've found all 5 providers, stop early.
+        if found_providers.len() >= 5 {
+            break;
+        }
     }
 
     results
 }
 
-/// Run the resolve pipeline for all pending companies.
+/// Result for a single company's resolution attempt.
+struct ResolveResult {
+    id: i64,
+    name: String,
+    portals: Vec<SlugProbeResult>,
+}
+
+/// Run the resolve pipeline for all pending companies — concurrently.
 pub async fn run(conn: &Connection, dry_run: bool) {
     let companies = get_pending_companies(conn);
 
@@ -98,48 +131,97 @@ pub async fn run(conn: &Connection, dry_run: bool) {
         return;
     }
 
-    println!("Resolving {} companies...\n", companies.len());
+    println!("Resolving {} companies (parallel)...\n", companies.len());
 
-    let client = reqwest::Client::new();
+    let client = crate::http::build_client();
+    let semaphore = Arc::new(Semaphore::new(10)); // Max 10 concurrent companies.
 
-    for (id, name, website) in &companies {
-        print!("  {name:<30} ");
+    // Spawn all probe tasks concurrently, with retry to handle flaky responses.
+    let mut handles = Vec::new();
 
-        let results = probe_all_providers(&client, name).await;
+    for (id, name, _website) in companies {
+        let client = client.clone();
+        let sem = semaphore.clone();
+        let name_clone = name.clone();
 
-        if results.is_empty() {
-            println!("  ✗ no ATS found — needs AI resolution");
+        let handle = tokio::spawn(async move {
+            let _permit = sem.acquire().await.unwrap();
+            // Try up to 2 rounds of probing — transient failures (timeouts,
+            // rate limits) can cause providers to be missed on the first pass.
+            let mut portals = probe_all_providers(&client, &name_clone).await;
+            if portals.is_empty() {
+                // Second attempt after a brief delay.
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                portals = probe_all_providers(&client, &name_clone).await;
+            }
+            ResolveResult {
+                id,
+                name: name_clone,
+                portals,
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Collect all results.
+    let mut results: Vec<ResolveResult> = Vec::new();
+    for handle in handles {
+        if let Ok(result) = handle.await {
+            results.push(result);
+        }
+    }
+
+    // Sort by name for clean output.
+    results.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Print results and write to DB.
+    let mut resolved_count = 0u64;
+    let mut unresolved_count = 0u64;
+
+    for result in &results {
+        if result.portals.is_empty() {
+            println!("  ✗ {:<35} no ATS found", result.name);
+            unresolved_count += 1;
             continue;
         }
 
-        // Find the portal with the most jobs to mark as primary.
-        let max_jobs = results.iter().map(|r| r.job_count).max().unwrap_or(0);
+        let max_jobs = result.portals.iter().map(|r| r.job_count).max().unwrap_or(0);
 
-        for result in &results {
-            let is_primary = result.job_count == max_jobs;
+        for portal in &result.portals {
+            let is_primary = portal.job_count == max_jobs;
             println!(
-                "  {} {} / {} ({} jobs{})",
+                "  {} {:<35} {} / {} ({} jobs{})",
                 if is_primary { "✓" } else { "·" },
-                result.provider,
-                result.slug,
-                result.job_count,
+                result.name,
+                portal.provider,
+                portal.slug,
+                portal.job_count,
                 if is_primary { ", primary" } else { "" }
             );
 
             if !dry_run {
-                insert_portal(conn, *id, result, is_primary);
+                insert_portal(conn, result.id, portal, is_primary);
             }
         }
 
         if !dry_run {
-            // Mark company as resolved.
             let _ = conn.execute(
                 "UPDATE companies SET status = 'resolved' WHERE id = ?1",
-                params![id],
+                params![result.id],
             );
         }
 
-        println!();
+        resolved_count += 1;
+    }
+
+    println!();
+    println!("── Summary ──");
+    println!("  Resolved:   {resolved_count}");
+    println!("  Unresolved: {unresolved_count} (need AI fallback)");
+
+    if dry_run {
+        println!("\n  (dry run — nothing was written to the database)");
     }
 }
 
@@ -147,7 +229,7 @@ pub async fn run(conn: &Connection, dry_run: bool) {
 pub async fn run_single(conn: &Connection, company_name: &str, dry_run: bool) {
     let companies = get_pending_companies(conn);
     let matching: Vec<_> = companies
-        .iter()
+        .into_iter()
         .filter(|(_, name, _)| name.to_lowercase().contains(&company_name.to_lowercase()))
         .collect();
 
@@ -156,10 +238,10 @@ pub async fn run_single(conn: &Connection, company_name: &str, dry_run: bool) {
         return;
     }
 
-    let client = reqwest::Client::new();
+    let client = crate::http::build_client();
 
-    for (id, name, _website) in matching {
-        print!("{name}: ");
+    for (id, name, _website) in &matching {
+        print!("  {name}: ");
         let results = probe_all_providers(&client, name).await;
 
         if results.is_empty() {
@@ -167,11 +249,12 @@ pub async fn run_single(conn: &Connection, company_name: &str, dry_run: bool) {
             continue;
         }
 
+        println!();
         let max_jobs = results.iter().map(|r| r.job_count).max().unwrap_or(0);
         for result in &results {
             let is_primary = result.job_count == max_jobs;
             println!(
-                "  {} {} / {} ({} jobs)",
+                "    {} {} / {} ({} jobs)",
                 if is_primary { "✓" } else { "·" },
                 result.provider,
                 result.slug,

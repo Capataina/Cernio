@@ -1,6 +1,7 @@
 mod ats;
 mod config;
 mod db;
+mod http;
 mod pipeline;
 mod tui;
 
@@ -13,6 +14,7 @@ async fn main() {
 
     match args.get(1).map(|s| s.as_str()) {
         Some("tui") => cmd_tui(),
+        Some("import") => cmd_import(&args),
         Some("resolve") => cmd_resolve(&args).await,
         Some("search") => cmd_search(&args).await,
         Some("clean") => cmd_clean(&args),
@@ -28,6 +30,16 @@ async fn main() {
 }
 
 // ── Pipeline commands ────────────────────────────────────────────
+
+/// Import companies from potential.md into the database.
+fn cmd_import(args: &[String]) {
+    let db = open_db();
+    let dry_run = args.iter().any(|a| a == "--dry-run");
+    let path = get_flag_value(args, "--file")
+        .unwrap_or_else(|| "companies/potential.md".to_string());
+
+    pipeline::import::run(db.conn(), std::path::Path::new(&path), dry_run);
+}
 
 /// Resolve ATS portals for pending companies.
 async fn cmd_resolve(args: &[String]) {
@@ -337,6 +349,7 @@ fn get_flag_value(args: &[String], flag: &str) -> Option<String> {
 fn print_usage() {
     println!("Usage: cernio <command>\n");
     println!("Pipeline commands:");
+    println!("  import [--file PATH] [--dry-run]         Import companies from potential.md into DB");
     println!("  resolve [--company NAME] [--dry-run]     Resolve ATS portals for pending companies");
     println!("  search [--company NAME] [--grade G] [--dry-run]  Search resolved companies for jobs");
     println!("  clean [--dry-run] [--jobs-only]          Archive stale/low-grade entries");

@@ -6,7 +6,7 @@ Discovers companies that do work aligned with the user's profile and adds them t
 
 ## Why this skill exists
 
-The company universe is the foundation of everything downstream — job search, evaluation, and application tracking are only as good as the companies in the system. Mass-market aggregators surface the same obvious names to everyone. The value of discovery is finding the companies that generic tools miss: the 60-person startup doing brilliant ML infrastructure work, the fintech that just raised Series B and is hiring its first systems engineers, the healthcare AI company whose work maps perfectly onto the profile but would never appear on a "top tech companies" list.
+The company universe is the foundation of everything downstream — job search, evaluation, and application tracking are only as good as the companies in the system. Mass-market aggregators surface the same obvious names to everyone. The value of discovery is finding the companies that generic tools miss: the 60-person startup doing brilliant infrastructure work, the company that just raised Series B and is hiring its first engineers in a niche the profile cares about, the firm whose work maps perfectly onto the profile but would never appear on a "top companies" list.
 
 Discovery is the most important skill in Cernio. The companies it finds determine the quality of every subsequent step.
 
@@ -16,38 +16,28 @@ Discovery is the most important skill in Cernio. The companies it finds determin
 
 ### 1. Read the profile and existing universe
 
-Before searching, understand what to look for and what's already known.
+Before searching, understand what to look for and what is already known.
 
-**Read `profile/`** to understand the user's skills, domains, interests, and preferences. The profile determines which sectors to explore and how to assess relevance. A company is worth discovering if the user's skills and interests would be genuinely valued there — not just if the company is impressive in the abstract.
+**Read every file in `profile/`** to build a complete picture of the user — skills, domains, interests, location preferences, visa constraints, experience level, and career direction. The profile determines which sectors to explore, which technologies matter, which geographies to target, and how to assess relevance. A company is worth discovering if the user's skills and interests would be genuinely valued there — not just if the company is impressive in the abstract.
+
+This step is non-negotiable. The profile is the lens through which all discovery is filtered. Without reading it, agents cannot distinguish relevant companies from irrelevant ones, and the skill collapses into generic "top companies" lists that add no value.
 
 **Read the existing universe from the database and `companies/potential.md`.** Query all company names and website URLs from `state/cernio.db` (these are resolved or bespoke companies already in the system), plus any entries still in `companies/potential.md` (discovered but not yet resolved). Discovery should not re-discover any of these. Website URL is the stable dedup key — company names vary across sources but the domain is usually consistent. Pass this list to every agent so they can skip known companies.
 
-### 2. Divide the search space and dispatch parallel agents
+### 2. Design the search space from the profile
 
-Discovery is too broad for a single agent to handle well. The orchestrator should divide the search space into independent territories and dispatch parallel agents, each exploring a different slice.
+The profile determines the search territories. Read the user's skills, domain interests, sector preferences, and career direction, then divide the search space into independent territories that cover the profile's surface area.
 
-**Divide by sector and source type.** The exact division depends on the profile and the user's current priorities. A typical split might look like:
+The orchestrator designs this division fresh each time based on what the profile actually says — there is no fixed list of sectors. If the profile emphasises distributed systems and data infrastructure, those become territories. If it emphasises biotech and computational chemistry, those become territories instead. If the profile has breadth across several domains, create more agents. If it is focused on one area, create fewer agents with deeper mandates.
 
-```
-Orchestrator
-  ├── Agent: AI / ML infrastructure / MLOps
-  ├── Agent: Fintech / payments / banking infrastructure
-  ├── Agent: Trading systems / quant / exchange infrastructure
-  ├── Agent: Healthcare AI / biotech / computational biology
-  ├── Agent: Developer tools / compilers / databases / infrastructure software
-  ├── Agent: Non-obvious sources (GitHub orgs, conference sponsors,
-  │          engineering blogs, HN/Reddit threads, Rust ecosystem)
-  └── ... additional agents as the search space demands
-```
-
-The user may also request targeted discovery: "find me healthcare AI companies in London" or "who's building Rust infrastructure tooling?" In that case, the scope is narrower and fewer agents may be needed.
+One agent should always be dedicated to non-obvious, indirect sources — the kind of places where companies leave traces of their work without advertising as employers. This agent's territory is defined by source type rather than sector, and the sources it explores should be chosen based on the technologies and domains in the profile.
 
 **Each agent gets:**
 - The relevant slice of the profile (skills and domains that matter for their sector)
 - The list of already-known companies (to avoid duplicates)
-- The search strategies reference file for guidance on where to look
+- The search strategies reference file for guidance on discovery approaches
 - A clear territory: which sector or source type they own
-- **Explicit instruction to use WebSearch and WebFetch tools.** Agents must perform real web searches, not answer from training knowledge. Discovery from memory produces "top companies everyone already knows" — the well-known names that every job board already surfaces. The skill's value comes from finding companies through live web searches: VC portfolio pages, conference sponsor lists, GitHub contributor profiles, engineering blog posts, HN threads, curated lists. An agent that doesn't search the web is not doing discovery.
+- **Explicit instruction to use WebSearch and WebFetch tools.** Agents must perform real web searches, not answer from training knowledge. Discovery from memory produces "top companies everyone already knows" — the well-known names that every job board already surfaces. The skill's value comes from finding companies through live web searches: VC portfolio pages, conference sponsor lists, contributor profiles, engineering blog posts, community threads, curated lists. An agent that does not search the web is not doing discovery.
 
 **Each agent returns:**
 - A list of discovered companies in the output format defined below
@@ -77,31 +67,35 @@ Each discovered company should capture:
 - **Location**: [HQ city/country]
 - **What they do**: [1-2 sentences — specific about their actual product/service, not generic sector labels]
 - **Why relevant**: [Why this company fits the profile — which skills, domains, or interests align]
-- **Source**: [Where the agent found them — specific: "Sequoia portfolio page", "HN Who's Hiring March 2026", "contributor to the `tokio` crate"]
+- **Source**: [Where the agent found them — specific and verifiable: a named portfolio page, a dated thread, a specific repository or contributor profile]
 - **Discovered**: [Date]
 ```
 
-The "why relevant" field matters. A company without a clear connection to the profile shouldn't be in the universe. The reasoning also helps later when evaluating jobs — it provides context for why the company was worth tracking.
+The "why relevant" field matters. A company without a clear connection to the profile should not be in the universe. The reasoning also helps later when evaluating jobs — it provides context for why the company was worth tracking.
 
 ---
 
 ## Agent dispatch guidelines
 
-**Use standard subagents, not worktree-isolated ones.** Discovery agents are doing web research and writing to a shared result set. They don't modify repo files independently — they return structured results to the orchestrator.
+**Use standard subagents, not worktree-isolated ones.** Discovery agents are doing web research and writing to a shared result set. They do not modify repo files independently — they return structured results to the orchestrator.
 
 **Each agent should be self-sufficient.** Give it everything it needs in the prompt: the relevant profile slice, the existing company list, the search strategies, and its territory. The agent should not need to read additional files or ask for clarification.
 
-**Scope each agent to produce 10-30 companies.** This is a guideline, not a hard limit — an agent exploring a rich sector might find 40, while one exploring a niche might find 8. The point is that each agent should explore thoroughly within its territory rather than skimming the surface of everything.
+**Encourage depth over breadth within each territory.** Each agent should explore thoroughly within its territory — following leads, expanding from one good find to its competitors and partners, digging into indirect sources — rather than skimming the surface of everything.
 
-**The non-obvious sources agent is critical.** This agent looks in places the sector-specific agents won't: GitHub organisation pages, open source contributor affiliations, conference sponsor lists, engineering blog rolls, job board threads, Rust/ML/systems community discussions. These indirect signals catch companies that have no press coverage and appear on no curated lists.
+**The non-obvious sources agent is critical.** This agent looks in places the sector-specific agents will not: open source contributor affiliations, conference sponsor lists, engineering blog rolls, community discussion threads, ecosystem-specific job boards. The specific sources it explores should be derived from the profile's technologies and domains. These indirect signals catch companies that have no press coverage and appear on no curated lists.
+
+**Encourage creative sourcing.** Agents should invent search strategies beyond what the reference file suggests. The reference file teaches discovery approaches — it is not an exhaustive list of sources. An agent that finds a company through a method nobody anticipated is doing the best work.
 
 ---
 
 ## Search strategy
 
-The `references/search-strategies.md` file contains detailed guidance on where to look and how to look sideways. Every agent should read it before beginning their search.
+The `references/search-strategies.md` file contains guidance on discovery approaches — how to look sideways, how to use indirect signals, and how to expand from one good find to many. Every agent should read it before beginning their search.
 
-The core principle: **obvious searches find obvious companies.** "Best fintech companies UK 2026" returns the same list every aggregator already has. The skill's value comes from creative, indirect discovery — finding companies through the traces they leave in the ecosystem rather than through top-10 lists.
+The core principle: **obvious searches find obvious companies.** Searching "[sector] companies [location] [year]" returns the same list every aggregator already has. The skill's value comes from creative, indirect discovery — finding companies through the traces they leave in the ecosystem rather than through top-10 lists.
+
+Agents should treat the reference file as a starting point for their thinking, not a constraint on their methods. The best discoveries come from sources and search strategies the skill author never anticipated.
 
 ---
 
@@ -110,9 +104,9 @@ The core principle: **obvious searches find obvious companies.** "Best fintech c
 Discovery is designed to be run repeatedly across sessions. Each run should:
 
 - Check the existing universe first and skip known companies
-- Focus on areas the user wants to expand ("let's look at healthcare AI this time")
-- Pick up where previous runs left off — if the last run covered fintech thoroughly, this run can explore other sectors
-- Surface genuinely new finds, not repackage what's already known
+- Focus on areas the user wants to expand, or on sectors the profile emphasises that have not been explored yet
+- Pick up where previous runs left off — if the last run covered one sector thoroughly, this run can explore others
+- Surface genuinely new finds, not repackage what is already known
 
 Over time, the universe grows from dozens to hundreds of companies, each with a clear reason for being there.
 
@@ -122,9 +116,9 @@ Over time, the universe grows from dozens to hundreds of companies, each with a 
 
 Discovery finds companies. It does not:
 
-- Resolve ATS portals or find job board URLs — that's the resolution step
-- Search for specific job listings — that's the search scripts
-- Evaluate whether a specific role fits the profile — that's the evaluation step
+- Resolve ATS portals or find job board URLs — that is the resolution step
+- Search for specific job listings — that is the search scripts
+- Evaluate whether a specific role fits the profile — that is the evaluation step
 - Filter companies by visa sponsorship capability — sponsorship status is not always public, companies can make exceptions, and filtering at discovery time loses opportunities
 
 Discovery is broad by design. The funnel narrows at every subsequent step.
@@ -135,10 +129,12 @@ Discovery is broad by design. The funnel narrows at every subsequent step.
 
 Before presenting results, verify:
 
-- [ ] Every discovered company has a specific, concrete "why relevant" — not just "they're a tech company"
-- [ ] The source is specific enough to be verifiable ("Balderton portfolio page" not "web search")
-- [ ] No company already in `companies/*.md` appears in the results
+- [ ] Every agent read `profile/` before searching — discoveries are grounded in the actual profile, not generic sector assumptions
+- [ ] The existing universe was queried from `state/cernio.db` and `companies/potential.md` before agents began, and no already-known company appears in the results
+- [ ] Every discovered company has a specific, concrete "why relevant" that connects to something in the profile — not just "they're a tech company"
+- [ ] The source is specific enough to be verifiable — a named page, dated thread, or identifiable repository, not just "web search"
 - [ ] The results include non-obvious finds, not just the well-known names everyone already knows about
-- [ ] Each sector agent explored beyond the first page of search results — depth over breadth
+- [ ] Each agent explored beyond the first page of search results — depth over breadth
 - [ ] The "what they do" field describes their actual product or service, not just their sector label
 - [ ] Companies span a range of sizes and stages — not exclusively large established firms or exclusively tiny startups
+- [ ] Search territories were derived from the profile, not from a hardcoded list of sectors
