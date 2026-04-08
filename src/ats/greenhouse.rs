@@ -3,6 +3,7 @@ use serde::Deserialize;
 use super::common::{AtsJob, SlugProbeResult};
 
 const BASE_URL: &str = "https://boards-api.greenhouse.io/v1/boards";
+const BASE_URL_EU: &str = "https://boards-api.eu.greenhouse.io/v1/boards";
 
 // ── API response types ───────────────────────────────────────────
 
@@ -40,51 +41,60 @@ struct GreenhouseOffice {
 
 // ── Public interface ─────────────────────────────────────────────
 
-/// Probe whether a Greenhouse board exists for this slug.
-/// Returns the job count if the board exists, or None if 404.
-pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
-    let url = format!("{BASE_URL}/{slug}/jobs");
-    let resp = client.get(&url).send().await.ok()?;
-    if !resp.status().is_success() {
-        return None;
+/// Determine the correct base URL based on ats_extra region.
+fn base_url(ats_extra: Option<&str>) -> &'static str {
+    if let Some(extra) = ats_extra {
+        if extra.contains("\"eu\"") || extra.contains("eu") {
+            return BASE_URL_EU;
+        }
     }
-    let board: BoardResponse = resp.json().await.ok()?;
-    if board.jobs.is_empty() {
-        return None;
-    }
-    Some(SlugProbeResult {
-        provider: "greenhouse",
-        slug: slug.to_string(),
-        job_count: board.jobs.len(),
-    })
+    BASE_URL
 }
 
-/// Fetch all jobs from a Greenhouse board (without descriptions).
-/// Returns normalised `AtsJob` values. Fast — no content fetched.
+/// Probe whether a Greenhouse board exists for this slug.
+pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResult> {
+    // Try US first, then EU.
+    for url_base in [BASE_URL, BASE_URL_EU] {
+        let url = format!("{url_base}/{slug}/jobs");
+        let resp = client.get(&url).send().await.ok()?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let board: BoardResponse = resp.json().await.ok()?;
+        if !board.jobs.is_empty() {
+            return Some(SlugProbeResult {
+                provider: "greenhouse",
+                slug: slug.to_string(),
+                job_count: board.jobs.len(),
+            });
+        }
+    }
+    None
+}
+
+/// Fetch all jobs from a Greenhouse board WITH full descriptions.
+/// Uses ?content=true to include HTML descriptions in a single request.
 pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<AtsJob>, reqwest::Error> {
-    let url = format!("{BASE_URL}/{slug}/jobs");
+    fetch_all_with_extra(client, slug, None).await
+}
+
+/// Fetch all jobs with optional ats_extra for EU region support.
+pub async fn fetch_all_with_extra(
+    client: &reqwest::Client,
+    slug: &str,
+    ats_extra: Option<&str>,
+) -> Result<Vec<AtsJob>, reqwest::Error> {
+    let url_base = base_url(ats_extra);
+    let url = format!("{url_base}/{slug}/jobs?content=true");
     let resp = client.get(&url).send().await?.error_for_status()?;
     let board: BoardResponse = resp.json().await?;
 
-    Ok(board.jobs.into_iter().map(|j| normalise(j, slug)).collect())
-}
-
-/// Fetch a single job's full description from Greenhouse.
-pub async fn fetch_detail(
-    client: &reqwest::Client,
-    slug: &str,
-    job_id: &str,
-) -> Result<Option<String>, reqwest::Error> {
-    let url = format!("{BASE_URL}/{slug}/jobs/{job_id}");
-    let resp = client.get(&url).send().await?.error_for_status()?;
-    let job: GreenhouseJob = resp.json().await?;
-    Ok(job.content.map(|html| strip_html(&html)))
+    Ok(board.jobs.into_iter().map(|j| normalise(j)).collect())
 }
 
 // ── Normalisation ────────────────────────────────────────────────
 
-fn normalise(job: GreenhouseJob, _slug: &str) -> AtsJob {
-    // Build all_locations from the primary location.name and any offices.
+fn normalise(job: GreenhouseJob) -> AtsJob {
     let mut all_locations = vec![job.location.name.clone()];
 
     // location.name can contain semicolon-separated cities (e.g. "Berlin; London; Munich").
@@ -97,7 +107,7 @@ fn normalise(job: GreenhouseJob, _slug: &str) -> AtsJob {
         }
     }
 
-    // Add office locations if present.
+    // Add office locations if present (from ?content=true).
     if let Some(offices) = &job.offices {
         for office in offices {
             all_locations.push(office.name.clone());
@@ -107,7 +117,6 @@ fn normalise(job: GreenhouseJob, _slug: &str) -> AtsJob {
         }
     }
 
-    // Infer remote policy from location.name.
     let remote_policy = if job.location.name.to_lowercase().contains("remote") {
         Some("Remote".to_string())
     } else if job.location.name.to_lowercase().contains("hybrid") {
@@ -128,16 +137,13 @@ fn normalise(job: GreenhouseJob, _slug: &str) -> AtsJob {
     }
 }
 
-/// Strip HTML tags from a string.
 fn strip_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut in_tag = false;
     for ch in html.chars() {
         match ch {
             '<' => in_tag = true,
-            '>' => {
-                in_tag = false;
-            }
+            '>' => in_tag = false,
             _ if !in_tag => result.push(ch),
             _ => {}
         }

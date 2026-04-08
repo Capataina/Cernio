@@ -4,3 +4,4 @@ pub mod greenhouse;
 pub mod lever;
 pub mod smartrecruiters;
 pub mod workable;
+pub mod workday;

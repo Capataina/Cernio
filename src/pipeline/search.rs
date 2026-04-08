@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use tokio::sync::Semaphore;
 
 use crate::ats::common::AtsJob;
-use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
+use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable, workday};
 use crate::config::SearchFilters;
 
 /// A resolved company with its portal info, ready for job fetching.
@@ -15,6 +15,7 @@ struct SearchTarget {
     portal_id: i64,
     provider: String,
     slug: String,
+    ats_extra: Option<String>,
 }
 
 /// Result of fetching jobs for one company.
@@ -136,7 +137,7 @@ pub async fn run_single(
 
     for target in &targets {
         println!("Searching {}...", target.company_name);
-        let jobs = fetch_jobs(&client, &target.provider, &target.slug).await;
+        let jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
         println!("  Fetched {} jobs", jobs.len());
 
         let filtered: Vec<_> = jobs
@@ -247,7 +248,7 @@ async fn fetch_all_parallel(targets: &[SearchTarget]) -> Vec<FetchResult> {
 
         let handle = tokio::spawn(async move {
             let _permit = sem.acquire().await.unwrap();
-            let jobs = fetch_jobs(&client, &target.provider, &target.slug).await;
+            let jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
             FetchResult { target, jobs }
         });
 
@@ -276,7 +277,7 @@ fn get_search_targets(conn: &Connection, filters: &SearchFilters) -> Vec<SearchT
         .map(|(i, _)| format!("?{}", i + 1))
         .collect();
     let sql = format!(
-        "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug
+        "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug, p.ats_extra
          FROM companies c
          JOIN company_portals p ON p.company_id = c.id AND p.is_primary = 1
          WHERE c.status = 'resolved' AND c.grade IN ({})
@@ -301,6 +302,7 @@ fn get_search_targets(conn: &Connection, filters: &SearchFilters) -> Vec<SearchT
             portal_id: row.get(2)?,
             provider: row.get(3)?,
             slug: row.get(4)?,
+            ats_extra: row.get(5)?,
         })
     })
     .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -309,7 +311,7 @@ fn get_search_targets(conn: &Connection, filters: &SearchFilters) -> Vec<SearchT
 
 fn get_all_search_targets(conn: &Connection) -> Vec<SearchTarget> {
     conn.prepare(
-        "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug
+        "SELECT c.id, c.name, p.id, p.ats_provider, p.ats_slug, p.ats_extra
          FROM companies c
          JOIN company_portals p ON p.company_id = c.id AND p.is_primary = 1
          WHERE c.status = 'resolved'
@@ -323,6 +325,7 @@ fn get_all_search_targets(conn: &Connection) -> Vec<SearchTarget> {
                 portal_id: row.get(2)?,
                 provider: row.get(3)?,
                 slug: row.get(4)?,
+                ats_extra: row.get(5)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -330,56 +333,46 @@ fn get_all_search_targets(conn: &Connection) -> Vec<SearchTarget> {
     .unwrap_or_default()
 }
 
-async fn fetch_jobs(client: &reqwest::Client, provider: &str, slug: &str) -> Vec<AtsJob> {
-    // Retry up to 2 times to handle transient failures.
-    let result = crate::http::with_retry(2, || async {
-        match provider {
-            "greenhouse" => greenhouse::fetch_all(client, slug).await,
-            "lever" => fetch_lever_normalised(client, slug).await,
-            "ashby" => ashby::fetch_all(client, slug).await,
-            "workable" => workable::fetch_all(client, slug).await,
-            "smartrecruiters" => smartrecruiters::fetch_all(client, slug).await,
-            _ => Ok(Vec::new()),
+async fn fetch_jobs(
+    client: &reqwest::Client,
+    provider: &str,
+    slug: &str,
+    ats_extra: Option<&str>,
+) -> Vec<AtsJob> {
+    let result: Result<Vec<AtsJob>, Box<dyn std::error::Error + Send + Sync>> = match provider {
+        "greenhouse" => greenhouse::fetch_all_with_extra(client, slug, ats_extra)
+            .await
+            .map_err(|e| e.into()),
+        "lever" => lever::fetch_all_with_extra(client, slug, ats_extra)
+            .await
+            .map(|postings| lever::normalise_postings(postings))
+            .map_err(|e| e.into()),
+        "ashby" => ashby::fetch_all(client, slug)
+            .await
+            .map_err(|e| e.into()),
+        "workable" => workable::fetch_all(client, slug)
+            .await
+            .map_err(|e| e.into()),
+        "smartrecruiters" => smartrecruiters::fetch_all(client, slug)
+            .await
+            .map_err(|e| e.into()),
+        "workday" => {
+            if let Some(extra) = ats_extra {
+                workday::fetch_all_with_extra(client, slug, extra).await
+            } else {
+                Ok(Vec::new())
+            }
         }
-    })
-    .await;
+        _ => {
+            eprintln!("    Unknown provider: {provider}");
+            Ok(Vec::new())
+        }
+    };
 
     result.unwrap_or_else(|e| {
         eprintln!("    Error fetching from {provider}/{slug}: {e}");
         Vec::new()
     })
-}
-
-/// Adapter: convert Lever's native types to AtsJob.
-async fn fetch_lever_normalised(
-    client: &reqwest::Client,
-    slug: &str,
-) -> Result<Vec<AtsJob>, reqwest::Error> {
-    let postings = lever::fetch_all(client, slug).await?;
-    Ok(postings
-        .into_iter()
-        .map(|p| {
-            let mut all_locations = Vec::new();
-            if let Some(loc) = &p.categories.location {
-                all_locations.push(loc.clone());
-            }
-
-            AtsJob {
-                external_id: p.id,
-                title: p.text,
-                url: p.hosted_url.unwrap_or_default(),
-                location: p.categories.location,
-                all_locations,
-                remote_policy: p.workplace_type,
-                posted_date: p.created_at.map(|ts| {
-                    chrono::DateTime::from_timestamp_millis(ts as i64)
-                        .map(|dt| dt.format("%Y-%m-%d").to_string())
-                        .unwrap_or_default()
-                }),
-                description: None,
-            }
-        })
-        .collect())
 }
 
 fn job_exists(conn: &Connection, url: &str) -> bool {

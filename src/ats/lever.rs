@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+use super::common::AtsJob;
+
 const BASE_URL: &str = "https://api.lever.co/v0/postings";
+const BASE_URL_EU: &str = "https://api.eu.lever.co/v0/postings";
 
 /// A job posting from Lever's list endpoint.
-/// Fields map to Lever's public API response shape.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LeverPosting {
     pub id: String,
@@ -17,6 +19,12 @@ pub struct LeverPosting {
     pub created_at: Option<u64>,
     #[serde(rename = "workplaceType")]
     pub workplace_type: Option<String>,
+    #[serde(rename = "descriptionPlain")]
+    pub description_plain: Option<String>,
+    pub additional: Option<String>,
+    #[serde(rename = "additionalPlain")]
+    pub additional_plain: Option<String>,
+    pub lists: Option<Vec<LeverList>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -27,8 +35,13 @@ pub struct LeverCategories {
     pub team: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LeverList {
+    pub text: String,
+    pub content: String,
+}
+
 /// Full posting detail from Lever's single-posting endpoint.
-/// Includes description text and structured requirement lists.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LeverPostingDetail {
     pub id: String,
@@ -48,28 +61,106 @@ pub struct LeverPostingDetail {
     pub workplace_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LeverList {
-    pub text: String,
-    pub content: String,
+/// Determine base URL based on ats_extra region.
+fn base_url(ats_extra: Option<&str>) -> &'static str {
+    if let Some(extra) = ats_extra {
+        if extra.contains("eu") {
+            return BASE_URL_EU;
+        }
+    }
+    BASE_URL
 }
 
-/// Fetch all open postings at a company.
-pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<LeverPosting>, reqwest::Error> {
-    let url = format!("{BASE_URL}/{slug}");
+/// Fetch all open postings at a company (US endpoint).
+pub async fn fetch_all(
+    client: &reqwest::Client,
+    slug: &str,
+) -> Result<Vec<LeverPosting>, reqwest::Error> {
+    fetch_all_with_extra(client, slug, None).await
+}
+
+/// Fetch all open postings with optional EU support.
+pub async fn fetch_all_with_extra(
+    client: &reqwest::Client,
+    slug: &str,
+    ats_extra: Option<&str>,
+) -> Result<Vec<LeverPosting>, reqwest::Error> {
+    let url_base = base_url(ats_extra);
+    let url = format!("{url_base}/{slug}");
     let postings: Vec<LeverPosting> = client.get(&url).send().await?.json().await?;
     Ok(postings)
 }
 
+/// Convert Lever postings to normalised AtsJob format with descriptions.
+pub fn normalise_postings(postings: Vec<LeverPosting>) -> Vec<AtsJob> {
+    postings.into_iter().map(normalise_posting).collect()
+}
+
+fn normalise_posting(p: LeverPosting) -> AtsJob {
+    let mut all_locations = Vec::new();
+    if let Some(loc) = &p.categories.location {
+        all_locations.push(loc.clone());
+    }
+
+    // Build description from available fields.
+    let description = build_description(&p);
+
+    AtsJob {
+        external_id: p.id,
+        title: p.text,
+        url: p.hosted_url.unwrap_or_default(),
+        location: p.categories.location,
+        all_locations,
+        remote_policy: p.workplace_type,
+        posted_date: p.created_at.map(|ts| {
+            chrono::DateTime::from_timestamp_millis(ts as i64)
+                .map(|dt| dt.format("%Y-%m-%d").to_string())
+                .unwrap_or_default()
+        }),
+        description,
+    }
+}
+
+fn build_description(p: &LeverPosting) -> Option<String> {
+    let mut parts = Vec::new();
+
+    if let Some(desc) = &p.description_plain {
+        if !desc.is_empty() {
+            parts.push(desc.clone());
+        }
+    }
+
+    if let Some(lists) = &p.lists {
+        for list in lists {
+            parts.push(format!("{}:\n{}", list.text, strip_html(&list.content)));
+        }
+    }
+
+    if let Some(additional) = &p.additional_plain {
+        if !additional.is_empty() {
+            parts.push(additional.clone());
+        }
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n\n"))
+    }
+}
+
 /// Fetch the full detail for a single posting.
-pub async fn fetch_detail(client: &reqwest::Client, slug: &str, id: &str) -> Result<LeverPostingDetail, reqwest::Error> {
+pub async fn fetch_detail(
+    client: &reqwest::Client,
+    slug: &str,
+    id: &str,
+) -> Result<LeverPostingDetail, reqwest::Error> {
     let url = format!("{BASE_URL}/{slug}/{id}");
     let detail: LeverPostingDetail = client.get(&url).send().await?.json().await?;
     Ok(detail)
 }
 
-/// Strip HTML tags from a string. Simple implementation for cleaning
-/// Lever's HTML content fields into readable plain text.
+/// Strip HTML tags from a string.
 pub fn strip_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut in_tag = false;
@@ -78,10 +169,6 @@ pub fn strip_html(html: &str) -> String {
             '<' => in_tag = true,
             '>' => {
                 in_tag = false;
-                // Add newline after block-level closing tags for readability.
-                if result.ends_with("/li") || result.ends_with("/p") || result.ends_with("/div") {
-                    result.push('\n');
-                }
             }
             _ if !in_tag => result.push(ch),
             _ => {}
