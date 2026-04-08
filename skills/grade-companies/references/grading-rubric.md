@@ -157,12 +157,26 @@ These dimensions break ties between companies that are similar on higher-weight 
 
 Company grades are gentler than job grades — they assess whether a company is worth monitoring, not whether to apply right now. A B-tier company might produce an S-tier role.
 
-| Grade | Meaning | Profile |
-|-------|---------|---------|
-| **S** | Excellent company — high priority monitoring | Scores well on all three high-weight dimensions. Strong engineering reputation, clear technical alignment, growing. Medium-weight dimensions are at least decent. This is a company where getting any relevant role would be a career win. |
-| **A** | Good company — regular monitoring | Strong on two of three high-weight dimensions, acceptable on the third. Or strong on all three but with a notable medium-weight weakness (uncertain sponsorship, flat org). Worth tracking actively — good roles will appear here. |
-| **B** | Decent company — worth tracking | Has genuine technical alignment and at least one other high-weight strength, but with clear weaknesses. Maybe small and uncertain, maybe narrow domain, maybe weak on engineering reputation. Still worth having in the database because a good role here is better than no role. |
-| **C** | Marginal — archived | Borderline relevance. The connection to the candidate's profile is tenuous, or the company's weaknesses outweigh its strengths for this specific candidate. Archived to prevent noise in job searches, but preserved for deduplication. |
+**Grades should be conservative.** S is reserved for companies where the alignment is genuinely exceptional across almost every dimension. Most good companies are A-tier. Most decent companies are B-tier. S should feel rare — if you're grading 50 companies and 15 come out as S, your bar is too low.
+
+| Grade | Meaning | Profile | Rough frequency |
+|-------|---------|---------|-----------------|
+| **S** | Exceptional — career-defining | Scores well on ALL three high-weight dimensions AND at least two medium-weight. Strong engineering reputation, clear technical alignment with the candidate's specific projects, actively growing, likely to sponsor, high career ceiling. Getting any relevant role here would be a career win. These are companies where the candidate's portfolio would genuinely impress interviewers. | ~10% of the universe. If more than 15% are S, re-examine. |
+| **A** | Strong — actively monitor | Strong on two of three high-weight dimensions, acceptable on the third. Or strong on all three but with a notable medium-weight weakness. These are companies the candidate should actively pursue — they produce genuinely good roles. | ~25-30% |
+| **B** | Decent — worth tracking | Has genuine relevance and at least one clear strength, but with notable weaknesses. Maybe the tech stack doesn't match, maybe the company is small, maybe the domain is adjacent rather than core. Still worth having in the database because a good role here beats no role. | ~35-40% |
+| **C** | Marginal — archived | The connection to the candidate's profile is genuinely tenuous, OR the company has hard negatives (excluded sector, no engineering team, dissolved). Archived to prevent noise, preserved for dedup. | ~20-25% |
+
+### Anti-inflation rules
+
+These rules prevent the grade drift that occurs when every "good company" becomes S:
+
+1. **Tech stack mismatch alone does NOT make a company C.** A large, well-funded company with strong engineering reputation and guaranteed sponsorship is at minimum B, even if they use Java instead of Rust. The tech stack is a medium-weight dimension, not a dealbreaker. Monzo (Go), Stripe (Ruby/Go), Bloomberg (C++) are all valuable employers regardless of language.
+
+2. **Large UK employers with guaranteed sponsorship get a floor of B.** Companies like Monzo, Revolut, Starling, Checkout.com, Wise, and Adyen are massive employers with established engineering teams, proven sponsorship track records, and strong CV signal. They should never be C-tier unless they fall into an explicitly excluded sector. Even if their technical alignment is moderate, the sponsorship guarantee, brand recognition, and career ceiling make them worth monitoring.
+
+3. **S requires genuine exceptionality, not just "good across the board."** To earn S, a company must have either (a) near-perfect technical alignment where the candidate's specific projects map directly to the company's core work, OR (b) an engineering reputation so strong that getting hired there would be transformative for the candidate's career regardless of the specific role. "Good company, grows, sponsors" is A-tier, not S.
+
+4. **The candidate's career stage matters.** With no formal work experience, CV signal from the first employer is disproportionately important. A company with a strong engineering name (even if the tech stack isn't Rust) is more valuable than a tiny Rust startup with no brand recognition. First-job companies should be graded with this lens.
 
 ### The gap between B and C
 
@@ -171,7 +185,7 @@ This is the most consequential boundary. B companies stay in the active search p
 - **False B (should be C):** The job search wastes time fetching and evaluating roles from a company that was never going to produce a relevant hit. Low cost per company, but it accumulates.
 - **False C (should be B):** A company with a genuinely good role gets archived, and the role is never seen. This is a missed opportunity that cannot be recovered.
 
-When in doubt between B and C, lean toward B. The cost of monitoring one extra company is low. The cost of missing a good role is high.
+**When in doubt between B and C, lean toward B.** The cost of monitoring one extra company is low. The cost of missing a good role is high. A company should only be C if you can articulate a clear reason why monitoring it would be a genuine waste — not just "their stack is different."
 
 ---
 

@@ -148,26 +148,23 @@ Format:
 
 ### 7. Write to database
 
-After user confirmation, execute the updates:
+After user confirmation, execute the updates. **Use EXACTLY this SQL format — do not rename columns, do not add extra fields, do not change the syntax.**
 
 ```sql
--- For S, A, B tier companies:
-UPDATE companies
-SET grade = 'X',
-    grade_reasoning = 'reasoning text here',
-    graded_at = datetime('now'),
-    why_relevant = 'updated relevance text'
-WHERE id = N;
+-- For S, A, B tier companies (EXACT format — do not modify column names):
+UPDATE companies SET grade = 'X', grade_reasoning = 'reasoning text here', why_relevant = 'updated relevance text', graded_at = datetime('now') WHERE id = N;
 
--- For C tier companies (grade + archive):
-UPDATE companies
-SET grade = 'C',
-    grade_reasoning = 'reasoning text here',
-    graded_at = datetime('now'),
-    why_relevant = 'updated relevance text',
-    status = 'archived'
-WHERE id = N;
+-- For C tier companies (grade + archive — EXACT format):
+UPDATE companies SET grade = 'C', grade_reasoning = 'reasoning text here', why_relevant = 'updated relevance text', graded_at = datetime('now'), status = 'archived' WHERE id = N;
 ```
+
+**Critical SQL rules for agents:**
+- Column names are `grade`, `grade_reasoning`, `why_relevant`, `graded_at`, `status`. NOT `reasoning`, NOT `relevance`, NOT any other variation.
+- Escape single quotes in text by doubling them: `it''s` not `it's`
+- `graded_at` must be `datetime('now')`, not a hardcoded date string
+- Do NOT set `status` for S/A/B companies — only set `status = 'archived'` for C-tier
+- Every statement must end with a semicolon
+- One UPDATE per line, no multi-line statements
 
 ---
 

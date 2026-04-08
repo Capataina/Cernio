@@ -57,21 +57,19 @@ One agent should always be dedicated to non-obvious, indirect sources — the ki
 - A clear territory: which sector or source type they own
 - **Explicit instruction to use WebSearch and WebFetch tools.** Agents must perform real web searches, not answer from training knowledge. Discovery from memory produces "top companies everyone already knows" — the well-known names that every job board already surfaces. The skill's value comes from finding companies through live web searches: VC portfolio pages, conference sponsor lists, contributor profiles, engineering blog posts, community threads, curated lists. An agent that does not search the web is not doing discovery.
 
-**Each agent returns:**
-- A list of discovered companies in the output format defined below
-- Brief notes on which sources were most productive and which searches yielded unexpected finds
+**Each agent writes to its own file.** Every agent must write its discoveries to a separate file named `companies/discovery-{territory}.md` (e.g., `companies/discovery-trading.md`, `companies/discovery-ai-ml.md`, `companies/discovery-non-obvious.md`). Agents must NOT all write to `companies/potential.md` — that causes merge conflicts and makes it impossible to see which agent found what.
 
-### 3. Deduplicate and merge
+**Each agent also returns:**
+- A brief summary of how many companies were found
+- Notes on which sources were most productive and which searches yielded unexpected finds
 
-When agents return, the orchestrator:
-- Deduplicates across agents (multiple agents may independently find the same company)
-- Deduplicates against the existing universe
-- Merges results into a single list
-- Presents the combined findings to the user for review
+### 3. Import and deduplicate
 
-### 4. Write to the universe
+After all agents complete, the orchestrator imports each file separately using `cernio import companies/discovery-{territory}.md`. The database handles deduplication automatically via its unique constraint on company website URLs — there is no need for manual deduplication. If two agents find the same company, the second import is silently skipped.
 
-After the user reviews the discoveries (they may want to discuss some, remove others, or ask for more detail), write accepted companies to `companies/potential.md`. These are now in the system and will be picked up by the resolution step later.
+### 4. Review
+
+After import, present the combined results to the user: how many companies each agent found, how many were new vs duplicates, and any notable finds worth highlighting.
 
 ---
 
