@@ -134,11 +134,13 @@ negative_signals = [
 #       Good engineering work, decent growth, less brand recognition.
 #   B — Decent company. Has relevant engineering work but weaker on
 #       some dimensions. Maybe small, uncertain growth, or narrow domain.
-#   C — Marginal. Borderline relevance. Archived by default — not
-#       searched for jobs, kept in DB for deduplication only.
+#   C — Marginal. Borderline relevance but still worth searching —
+#       a C company might have one genuinely good role. Job grading
+#       handles quality filtering, so more jobs from weaker companies
+#       is low cost (grading time) vs high potential (finding a hidden gem).
 #
-# Default: "B" (searches S, A, and B companies; skips C and archived)
-min_company_grade = "B"
+# Default: "C" (searches all non-archived companies)
+min_company_grade = "C"
 
 # Title must contain at least one of these keywords (OR logic).
 # Case-insensitive matching. A job is KEPT if its title contains
@@ -269,6 +271,10 @@ stale_days = 14
 # from job searches, but preserved in DB for deduplication so
 # discovery won't waste time re-discovering them.
 #
-# Valid company grades: S, A, B, C (same scale as above but gentler —
-# a B company might still have an S-tier role)
-archive_company_grades = ["C"]
+# Empty list means cleanup does NOT auto-archive any companies by
+# grade. Companies can still be archived manually if needed.
+# C-tier companies are kept active because job grading handles
+# quality filtering — a C company might still have one good role.
+#
+# Valid company grades: S, A, B, C
+archive_company_grades = []

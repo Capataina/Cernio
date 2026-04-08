@@ -102,15 +102,13 @@ An example of **unacceptable** grade reasoning:
 An example of **acceptable** grade reasoning:
 > "S-tier. Core product is a distributed time-series database built in Rust — direct overlap with the candidate's Nyquestro (lock-free matching engine) and systems programming depth. Active OSS presence (12 public repos, regular commits). Engineering blog with substantive posts on storage engine internals. Confirmed Skilled Worker sponsor (licence active on gov.uk register). Series B ($45M, 2025) — actively growing, 8 open engineering roles on Greenhouse. Clear IC ladder visible on Levels.fyi. Technical alignment is near-perfect; the only weakness is relatively low brand recognition outside the database community, which limits CV signal compared to tier-1 names."
 
-### 5. Handle C-tier archival
+### 5. C-tier companies stay active
 
-Companies graded C get their status set to `archived`. This means:
-- They are excluded from job searches (the search script skips archived companies)
-- They disappear from the TUI's active view
-- They remain in the database for deduplication (discovery will not re-discover them)
-- They preserve their grade and reasoning (the evaluation is not lost)
+C-tier companies are NOT automatically archived. They remain in the active search pool because job grading handles quality filtering — a C-tier company might still have one genuinely good role that would be graded A or B on its own merits. The cost of searching a few extra companies is low (extra grading time), while the cost of missing a good role at a "marginal" company is an unrecoverable loss.
 
-Archival is not deletion. A C-tier company that was properly evaluated and found marginal is more valuable than a gap in the database — it prevents wasted effort in future discovery runs.
+Companies should only be archived manually when there is a hard reason (excluded sector, dissolved company, no engineering team) — not just because the overall grade is C.
+
+**Do NOT set `status = 'archived'` when grading C-tier companies.** Leave their status unchanged. The SQL for C-tier is the same as S/A/B — just the grade value differs.
 
 ### 6. Present results for review
 
@@ -151,18 +149,15 @@ Format:
 After user confirmation, execute the updates. **Use EXACTLY this SQL format — do not rename columns, do not add extra fields, do not change the syntax.**
 
 ```sql
--- For S, A, B tier companies (EXACT format — do not modify column names):
+-- EXACT format for ALL grades (S, A, B, C) — do not modify column names:
 UPDATE companies SET grade = 'X', grade_reasoning = 'reasoning text here', why_relevant = 'updated relevance text', graded_at = datetime('now') WHERE id = N;
-
--- For C tier companies (grade + archive — EXACT format):
-UPDATE companies SET grade = 'C', grade_reasoning = 'reasoning text here', why_relevant = 'updated relevance text', graded_at = datetime('now'), status = 'archived' WHERE id = N;
 ```
 
 **Critical SQL rules for agents:**
-- Column names are `grade`, `grade_reasoning`, `why_relevant`, `graded_at`, `status`. NOT `reasoning`, NOT `relevance`, NOT any other variation.
+- Column names are `grade`, `grade_reasoning`, `why_relevant`, `graded_at`. NOT `reasoning`, NOT `relevance`, NOT any other variation.
+- Do NOT set `status = 'archived'` for any grade including C. C-tier companies stay active.
 - Escape single quotes in text by doubling them: `it''s` not `it's`
 - `graded_at` must be `datetime('now')`, not a hardcoded date string
-- Do NOT set `status` for S/A/B companies — only set `status = 'archived'` for C-tier
 - Every statement must end with a semicolon
 - One UPDATE per line, no multi-line statements
 

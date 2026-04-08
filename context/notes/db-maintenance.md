@@ -19,12 +19,13 @@ A single command (TUI button or CLI) that sweeps the database for stale, irrelev
 | **Stale jobs** | `discovered_at` older than 14 days AND no user decision | Jobs older than two weeks are almost certainly closed or filled. If the user marked one as "watching" or "applied", preserve it regardless of age |
 | **Stale evaluations** | Jobs whose `posted_date` is older than 14 days (when available) | Some ATS boards keep old listings live. Use `posted_date` when available, fall back to `discovered_at` |
 
-**Companies (soft-archived, not deleted):**
+**Companies:**
+
+Cleanup does NOT auto-archive companies by grade. C-tier companies stay active because job grading handles quality filtering — a C company might still have one genuinely good role. Companies are only archived manually when there's a hard reason (excluded sector, dissolved, no engineering team).
 
 | Target | Condition | Rationale |
 |--------|-----------|-----------|
-| **C-graded companies** | `grade = 'C'` | Marginal relevance. Set `status = 'archived'` so they don't appear in TUI or get searched for jobs. Preserved for deduplication — discovery won't re-discover them |
-| **Unresolvable companies** | `status = 'potential'` with failed resolution attempts | Couldn't find ATS or careers page. Not worth keeping in active view |
+| **Manual archival only** | User decision | Only archive when there's a concrete reason, not based on grade alone |
 
 All thresholds (which grades to remove, stale age, which company grades to archive) are configurable in `profile/preferences.toml`.
 
