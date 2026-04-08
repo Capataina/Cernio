@@ -37,6 +37,70 @@ impl Database {
     /// Run all migrations. Idempotent — safe to call on every startup.
     fn migrate(&self) -> Result<()> {
         self.conn.execute_batch(MIGRATION_001)?;
+        self.migrate_002_add_archived_status()?;
+        Ok(())
+    }
+
+    /// Migration 002: Add 'archived' to companies status CHECK constraint.
+    ///
+    /// SQLite doesn't support ALTER CHECK, so we test whether 'archived' is
+    /// already accepted. If not, we rebuild the table with the new constraint.
+    fn migrate_002_add_archived_status(&self) -> Result<()> {
+        // Test if the constraint already allows 'archived'.
+        let needs_migration = self
+            .conn
+            .execute(
+                "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, status, why_relevant, relevance_updated_at)
+                 VALUES ('__migration_test__', '__migration_test__', '__test__', '__test__', '__test__', 'archived', '__test__', '__test__')",
+                [],
+            )
+            .is_err();
+
+        if !needs_migration {
+            // Clean up the test row — the constraint already accepts 'archived'.
+            self.conn.execute(
+                "DELETE FROM companies WHERE website = '__migration_test__'",
+                [],
+            )?;
+            return Ok(());
+        }
+
+        // Rebuild the companies table with the updated CHECK constraint.
+        // Temporarily disable foreign keys for the table rebuild.
+        self.conn.execute_batch("
+            PRAGMA foreign_keys = OFF;
+
+            DROP TABLE IF EXISTS companies_new;
+
+            CREATE TABLE companies_new (
+                id              INTEGER PRIMARY KEY,
+                name            TEXT NOT NULL,
+                website         TEXT NOT NULL UNIQUE,
+                what_they_do    TEXT NOT NULL,
+                discovery_source TEXT NOT NULL,
+                discovered_at   TEXT NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'potential'
+                                CHECK (status IN ('potential', 'resolved', 'bespoke', 'archived')),
+                location        TEXT,
+                sector_tags     TEXT,
+                careers_url     TEXT,
+                why_relevant    TEXT NOT NULL,
+                relevance_updated_at TEXT NOT NULL,
+                grade           TEXT CHECK (grade IS NULL OR grade IN ('S', 'A', 'B', 'C')),
+                grade_reasoning TEXT,
+                graded_at       TEXT
+            );
+
+            INSERT INTO companies_new SELECT * FROM companies;
+            DROP TABLE companies;
+            ALTER TABLE companies_new RENAME TO companies;
+
+            CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
+            CREATE INDEX IF NOT EXISTS idx_companies_grade ON companies(grade);
+
+            PRAGMA foreign_keys = ON;
+        ")?;
+
         Ok(())
     }
 
@@ -132,6 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_evaluation_status ON jobs(evaluation_status)
 CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
 CREATE INDEX IF NOT EXISTS idx_user_decisions_job_id ON user_decisions(job_id);
 ";
+
 
 #[cfg(test)]
 mod tests {
@@ -356,5 +421,39 @@ mod tests {
         );
 
         assert!(result.is_err(), "should reject duplicate portal entry");
+    }
+
+    #[test]
+    fn archived_status_accepted() {
+        let db = Database::open_in_memory().unwrap();
+        let now = "2026-04-08";
+
+        db.conn()
+            .execute(
+                "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, status, why_relevant, relevance_updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    "Archived Co",
+                    "https://archived.com",
+                    "Was relevant",
+                    "test",
+                    now,
+                    "archived",
+                    "no longer relevant",
+                    now
+                ],
+            )
+            .unwrap();
+
+        let status: String = db
+            .conn()
+            .query_row(
+                "SELECT status FROM companies WHERE website = ?1",
+                params!["https://archived.com"],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(status, "archived");
     }
 }

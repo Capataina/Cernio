@@ -66,8 +66,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-fn handle_dashboard(_app: &mut App, _key: KeyEvent) {
-    // Dashboard is read-only for now.
+fn handle_dashboard(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('D') => app.run_cleanup(),
+        _ => {}
+    }
 }
 
 fn handle_company_list(app: &mut App, key: KeyEvent) {

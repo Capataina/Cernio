@@ -64,6 +64,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let keys = match (app.view, app.focus) {
         (View::Dashboard, _) => vec![
             ("1-3", "view"),
+            ("D", "clean db"),
             ("?", "help"),
             ("q", "quit"),
         ],
@@ -146,6 +147,7 @@ fn draw_help_overlay(frame: &mut Frame, app: &App) {
         help_line(t, "  a", "Mark job as applied"),
         help_line(t, "  x", "Mark job as rejected"),
         help_line(t, "  o", "Open URL in browser"),
+        help_line(t, "  D", "Clean database (from dashboard)"),
         Line::from(""),
         Line::from(Span::styled("  General", t.help_section)),
         Line::from(""),

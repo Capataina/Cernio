@@ -108,3 +108,167 @@ negative_signals = [
     "legacy-only-codebase",
     "crunch-culture",
 ]
+
+# ─────────────────────────────────────────────────────────────────
+# SEARCH FILTERS
+# ─────────────────────────────────────────────────────────────────
+# These filters control the mechanical job search pipeline (cernio search).
+# They run BEFORE any AI grading — their job is to reduce thousands of
+# raw ATS listings to hundreds of plausible candidates, which the AI
+# then grades with full judgment.
+#
+# The cardinal rule: false positives are cheap (AI grades them F in
+# 30 seconds), false negatives are unrecoverable (a perfect job
+# silently filtered out is lost forever). When in doubt, INCLUDE.
+
+[search_filters]
+# Minimum company grade to include in job searches.
+# Companies below this threshold are skipped entirely — their jobs
+# are never fetched.
+#
+# Valid grades (from best to worst):
+#   S — Excellent company. Strong engineering reputation, clear
+#       technical alignment with profile, growing, likely to sponsor,
+#       career progression. Examples: Palantir, Cloudflare, XTX Markets.
+#   A — Good company. Solid on most dimensions, 1-2 weaknesses.
+#       Good engineering work, decent growth, less brand recognition.
+#   B — Decent company. Has relevant engineering work but weaker on
+#       some dimensions. Maybe small, uncertain growth, or narrow domain.
+#   C — Marginal. Borderline relevance. Archived by default — not
+#       searched for jobs, kept in DB for deduplication only.
+#
+# Default: "B" (searches S, A, and B companies; skips C and archived)
+min_company_grade = "B"
+
+# Title must contain at least one of these keywords (OR logic).
+# Case-insensitive matching. A job is KEPT if its title contains
+# ANY of these. If a title matches NONE, the job is removed.
+#
+# Bias toward inclusion — add generously. A false positive costs
+# the AI 30 seconds to grade as F. A false negative is a lost
+# opportunity that can never be recovered.
+#
+# "Senior" is deliberately here (not excluded). Many companies use
+# "Senior" for roles accessible to strong candidates without years
+# of experience. The AI will evaluate seniority fit properly during
+# grading — giving most a B or C, but not missing the ones where
+# "Senior" just means "not intern".
+include_keywords = [
+    # Core engineering roles
+    "Engineer", "Engineering", "Developer", "Dev", "SWE", "Software",
+    # Systems and infrastructure
+    "Systems", "System", "Infrastructure", "Infra", "Platform",
+    # Backend
+    "Backend", "Back-end", "Back End",
+    # Full-stack (might have backend-heavy work)
+    "Fullstack", "Full-stack", "Full Stack",
+    # AI/ML
+    "ML", "Machine Learning", "AI", "Data",
+    # Specialist domains
+    "Compiler", "Runtime", "Database", "Distributed",
+    "Embedded", "Low-latency", "Performance", "HFT",
+    # Operations/reliability
+    "DevOps", "SRE", "Reliability", "Cloud",
+    # Security
+    "Security", "Cryptography", "Cyber",
+    # Quant
+    "Quantitative", "Quant", "Research",
+    # Entry-level indicators
+    "Graduate", "Grad", "Junior", "Entry",
+    # Senior (kept deliberately — see note above)
+    "Senior",
+    # Broad catch-all
+    "Analyst",
+]
+
+# Title containing any of these is excluded (AND NOT logic).
+# Case-insensitive matching. A job is REMOVED if its title contains
+# ANY of these keywords, regardless of inclusion keywords.
+# Exclusion runs BEFORE inclusion.
+#
+# Be conservative with exclusions — only exclude titles that are
+# categorically impossible or irrelevant. If unsure, leave it out
+# and let the AI grade it.
+exclude_keywords = [
+    # Clearly senior/leadership (beyond "Senior" which is kept)
+    "Principal", "Staff", "Distinguished",
+    "Director", "VP", "Vice President",
+    "Head of", "Chief", "CTO", "CIO",
+    # Management
+    "Manager", "Managing",
+    # Too junior (internships have separate pipelines)
+    "Intern", "Internship", "Apprentice", "Placement",
+    # Architecture (typically requires 10+ years)
+    "Lead Architect",
+]
+
+# ─────────────────────────────────────────────────────────────────
+# LOCATION FILTERS (per ATS provider)
+# ─────────────────────────────────────────────────────────────────
+# Each ATS provider formats location data differently. These patterns
+# are matched case-insensitively against the provider's location field.
+# A job is KEPT if its location contains ANY of the patterns below.
+#
+# If a job's location is NULL, empty, or missing entirely, it is KEPT
+# (false negative protection — the job might be in London but the
+# company just didn't fill in the field).
+#
+# Greenhouse: location.name is freetext, often includes work policy
+#   (e.g. "Hybrid", "London, England"). Some companies use semicolons
+#   for multi-city: "Berlin; London; Munich".
+# Lever: categories.location is a string, typically "City, Country".
+# Ashby: location is freetext, often includes policy ("London Office - Hybrid").
+#   Also has structured address.postalAddress with addressLocality/Country.
+# Workable: separate city/country fields plus a locations array.
+#   Country codes are uppercase ISO alpha-2 ("GB").
+# SmartRecruiters: structured object with city, country (lowercase "gb"),
+#   plus fullLocation pre-formatted string. Has server-side country filter.
+
+[search_filters.locations.greenhouse]
+patterns = ["London", "UK", "United Kingdom", "England", "Remote", "Cambridge"]
+
+[search_filters.locations.lever]
+patterns = ["London", "UK", "United Kingdom", "England", "Remote", "Cambridge"]
+
+[search_filters.locations.ashby]
+patterns = ["London", "UK", "United Kingdom", "England", "Remote", "Cambridge"]
+
+[search_filters.locations.workable]
+patterns = ["London", "GB", "United Kingdom", "Remote", "Cambridge"]
+
+[search_filters.locations.smartrecruiters]
+patterns = ["London", "gb", "United Kingdom", "Remote", "Cambridge"]
+
+# ─────────────────────────────────────────────────────────────────
+# CLEANUP THRESHOLDS
+# ─────────────────────────────────────────────────────────────────
+# Control what gets removed or archived when running `cernio clean`.
+# All thresholds are configurable so you can tune aggressiveness.
+
+[cleanup]
+# Job grades to remove during cleanup. Jobs with these grades are
+# deleted unless they have a user decision (watching/applied/rejected).
+#
+# Valid job grades: SS, S, A, B, C, F
+# SS — Apply immediately. Everything aligns.
+# S  — Strong application candidate. Most dimensions good.
+# A  — Worth applying to. Good with 1-2 notable weaknesses.
+# B  — Backup / worth watching. Decent but limited in some way.
+# C  — Only if nothing better. Limited ceiling or poor growth.
+# F  — Don't apply. Wrong seniority, dead-end, or dealbreaker.
+remove_job_grades = ["F", "C"]
+
+# Job age threshold in days. Jobs older than this with no user
+# decision are removed, regardless of grade — EXCEPT SS and S
+# graded jobs which are always kept as records of what companies
+# look for.
+stale_days = 14
+
+# Company grades to archive during cleanup. Companies with these
+# grades are set to status='archived' — hidden from TUI and excluded
+# from job searches, but preserved in DB for deduplication so
+# discovery won't waste time re-discovering them.
+#
+# Valid company grades: S, A, B, C (same scale as above but gentler —
+# a B company might still have an S-tier role)
+archive_company_grades = ["C"]

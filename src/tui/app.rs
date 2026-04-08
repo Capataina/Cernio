@@ -307,6 +307,38 @@ impl App {
         }
         self.refresh();
     }
+
+    // ── Database cleanup ─────────────────────────────────────────
+
+    pub fn run_cleanup(&mut self) {
+        if let Ok(conn) = Connection::open(&self.db_path) {
+            // Remove F and C graded jobs (preserving those with user decisions and SS/S).
+            let _ = conn.execute(
+                "DELETE FROM jobs
+                 WHERE grade IN ('F', 'C')
+                 AND grade NOT IN ('SS', 'S')
+                 AND id NOT IN (SELECT job_id FROM user_decisions)",
+                [],
+            );
+
+            // Remove stale jobs (>14 days, no decision, not SS/S).
+            let _ = conn.execute(
+                "DELETE FROM jobs
+                 WHERE discovered_at < datetime('now', '-14 days')
+                 AND grade NOT IN ('SS', 'S')
+                 AND id NOT IN (SELECT job_id FROM user_decisions)",
+                [],
+            );
+
+            // Archive C-graded companies.
+            let _ = conn.execute(
+                "UPDATE companies SET status = 'archived'
+                 WHERE grade = 'C' AND status != 'archived'",
+                [],
+            );
+        }
+        self.refresh();
+    }
 }
 
 fn clamp_selection(state: &mut TableState, len: usize) {

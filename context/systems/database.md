@@ -38,7 +38,7 @@ The company universe. Each row represents one company at any lifecycle stage.
 | `what_they_do` | TEXT | NOT NULL | Fact | 1–2 sentence description |
 | `discovery_source` | TEXT | NOT NULL | Fact | Where the company was found |
 | `discovered_at` | TEXT | NOT NULL | Fact | ISO date |
-| `status` | TEXT | NOT NULL, DEFAULT 'potential' | Checkpoint | `potential`, `resolved`, or `bespoke` |
+| `status` | TEXT | NOT NULL, DEFAULT 'potential' | Checkpoint | `potential`, `resolved`, `bespoke`, or `archived` |
 | `location` | TEXT | — | Checkpoint | HQ city/country |
 | `sector_tags` | TEXT | — | Checkpoint | Comma-separated sector labels |
 | `careers_url` | TEXT | — | Checkpoint | Direct careers page URL (primarily for bespoke) |
@@ -114,13 +114,15 @@ User actions on evaluated jobs. Multiple decisions per job are allowed (history)
 
 ### Migration Strategy
 
-The schema is defined as a single `CREATE TABLE IF NOT EXISTS` batch in `MIGRATION_001`. It runs on every startup and is idempotent. Future schema changes will be added as `MIGRATION_002`, etc., each gated by a version check.
+The schema is defined as a single `CREATE TABLE IF NOT EXISTS` batch in `MIGRATION_001`. It runs on every startup and is idempotent. Future schema changes are added as numbered migrations, each gated by a version check.
+
+**MIGRATION_002** (session 3): Adds `'archived'` to the `companies.status` CHECK constraint. Uses the table-rebuild approach (create new table with updated CHECK, copy data, drop old, rename) with foreign keys temporarily disabled. This supports C-tier company soft-archival — archived companies are hidden from TUI and excluded from job searches but preserved for deduplication.
 
 The database can always be recreated from scratch by deleting `state/cernio.db` and restarting — the migration rebuilds everything. The data is lost, but the schema is code.
 
 ### Tests
 
-10 tests in `src/db/schema.rs`:
+11 tests in `src/db/schema.rs`:
 
 | Test | Verifies |
 |------|----------|
@@ -183,9 +185,9 @@ None at this stage.
 
 ## Planned / Missing / Likely Changes
 
-- Future migrations (`MIGRATION_002`, etc.) will be needed as the schema evolves
-- Higher-level query functions in `src/db/mod.rs` will grow as the pipeline CLI is built
-- DB cleanup operation planned — remove F/C-graded jobs and stale listings >14 days (see `notes/db-maintenance.md`)
+- Future migrations (`MIGRATION_003`, etc.) will be needed as the schema evolves
+- Higher-level query functions in `src/db/mod.rs` will grow as more pipeline operations are added
+- DB cleanup is implemented via `cernio clean` — removes F/C-graded jobs, stale listings >14d, archives C-grade companies
 
 ---
 

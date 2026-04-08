@@ -14,6 +14,7 @@ pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id
                 AND j.grade IN ('SS', 'S', 'A'))
         FROM companies c
+        WHERE c.status != 'archived'
         ORDER BY
             CASE c.grade
                 WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3

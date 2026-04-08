@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-07 (session 2). TUI v1 implemented with 3 views, 9 Rust source files. Database schema with 4 tables, 10 tests. Four skills designed. Lever fetcher working.
+> Last updated: 2026-04-08 (session 3). Pipeline separation complete — 5 ATS fetchers, 4 pipeline scripts (resolve, search, clean, check), 3 new AI skills (grade-companies, grade-jobs, resolve-portals redesigned). 20 Rust source files, 11 tests, 7 skills. MIGRATION_002 adds archived status.
 
 ---
 
@@ -54,13 +54,14 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 | Component | Choice | Status |
 |-----------|--------|--------|
 | Core language | Rust (edition 2024) | In use |
-| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — schema, migrations, 7 tests |
-| Date handling | `chrono` | Added |
-| Async runtime | Tokio | Planned (for search scripts) |
-| HTTP | Reqwest | Planned (for ATS API calls) |
-| Serialisation | Serde | Planned (JSON, TOML, JSONL) |
-| TUI | Ratatui 0.29 + Crossterm backend | v1 implemented — 3 views, ANSI theme |
-| AI layer | Claude Code skills (conversational invocation) | 3 skills designed |
+| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — schema, 2 migrations, 11 tests |
+| Date handling | `chrono` | In use |
+| Async runtime | Tokio | In use — pipeline scripts (resolve, search, clean, check) |
+| HTTP | Reqwest | In use — ATS API calls across 5 providers |
+| Serialisation | Serde | In use — JSON (ATS responses), TOML (config) |
+| Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed config structs |
+| TUI | Ratatui 0.29 + Crossterm backend | v1 implemented — 3 views, ANSI theme, D key cleanup |
+| AI layer | Claude Code skills (conversational invocation) | 7 skills (3 original + grade-companies, grade-jobs, resolve-portals redesigned, search-jobs legacy) |
 
 ---
 
@@ -69,16 +70,31 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 ```text
 cernio/
 ├── src/
-│   ├── main.rs                 # Entry point, CLI dispatch
+│   ├── main.rs                 # Entry point, CLI dispatch (resolve/search/clean/check/tui)
+│   ├── config.rs               # TOML config parser (preferences.toml → typed structs)
 │   ├── db/
 │   │   ├── mod.rs              # Public DB interface
-│   │   └── schema.rs           # Migration, schema, tests
+│   │   └── schema.rs           # Migration (001 + 002), schema, 11 tests
+│   ├── ats/
+│   │   ├── mod.rs              # ATS provider trait, provider dispatch
+│   │   ├── common.rs           # Shared types (AtsJob, slug normalisation)
+│   │   ├── lever.rs            # Lever API fetcher
+│   │   ├── greenhouse.rs       # Greenhouse API fetcher
+│   │   ├── ashby.rs            # Ashby API fetcher
+│   │   ├── workable.rs         # Workable API fetcher
+│   │   └── smartrecruiters.rs  # SmartRecruiters API fetcher (totalFound>0 check)
+│   ├── pipeline/
+│   │   ├── mod.rs              # Pipeline module exports
+│   │   ├── resolve.rs          # cernio resolve — slug probing, multi-provider
+│   │   ├── search.rs           # cernio search — fetch → filter → insert
+│   │   ├── clean.rs            # cernio clean — job removal, company archival
+│   │   └── check.rs            # cernio check — integrity report
 │   └── tui/
 │       ├── mod.rs              # Terminal setup, event loop
 │       ├── app.rs              # App state, data models, navigation
-│       ├── handler.rs          # Key event dispatch
+│       ├── handler.rs          # Key event dispatch (includes D for cleanup)
 │       ├── theme.rs            # Semantic ANSI colour palette
-│       ├── queries.rs          # DB read queries
+│       ├── queries.rs          # DB read queries (excludes archived)
 │       └── views/
 │           ├── mod.rs          # Draw dispatcher, tabs, status bar, help
 │           ├── dashboard.rs    # Stats overview
@@ -90,7 +106,7 @@ cernio/
 │   ├── experience.md           # Work history
 │   ├── projects.md             # Full project inventory (16 projects)
 │   ├── skills.md               # Languages, frameworks, domains
-│   ├── preferences.toml        # Hard and soft job filters
+│   ├── preferences.toml        # Search filters, cleanup config, location patterns
 │   ├── visa.md                 # Right to work, sponsorship needs
 │   ├── portfolio-gaps.md       # Strengths, gaps, closure opportunities
 │   ├── resume.md               # LaTeX resume source
@@ -102,12 +118,20 @@ cernio/
 │   ├── discover-companies/
 │   │   ├── SKILL.md
 │   │   └── references/search-strategies.md
-│   └── populate-db/SKILL.md
+│   ├── populate-db/SKILL.md
+│   ├── resolve-portals/SKILL.md  # Redesigned — AI fallback only
+│   ├── search-jobs/SKILL.md      # Legacy — job search moved to script
+│   ├── grade-companies/
+│   │   ├── SKILL.md
+│   │   └── references/          # grading-rubric.md, profile-context.md
+│   └── grade-jobs/
+│       ├── SKILL.md
+│       └── references/          # grading-rubric.md, profile-context.md, prioritisation-guide.md
 ├── state/
 │   └── cernio.db               # SQLite database (gitignored)
 ├── AgentCreationResearch/      # Skill authoring research (reference)
 ├── context/                    # Project memory
-├── Cargo.toml                  # rusqlite + chrono
+├── Cargo.toml                  # rusqlite, chrono, tokio, reqwest, serde, toml
 ├── claude.md                   # Session configuration
 └── README.md                   # Project vision and milestones
 ```
@@ -134,18 +158,24 @@ Skills handle slow, fuzzy, infrequent work that requires reasoning. Invoked conv
 | `profile-scrape` | Designed, tested | Scrape GitHub repos and update profile with evidence-based entries |
 | `discover-companies` | Designed | Profile-aware company discovery with parallel sector agents and creative search strategies |
 | `populate-db` | Designed | Research companies from discovery, find ATS slugs, verify endpoints, insert into SQLite |
+| `resolve-portals` | Redesigned | AI fallback for companies that fail script-based ATS resolution |
+| `grade-companies` | Designed | Grade ungraded companies (S/A/B/C) with extensive rubric and profile context |
+| `grade-jobs` | Designed | Grade ungraded jobs (SS/S/A/B/C/F) with smart prioritisation by company grade × title signal |
+| `search-jobs` | Legacy | Original job search skill — search logic moved to `cernio search` script |
 
 Skills live in `skills/` within this repo, not in the upstream `agent-skills` framework. They are project-specific.
 
-### Rust Scripts (Planned)
+### Rust Scripts (Pipeline)
 
-Scripts are generic, stateless, and parameterised. They take inputs, produce outputs, and exit.
+Scripts handle all mechanical volume work. Each has a single purpose and takes no judgment decisions.
 
-| Script | Inputs | Output | Status |
-|--------|--------|--------|--------|
-| `search` | ATS slugs, search terms, provider | Matching jobs as structured results | Not started |
-| `resolve` | Company names, ATS URL patterns | Slug matches with verification | Not started |
-| `export` | Result set, format options | Markdown file with tables and links | Not started |
+| Script | CLI | Purpose | Status |
+|--------|-----|---------|--------|
+| `resolve` | `cernio resolve [--company] [--dry-run]` | Probe ATS slug candidates across 5 providers, insert portals | Implemented |
+| `search` | `cernio search [--company] [--grade] [--dry-run]` | Fetch jobs → location/exclusion/inclusion filter → dedup → insert | Implemented |
+| `clean` | `cernio clean [--dry-run] [--jobs-only]` | Remove F/C jobs, stale jobs, archive C companies | Implemented |
+| `check` | `cernio check [--ats-only] [--fix]` | Integrity report: health, completeness, staleness, recommendations | Implemented |
+| `export` | — | Markdown export of curated results | Not started |
 
 ### Data Layer
 
@@ -294,26 +324,33 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of first session.** Core pipeline proven end-to-end: discovery → population → job search → evaluation. Infrastructure in place, scaling architecture designed.
+**End of session 3.** Pipeline separation complete. Scripts handle all mechanical volume work (resolve, search, clean, check). AI skills handle all judgment work (grade-companies, grade-jobs). Five ATS fetchers implemented. Full CLI for all pipeline operations.
 
 | Component | Status |
 |-----------|--------|
 | Profile (12 files) | Fully populated, tested profile-scrape against NeuroDrive |
-| SQLite schema | 4 tables (companies, company_portals, jobs, user_decisions), 10 tests passing, WAL mode |
-| Lever fetcher (`src/ats/lever.rs`) | Working — `lever-list` and `lever-detail` CLI commands |
+| SQLite schema | 4 tables, 2 migrations (MIGRATION_001 base, MIGRATION_002 archived status), 11 tests passing, WAL mode |
+| Config (`src/config.rs`) | TOML parser for `preferences.toml` — search filters, cleanup config, location patterns |
+| ATS fetchers (`src/ats/`) | 5 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters. Common trait + dispatch |
+| Pipeline: resolve (`src/pipeline/resolve.rs`) | Slug candidate generation, parallel multi-provider probing, SmartRecruiters false positive handling |
+| Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert |
+| Pipeline: clean (`src/pipeline/clean.rs`) | Job removal (F/C grades, stale), company archival (C-grade → archived) |
+| Pipeline: check (`src/pipeline/check.rs`) | ATS re-verification, stale detection, completeness, dead URLs, duplicates, profile-change, structured report |
 | profile-scrape skill | Designed, tested on NeuroDrive |
 | discover-companies skill | Designed with search-strategies reference, first run produced 73 companies |
 | populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
-| search-jobs skill | Designed with Lever reference, grading rubric (SS–F), tested on Palantir |
+| search-jobs skill | Legacy — job search moved to `cernio search` script |
+| resolve-portals skill | Redesigned — AI fallback only for companies that fail script resolution |
+| grade-companies skill | New — extensive SKILL.md, grading rubric with worked examples, profile context reference |
+| grade-jobs skill | New — extensive SKILL.md, grading rubric, profile context, prioritisation guide |
 | Company universe | 9 companies in DB (5 S-tier, 2 A-tier, 2 B-tier bespoke), ~65 more in potential.md |
 | Jobs | 25 Palantir London jobs evaluated and graded in DB |
-| Greenhouse/Ashby/other fetchers | Not started — need companies on those platforms first |
-| Pipeline CLI (search --all, pending) | Not started — critical for scaling beyond a few companies |
-| TUI (`src/tui/`) | v1 implemented — dashboard, companies, jobs views with detail panels, user decisions, help overlay, auto-refresh. See `context/systems/tui.md` |
+| TUI (`src/tui/`) | v1 implemented — dashboard, companies, jobs views with detail panels, user decisions, help overlay, auto-refresh, D key for cleanup. Excludes archived companies. See `context/systems/tui.md` |
 | Export | Not started |
 
 **Next priorities:**
-1. Build the pipeline CLI (`cernio search --company`, `cernio pending`) to move volume work off Claude
-2. Populate more companies from potential.md to encounter Greenhouse/Ashby and build those fetchers
-3. Build Greenhouse fetcher (Cloudflare, XTX, Helsing are all on Greenhouse)
-4. TUI v2 — activity/progress view, filtering, sorting (see `context/systems/tui.md` deferred section)
+1. Run the pipeline end-to-end: resolve remaining companies from potential.md, search for jobs, grade with AI skills
+2. Populate more companies to exercise the full multi-provider resolution
+3. TUI v2 — activity/progress view, filtering, sorting (see `context/systems/tui.md` deferred section)
+4. Create check-integrity AI skill for re-evaluation and grade quality auditing
+5. Export functionality
