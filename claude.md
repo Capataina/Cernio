@@ -263,6 +263,12 @@ The reasoning must explain **why** with specific evidence, not just assert a con
 
 This standard applies everywhere grades or fit assessments appear: company grading, job evaluation, enrichment, integrity checks, and any conversational assessment. If you cannot cite specific profile elements to support a judgment, you have not read the profile carefully enough — go back and read it again.
 
+### Portfolio gap tracking
+
+`profile/portfolio-gaps.md` is the career coaching output of the grading process. It tracks what the market consistently asks for vs what the profile offers — technologies, domain knowledge, experience patterns. **This file must be updated after every job grading batch.** If you grade 30 jobs and don't update portfolio-gaps.md, the career coaching loop is broken and one of the most valuable outputs of the entire system is lost.
+
+Track both gaps (what the market wants that the profile lacks) and confirmed strengths (what the profile has that the market clearly values). Be specific: name the roles and companies that surfaced each pattern, count how frequently it appeared, and suggest concrete closure opportunities for gaps.
+
 ---
 
 ## Engineering Standards
