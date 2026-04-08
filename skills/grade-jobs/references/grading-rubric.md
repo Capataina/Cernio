@@ -49,21 +49,39 @@ F is not "bad." F is "do not waste time." The most common F reasons:
 - Role type dealbreaker (check `preferences.toml` for excluded role types)
 - Security clearance requirement that cannot be met (check `personal.md` and `military.md` for nationality and clearance eligibility)
 
-### Hard grade floors for jobs — NON-NEGOTIABLE
+### Career-stage calibration for jobs
 
-These override dimension-based evaluation. They exist because company-level grading errors (Monzo graded C, Amazon graded B) proved that agents systematically under-weight career-stage factors. Job grading MUST NOT repeat this.
+The same calibration that applies to companies applies to jobs, but with an additional factor: the job description gives you far more data to work with. Use it.
 
-**Floor 1: Graduate/entry-level role at a FAANG-tier employer → minimum A.**
-If the role is explicitly graduate, entry-level, or junior at Google, Meta, Amazon, Apple, Microsoft, Bloomberg, Spotify, Uber, Stripe, Databricks, Snowflake, or equivalent — it is minimum A regardless of team, domain, or tech stack. These are career-defining first jobs with guaranteed sponsorship, mentorship, and CV signal. The only exception: if the role hits a HARD exclusion (consulting, customer-facing, gambling). "The team does internal tooling" or "the stack is Java" are NOT valid reasons to drop below A.
+**Dimension reweighting for this career stage:**
 
-**Floor 2: Graduate/entry-level role at any company with 500+ employees, confirmed sponsorship, and a known engineering team → minimum B.**
-If the role says "graduate," "entry-level," "junior," or "0-2 years" at a large employer with sponsorship capability, it is minimum B. The candidate needs a first job that sponsors — any such role is worth considering. Tech stack, domain, or "not perfectly aligned" are not valid reasons to drop below B.
+| Dimension | Standard weight | Calibrated weight | Why |
+|-----------|----------------|-------------------|-----|
+| Seniority match | Critical | Critical | Unchanged — unachievable roles are still F |
+| Career ceiling | Critical | Critical | Unchanged — trajectory matters enormously at entry level |
+| Company signal | High | **Very high** | First-job CV signal. "Graduate SWE at Bloomberg" opens more doors than "Rust Engineer at Unknown Startup Ltd" |
+| Sponsorship viability | High | **Very high** | Read `visa.md` — mandatory from Aug 2027. A role that can't sponsor has a hard expiry date |
+| Technical depth | High | High | Unchanged |
+| Skill breadth | High | High | Unchanged — breadth matters more early in career |
+| Tech stack match | Medium | **Low** | A graduate switching languages takes weeks. Never the deciding factor between grades |
 
-**Floor 3: Any role explicitly mentioning Rust as a primary language → minimum B.**
-Rust is the candidate's primary language at proficient level. Any role that lists Rust as a production language is minimum B regardless of company size, domain, or other factors. Rust roles are rare enough that every one deserves evaluation.
+### Relative grading for jobs — MANDATORY
 
-**Floor 4: Any role at an S-tier company → minimum B.**
-If the company was graded S, every engineering role there is minimum B. Even a narrow or operational role at an S-tier company provides CV signal and the potential for internal mobility. Only F if the seniority is genuinely unachievable (hard 5+ years requirement) or the role is non-engineering.
+**Do not grade jobs in isolation.** After grading a batch, cross-reference:
+
+1. **Compare within each grade tier.** All the jobs at the same grade should be genuinely comparable in career value. If a "Graduate SWE at Bloomberg" and a "Junior Developer at a 5-person agency" are both B, re-examine.
+
+2. **Compare across adjacent tiers.** For every job at the boundary, ask: "Would the candidate genuinely prefer every A-tier job over this B-tier job?" If not, the grades are wrong.
+
+3. **The "which offer would you take" test.** For any two jobs at different grades, imagine the candidate has offers from both. If they'd take the lower-graded one, the grades need adjusting.
+
+4. **Cross-reference with company grades.** A graduate role at an S-tier company should rarely grade below the company itself. If the company is S but the graduate SWE role is C, something is wrong — re-examine. (It CAN happen — an S-tier company might post a non-engineering role disguised by title — but it should be explicitly justified.)
+
+5. **Sanity check after every batch.** Before writing to the database, scan for:
+   - Any graduate/entry-level role at a major employer graded C or F without a hard exclusion reason
+   - Any role mentioning Rust graded below B
+   - Any role at an S-tier company graded below B without clear justification
+   - These are the patterns that caused real grading failures. They're not automatic overrides — but each one demands explicit justification in the fit assessment.
 
 ### Anti-inflation and anti-deflation rules
 

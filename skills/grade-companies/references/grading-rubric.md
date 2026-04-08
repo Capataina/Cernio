@@ -166,21 +166,37 @@ Company grades are gentler than job grades — they assess whether a company is 
 | **B** | Decent — worth tracking | Has genuine relevance and at least one clear strength, but with notable weaknesses. Maybe the tech stack doesn't match, maybe the company is small, maybe the domain is adjacent rather than core. Still worth having in the database because a good role here beats no role. | ~35-40% |
 | **C** | Marginal — archived | The connection to the candidate's profile is genuinely tenuous, OR the company has hard negatives (excluded sector, no engineering team, dissolved). Archived to prevent noise, preserved for dedup. | ~20-25% |
 
-### Hard grade floors — NON-NEGOTIABLE
+### Career-stage calibration
 
-These are not suggestions. They are rules that OVERRIDE the dimension-based evaluation. If a company matches any of these conditions, the grade floor applies regardless of what the dimension scoring says. These exist because production grading runs have repeatedly made the same errors — penalising world-class employers for irrelevant reasons like tech stack mismatch.
+The standard dimension weights assume an experienced engineer choosing between equivalent options. **This candidate is not in that position.** Read `experience.md` — there is no formal work experience. The profile's strength comes entirely from the project portfolio. This fundamentally changes what matters:
 
-**Floor 1: FAANG-tier and equivalent → minimum A.**
-Companies: Google, Google DeepMind, Meta, Amazon (AWS), Apple, Microsoft, Netflix, Bloomberg, Spotify, Uber, Stripe, Databricks, Snowflake, and any company of equivalent scale, engineering reputation, and sponsorship capability. These are career-defining employers with guaranteed sponsorship, world-class engineering on at least some teams, and CV signal that opens every door. They are minimum A even if the tech stack is completely different, even if the domain is "consumer," even if the specific team is uncertain. The only exception: if the company is in an explicitly excluded sector (gambling, adtech, consumer-crypto — none of these companies are).
+**Dimension reweighting for this career stage:**
 
-**Floor 2: Major UK employers with engineering teams and sponsorship → minimum B.**
-Any company that is: (a) well-known enough that UK engineers would recognise the name, AND (b) large enough (200+ employees) to have established sponsorship infrastructure, AND (c) has a genuine engineering team (not just sales/support). Examples: Monzo, Revolut, Starling Bank, Wise, Checkout.com, Adyen, GoCardless, Form3, ClearBank, Darktrace, Ocado Technology, Palantir. These should never be C unless they fall into an excluded sector. The candidate needs a first job with sponsorship — large UK employers that provide both are inherently valuable.
+| Dimension | Standard weight | Calibrated weight | Why |
+|-----------|----------------|-------------------|-----|
+| Technical alignment | High | High | Unchanged — the portfolio is the primary evidence |
+| Engineering reputation | High | **Very high** | The first employer's name IS the professional credential. With no work history, company name on the CV does the job that prior employers would do for experienced candidates. |
+| Growth trajectory | High | High | Unchanged — growth means hiring, which means opportunity |
+| Sponsorship capability | Medium | **Very high** | Read `visa.md` — sponsorship becomes mandatory from August 2027. Companies that can sponsor solve the single hardest constraint. This is not a nice-to-have. |
+| Career ceiling | Medium | **High** | First job sets the trajectory. More important at entry level than mid-career. |
+| Tech stack match | Medium | **Low** | Languages are learned in months. A graduate engineer switching from Rust to Go takes weeks, not years. Tech stack should never be the deciding factor between grades. It's a tiebreaker, nothing more. |
+| CV signal | Low (tiebreaker) | **High** | First-job premium. "Bloomberg" on a CV gets through screening filters that "Unknown Startup Ltd" cannot. This premium decreases with each subsequent job but is very high right now. |
 
-**Floor 3: Companies in preferred sectors with 100+ employees → minimum B.**
-If a company operates in a preferred sector (fintech-infrastructure, trading-systems, AI-infrastructure, developer-tools, databases, compilers) AND has 100+ employees, it is minimum B. The sector relevance combined with the company's ability to actually hire and potentially sponsor makes it worth monitoring regardless of tech stack.
+**What this means in practice:** A company with strong engineering reputation, guaranteed sponsorship, and high career ceiling should grade well even if the tech stack is completely different. Conversely, a tiny Rust startup with no brand recognition, uncertain sponsorship, and limited career ceiling should not grade higher than a well-known employer just because it uses Rust.
 
-**Floor 4: Any company with Rust in production → minimum B.**
-If a company uses Rust as a primary production language, it is minimum B. Rust is the candidate's primary language at proficient level. A Rust shop that is small, unknown, or in a non-preferred domain is still worth monitoring because the language match is exceptionally strong and Rust jobs are rare.
+### Relative grading — MANDATORY
+
+**Do not grade companies in isolation.** After assigning initial grades to a batch, you MUST cross-reference and compare:
+
+1. **Compare within each grade tier.** Look at all the companies you've put in the same tier. Do they genuinely belong together? Would it make sense to tell the candidate "these are all equally worth pursuing"? If Amazon and a 10-person unfunded startup are both B, something is wrong — re-examine both.
+
+2. **Compare across adjacent tiers.** Look at the boundary between each pair of tiers (S/A, A/B, B/C). For every company at the lower tier, ask: "Is this genuinely less valuable than every company in the tier above?" If a B-tier company would clearly be a better career move than an A-tier company, the grades are wrong.
+
+3. **The "would you take this over that" test.** For any two companies at different grades, ask: "If the candidate had a graduate SWE offer from both, which would they take?" If the answer consistently contradicts the grades, adjust.
+
+4. **Sanity check extreme cases.** After grading, scan for: any FAANG-tier company below A, any well-known UK employer below B, any excluded-sector company above C. These are the patterns that have caused real grading failures. They're not automatic overrides — but if you find one, you must re-examine and explicitly justify the grade in the reasoning.
+
+**When grading in parallel across multiple agents:** Each agent grades its batch independently, but the orchestrator MUST do a cross-batch comparison before writing to the database. Pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other.
 
 ### Anti-inflation rules
 
@@ -188,11 +204,19 @@ These prevent grade inflation where every decent company becomes S:
 
 1. **S requires genuine exceptionality, not just "good across the board."** To earn S, a company must have either (a) near-perfect technical alignment where the candidate's specific projects map directly to the company's core work (matching engines → trading firms, compilers → compiler companies, Rust systems → Rust infrastructure companies), OR (b) an engineering reputation so strong and career ceiling so high that getting hired there would be transformative regardless of the specific role (top quant firms, leading AI labs). "Good company, grows, sponsors" is A-tier, not S.
 
-2. **Tech stack match is a bonus, not a requirement.** A company using Go, Java, C++, or Python is not penalised for not using Rust. Languages are learned in months. What matters is: does the engineering work involve the same class of problems the candidate's projects demonstrate? Distributed systems are distributed systems regardless of language. Low-latency is low-latency. Financial transaction processing is financial transaction processing.
+2. **Tech stack match is a bonus, not a requirement.** A company using Go, Java, C++, or Python is not penalised for not using Rust. Languages are learned in months. What matters is: does the engineering work involve the same class of problems the candidate's projects demonstrate? Distributed systems are distributed systems regardless of language.
 
 3. **"Consumer product" does not mean "consumer-facing role."** Backend infrastructure at Spotify, Monzo, or Uber is systems engineering regardless of what the end user sees. The preference exclusion is for consumer-facing ROLES (consulting, support, sales engineering), not for companies whose product is used by consumers.
 
-4. **The candidate's career stage matters above all.** Read `experience.md` — with no formal work experience, the first employer's name IS the professional credential. A strong engineering name on the CV (even at a company using Java) is worth more than a perfect Rust role at a company nobody has heard of. This is the single most important lens for company grading at this career stage.
+### Anti-deflation rules
+
+These prevent the systematic under-grading that has caused real failures in production:
+
+1. **Tech stack mismatch alone cannot drop a grade by more than one step.** If a company would be A on every other dimension but uses Java instead of Rust, the tech stack can drop it to B at most — never to C. Languages are the most learnable dimension; penalising them heavily is irrational at any career stage.
+
+2. **Sponsorship-capable employers with graduate hiring get a boost.** These solve the candidate's two hardest constraints simultaneously. This is a significant positive signal that should push grades UP, not be treated as neutral.
+
+3. **"Not aligned with target sectors" is a soft preference, not a hard exclusion.** Only the sectors explicitly listed as hard exclusions in `preferences.toml` (gambling, adtech, consumer-crypto) justify downgrading on sector alone. A strong engineering role in healthcare, climate tech, or any other non-excluded sector can still be A-tier.
 
 ### The gap between B and C
 
