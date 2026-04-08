@@ -6,6 +6,21 @@ Grades ungraded jobs from the database in prioritised batches, evaluating each a
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before grading any job, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all 15 files, no exceptions.
+2. **`references/grading-rubric.md`** — the full grading rubric with dimensions, weights, worked examples, and boundary cases.
+3. **`references/profile-context.md`** — how to read and synthesise the profile files for job evaluation.
+4. **`references/prioritisation-guide.md`** — how to order the pending queue so the best jobs get graded first.
+
+**When delegating grading to parallel agents:** embed the FULL TEXT of all three reference files and all relevant profile data in each agent's prompt. Agents spawned via the Agent tool cannot read files from the repo — if you don't embed the rubric, they will produce shallow, generic assessments that are useless to the user. This is a hard requirement.
+
+**Do not begin evaluating any job until all mandatory reads are complete.**
+
+---
+
 ## Why this skill exists
 
 The search pipeline deposits hundreds of jobs into the database with `evaluation_status = 'pending'` and no grade. Those jobs are useless until a human-quality judgment evaluates them against the profile. Grading is the step that turns raw listings into actionable career intelligence. The user should see the best opportunities first, not wade through noise to find signal.
@@ -105,13 +120,33 @@ WHERE id = ?
 | C | `no_fit` | 0.20 - 0.39 |
 | F | `no_fit` | 0.00 - 0.19 |
 
-The `fit_assessment` field carries the reasoning. Scale depth by grade:
+The `fit_assessment` field carries the reasoning. It must connect the job to the candidate's specific profile — not generic evaluation, but "this job wants X, you have Y" analysis.
 
-- **SS/S**: Full multi-paragraph assessment. Profile alignment, specific strengths that map to the role, gaps and how to address them in the application, sponsorship analysis, career trajectory analysis, and a recommended application approach.
-- **A/B**: Concise assessment. Key strengths, notable gaps, why it falls short of S-tier, whether it's worth pursuing if higher-grade options are scarce.
-- **C/F**: One to two sentences. The primary reason for the low grade.
+**SS/S assessments must include ALL of the following:**
+- **Profile alignment:** Name specific projects from `profile/projects.md` that demonstrate relevant capability. "Your Nyquestro matching engine demonstrates exactly the lock-free, low-latency systems thinking this role demands" — not "you have relevant experience."
+- **Technology match:** Name specific technologies from `profile/skills.md` that the job requires and the candidate has. "Requires Rust — your primary language at proficient level" — not "good tech stack match."
+- **Gap analysis:** Name specific gaps from `profile/portfolio-gaps.md` or skills the job requires that the candidate lacks. "Heavy Kubernetes usage — currently a gap in your portfolio, but your Docker experience from NeuroDrive provides a foundation."
+- **Sponsorship analysis:** Reference `profile/visa.md` — current visa status, timeline, and whether this company can sponsor when needed.
+- **Career trajectory:** How this role fits the long-term targets from `preferences.toml`.
+- **Application narrative:** A 1-2 sentence pitch for why the candidate's application would be compelling for this specific role.
+
+**A/B assessments must include:**
+- At least one specific profile project or technology that aligns
+- The primary reason it falls short of S-tier
+- Whether it's worth pursuing if higher-grade options are scarce
+
+**C/F assessments must include:**
+- The specific dealbreaker or primary weakness (e.g., "Requires 5+ years production experience — hard seniority mismatch" or "Solutions engineering role disguised by title — 60% customer-facing, excluded by preferences")
+
+**Unacceptable fit assessment (real example of what NOT to write):**
+> "Good role at a strong company. Decent fit with the profile. Worth considering."
+
+**Acceptable fit assessment (what we expect):**
+> "SS. Graduate Infrastructure Engineer at Cloudflare's London office. The role builds and operates edge network infrastructure handling millions of requests/second — directly aligned with your systems engineering focus. Your Nyquestro matching engine demonstrates the exact lock-free, performance-critical thinking this team values. NeuroDrive's distributed multi-agent simulation shows you can reason about distributed systems at scale. Rust is mentioned as a 'bonus' language — your primary language and strongest differentiator. Cloudflare is a confirmed Skilled Worker sponsor with an established graduate programme, addressing the sponsorship timeline from your Graduate visa (expires Aug 2027). Career ceiling is exceptional — clear IC track to Principal Engineer, compensation reaches your long-term targets. The only gap: no production operations experience, but the graduate programme explicitly provides mentorship and on-call onboarding. Application narrative: your matching engine project + Rust proficiency + systems thinking make you a standout among graduates, most of whom have only web application experience."
 
 ### 6. Parallel grading
+
+**Critical: every parallel agent must receive the full content of ALL reference files.** Embed the complete text of `references/grading-rubric.md`, `references/profile-context.md`, and `references/prioritisation-guide.md` in each agent's prompt. Also embed the full content of every file from `profile/`. Agents that don't receive these files will produce shallow, generic assessments — "good role, decent fit" — that are useless. The reference files are what enable specific, profile-grounded evaluation. This is the single most important requirement for parallel grading quality.
 
 Job grading should always be parallelised using multiple agents. Split the pending queue into batches by company cluster (e.g. 5 agents each handling ~100-150 jobs) and run them simultaneously. Each agent reads the same profile, gets a different set of jobs with their descriptions, and outputs SQL UPDATE statements.
 

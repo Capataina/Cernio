@@ -26,8 +26,8 @@ The deduplication check should be: query all company websites from the database,
 
 ## Companies may use multiple ATS platforms
 
-Some companies post jobs on more than one ATS. A company might use Lever for engineering roles and Workday for corporate roles, or Greenhouse for one region and a different system for another. The database currently stores one `ats_provider` and `ats_slug` per company.
+Some companies post jobs on more than one ATS. ClearBank was found to have both an active Ashby board (25 jobs) and a residual Workable board (0 jobs) from a migration.
 
-This means we might miss jobs if a company splits their listings across platforms. For now this is an accepted limitation — most companies use one primary ATS for engineering roles. If we discover a company appears on multiple platforms during population or search, we should note it and consider whether the schema needs to support multiple ATS entries per company (e.g. a separate `company_ats` junction table).
+The schema now handles this via the `company_portals` table — each company can have multiple portal entries, with `is_primary` flagging the active one. The `cernio resolve` script probes ALL providers per company and records all hits, not just the first match.
 
-**Implication for populate-db:** When resolving a company, check more than one provider. A company that resolves on Lever might also have a Greenhouse board. At minimum, note when a company's careers page links to a different ATS than the one we found via slug probing.
+**Lesson from production:** Finding a company on two platforms is expected, not an error. The script marks the portal with the most jobs as primary. The search script uses the primary portal for job fetching.

@@ -126,3 +126,30 @@ Read `preferences.toml` for explicit dealbreakers, then also watch for:
 - Role is framed around a single tool or framework
 - Company's "engineering" is configuring vendor products rather than building technology
 - Significant customer-facing responsibilities (check `preferences.toml` for whether this is a hard exclusion)
+
+---
+
+## Profile elements to reference in fit assessments
+
+When writing fit assessments, you must connect jobs to the profile concretely. Here is a checklist of profile elements to reference:
+
+**For every job (minimum):**
+- At least one project from `projects.md` that demonstrates relevant capability, named explicitly
+- The candidate's proficiency level for the job's required technologies from `skills.md`
+- Seniority assessment grounded in `experience.md` and `projects.md`
+
+**For SS/S jobs (mandatory):**
+- All projects from `projects.md` that are relevant, with explanation of what each demonstrates
+- Full technology overlap analysis from `skills.md`
+- Gaps identified from `portfolio-gaps.md` with severity assessment
+- Visa timeline from `visa.md` and sponsorship viability
+- Career trajectory fit against targets in `preferences.toml`
+- At least one specific element from the candidate's background that makes them a standout applicant
+
+**For A/B jobs:**
+- Primary project alignment (at least one named project)
+- Key gap or reason it's not S-tier
+- Whether it addresses any gaps from `portfolio-gaps.md`
+
+**For C/F jobs:**
+- The specific dealbreaker, referencing the relevant profile file (e.g., "hard seniority mismatch per experience.md" or "excluded sector per preferences.toml")

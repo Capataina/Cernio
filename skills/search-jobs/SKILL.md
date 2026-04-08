@@ -4,6 +4,18 @@ Searches for open positions at companies in the database using the Rust pipeline
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before executing any search, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all files, no exceptions. You need the user's background, skills, and career targets to evaluate results.
+
+**Note:** This skill handles search orchestration. For grading jobs, use the `grade-jobs` skill which has comprehensive reference files (grading rubric, profile context, prioritisation guide). The grading section below is retained for legacy reference but the `grade-jobs` skill and its references should be the authoritative source for evaluation methodology.
+
+**Do not begin searching until the mandatory read is complete.**
+
+---
+
 ## Why this skill exists
 
 The company universe is only valuable if we can see what is hiring. This skill bridges the gap between "we know these companies" and "here are the specific roles worth applying to." The key challenge is avoiding false negatives — missing a perfect role because of overly aggressive filtering is worse than spending a few extra minutes evaluating irrelevant listings.
@@ -84,6 +96,8 @@ The agent should be creative about where to find listings. Some sources to consi
 - Any sector-specific job board the agent knows about
 
 ### 5. Grade jobs against the profile
+
+> **Note:** For comprehensive job grading, prefer the dedicated `grade-jobs` skill which has extensive reference files (rubric, profile context, prioritisation guide) and supports parallel grading. The grading guidance below is a simplified version retained for quick in-line evaluation during search sessions. For full grading runs, invoke `grade-jobs` instead.
 
 This is where the skill's core value lies — the script fetches, Claude evaluates.
 

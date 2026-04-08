@@ -44,3 +44,18 @@ The original CLAUDE.md supported teaching and implementation modes. Teaching mod
 ## README is editable
 
 The original CLAUDE.md treated README.md as read-only. This was changed — the README is a living document updated as decisions change and hardcoded assumptions are replaced.
+
+---
+
+## Mandatory-read protocol (added session 3, 2026-04-08)
+
+All 8 skills now enforce a mandatory-read block at the top of their SKILL.md. This block requires reading:
+1. The skill's SKILL.md itself
+2. Every file in the skill's `references/` directory
+3. All files in `profile/`
+
+This was added after discovering that agents executing skills (especially discovery and grading) were skipping reference files, producing shallow and generic results. The search-strategies reference for discovery and the grading rubrics for evaluation are what make these skills valuable — without them, agents default to generic output.
+
+CLAUDE.md now enforces this globally via three sections: Skill Execution Protocol, Subagent Context Requirements, and Grade and Fit Assessment Quality Standard.
+
+**Why:** The first discovery run's agents that didn't use web search produced obvious company lists. Grading runs without the full rubric produced shallow "good company, decent tech" reasoning. The mandatory-read protocol prevents both failure modes.

@@ -4,6 +4,16 @@ Scrapes a GitHub repository and updates the user's structured profile with accur
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before scraping any repository, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all files, no exceptions. You need to know the current state of the profile to identify what has changed and what needs updating. Without reading the existing profile, you cannot compare new findings against current entries.
+
+**Do not begin scraping until the mandatory read is complete.**
+
+---
+
 ## Why this skill exists
 
 The profile is the source of truth for job evaluation. Stale or inaccurate entries lead to bad fit assessments — a project that has grown significantly since its last profile entry will be undersold in evaluations, and skills gained from recent work won't be matched against job requirements. Scraping the actual repo ensures the profile reflects reality, not a snapshot from whenever someone last edited it manually.

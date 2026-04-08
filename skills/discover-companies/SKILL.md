@@ -4,6 +4,24 @@ Discovers companies that do work aligned with the user's profile and adds them t
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before executing any part of this skill, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all of them, no exceptions. The profile determines what to search for, which sectors matter, and how to assess relevance.
+2. **`references/search-strategies.md`** — the complete guide to creative, non-obvious company discovery. This file is what makes discovery produce valuable results instead of generic top-10 lists.
+
+**When dispatching discovery agents:** You MUST embed the FULL TEXT of `references/search-strategies.md` directly in each agent's prompt. Agents cannot read files from the repo — if you don't include it, they work without it, and they will produce generic, obvious results. This is the single most common failure mode of this skill.
+
+Also embed in each agent's prompt:
+- The relevant slice of the profile (skills, domains, interests that matter for their sector)
+- The complete list of already-known companies (from DB + potential.md) for deduplication
+- Explicit instruction to use WebSearch and WebFetch tools — agents must perform real web searches
+
+**Do not proceed to agent dispatch until all mandatory reads are complete.**
+
+---
+
 ## Why this skill exists
 
 The company universe is the foundation of everything downstream — job search, evaluation, and application tracking are only as good as the companies in the system. Mass-market aggregators surface the same obvious names to everyone. The value of discovery is finding the companies that generic tools miss: the 60-person startup doing brilliant infrastructure work, the company that just raised Series B and is hiring its first engineers in a niche the profile cares about, the firm whose work maps perfectly onto the profile but would never appear on a "top companies" list.
@@ -66,16 +84,20 @@ Each discovered company should capture:
 - **Website**: [URL]
 - **Location**: [HQ city/country]
 - **What they do**: [1-2 sentences — specific about their actual product/service, not generic sector labels]
-- **Why relevant**: [Why this company fits the profile — which skills, domains, or interests align]
+- **Why relevant**: [Specific connection to the profile — name the projects, technologies, or domains from `profile/` that align. "Interesting tech company" is not acceptable. "Core product involves lock-free data structures and low-latency networking — directly overlaps with Nyquestro's matching engine architecture and NeuroDrive's real-time simulation" is the standard.]
 - **Source**: [Where the agent found them — specific and verifiable: a named portfolio page, a dated thread, a specific repository or contributor profile]
 - **Discovered**: [Date]
 ```
 
 The "why relevant" field matters. A company without a clear connection to the profile should not be in the universe. The reasoning also helps later when evaluating jobs — it provides context for why the company was worth tracking.
 
+**Quality standard for "Why relevant":** Every entry must name at least one specific element from the profile (a project, a skill, a domain interest) that connects to the company's work. Generic relevance statements like "does interesting engineering" or "relevant to systems engineering" are not acceptable — they add no information. The connection must be concrete enough that someone reading it understands exactly why this company matters for THIS specific candidate.
+
 ---
 
 ## Agent dispatch guidelines
+
+**Critical: each agent must receive the full content of `references/search-strategies.md` embedded in their prompt.** This is not optional. The search strategies reference teaches agents HOW to discover companies creatively — through VC portfolios, open source signals, conference sponsors, engineering blogs, funding announcements, and indirect traces. Without it, agents default to obvious web searches that produce the same results as every job board. The reference file is what makes this skill valuable.
 
 **Use standard subagents, not worktree-isolated ones.** Discovery agents are doing web research and writing to a shared result set. They do not modify repo files independently — they return structured results to the orchestrator.
 

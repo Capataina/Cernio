@@ -359,3 +359,31 @@ Company grade sets a monitoring priority. Job grade determines whether to apply.
 | Unknown company, strong technical role | B | A | Small company with a systems engineer role matching the candidate's skills. Company lacks brand signal but the role itself is technically excellent. |
 
 **The key insight:** Company grade determines whether jobs are fetched and shown to the user. Job grade determines whether to apply. A high company grade with no good roles wastes some search time but causes no harm. A low company grade that filters out a great role before it is ever seen is an unrecoverable loss. This is why the B/C boundary matters so much — it is the cutoff between "jobs are visible" and "jobs are invisible."
+
+---
+
+## Evidence Standards
+
+Grade reasoning must be grounded in evidence you can actually find and verify. Different types of evidence have different reliability and availability.
+
+### What to look for (and where)
+
+| Signal | Where to find it | Reliability | If you can't find it |
+|--------|-----------------|-------------|---------------------|
+| Engineering reputation | GitHub repos, engineering blog, conference talks, Glassdoor engineering reviews | High | Note "no public engineering signals found" — this is a weak negative signal but not conclusive |
+| Technical alignment | Company website, product docs, job descriptions, engineering blog posts | High | If the company's actual work is unclear from public sources, note the uncertainty |
+| Growth trajectory | Crunchbase, press releases, LinkedIn headcount, careers page job count | Moderate | Many private/profitable companies have no public growth data. Do NOT assume declining — say "growth data unavailable" |
+| Sponsorship | UK sponsor register (gov.uk), job listing text, company size | High (register), Moderate (inference) | Check the register. If not listed, note it but consider company size — large companies often sponsor even without being listed for the specific entity name |
+| Career ceiling | Levels.fyi, Glassdoor reviews, LinkedIn profiles of engineers, job ladder in descriptions | Moderate | If progression data is unavailable, infer from company size and structure |
+| Hiring activity | Careers page, ATS job count, LinkedIn Jobs | Moderate | "No visible open roles" is not the same as "not hiring" — many companies hire through referrals |
+
+### The golden rule
+
+**Absence of evidence is not evidence of absence.** A company with no public funding data might be bootstrapped and profitable. A company with no engineering blog might have excellent engineering culture internally. A company with no visible open roles might hire exclusively through referrals.
+
+Grade based on what you CAN find:
+- Positive evidence raises the grade
+- Negative evidence (layoffs, dissolved on Companies House, "we don't sponsor" in listings) lowers the grade
+- Absence of evidence is neutral — note it honestly but do not treat it as a negative signal
+
+The exception: if you cannot find enough evidence to form ANY confident assessment, say so. A grade with acknowledged thin evidence ("B — limited public information; graded on technical alignment alone, which appears moderate based on product description") is more honest than a confident grade based on nothing.

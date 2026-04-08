@@ -4,6 +4,19 @@ Audits the health and consistency of the Cernio database by combining mechanical
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before executing any integrity check, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all 15 files, no exceptions. The profile is the reference point against which all grades and evaluations are assessed.
+2. **`references/remediation-guide.md`** — how to fix every type of issue this skill can detect. Without this, you can identify problems but not solve them.
+3. **`references/quality-standards.md`** — what good vs bad grade reasoning and fit assessments look like. This is how you judge whether existing assessments meet the bar.
+4. **`references/profile-context.md`** — how to read and synthesise the profile for integrity assessment.
+
+**Do not begin any checks until all mandatory reads are complete.**
+
+---
+
 ## Why this skill exists
 
 The Cernio database is a living system. Profile changes — a new project, a new skill, updated preferences, a visa status change — can silently invalidate grades and evaluations that were correct when they were written. A company graded C because the user lacked Kubernetes experience should be reconsidered once a Kubernetes project lands in the profile. A job evaluated as "weak fit" due to a Go requirement may become viable after the user ships a Go project.
@@ -144,6 +157,32 @@ Do not automatically execute any changes. Present findings and recommendations, 
 
 ---
 
+## Remediation mode
+
+When the user reviews the integrity report and says "fix these", "update these", "regrade these", or similar, switch from reporting mode to remediation mode. The `references/remediation-guide.md` file contains detailed procedures for every issue type.
+
+### How remediation works
+
+1. **Confirm scope with the user.** Which issues should be fixed? All of them, or a specific subset?
+2. **Read `references/remediation-guide.md`** for the procedure for each issue type.
+3. **Execute fixes in priority order:**
+   - Profile-driven staleness (regrade companies/jobs whose grades are invalidated by profile changes)
+   - Quality issues (rewrite shallow grade reasoning and fit assessments with profile-specific evidence)
+   - Missing data (fetch job descriptions, grade ungraded entries, write relevance statements)
+   - Mechanical issues (fix orphaned records, update dead URLs, re-verify ATS slugs)
+4. **Present each fix for user approval** before writing to the database. Never auto-fix without confirmation.
+5. **Use the quality standards** from `references/quality-standards.md` as the bar for rewritten assessments.
+
+### What the agent must know for remediation
+
+- **Regrading companies:** Follow the full procedure in `skills/grade-companies/SKILL.md` and its references. Read the profile fresh, apply the rubric, write evidence-based reasoning.
+- **Regrading jobs:** Follow the full procedure in `skills/grade-jobs/SKILL.md` and its references. Fetch the job description first (WebFetch the URL), read the profile, apply the rubric.
+- **Resolving ATS:** Run `cernio resolve --company "CompanyName"` for mechanical resolution. If that fails, follow the AI fallback procedure in `skills/resolve-portals/SKILL.md` and its `references/ats-providers.md`.
+- **Rewriting relevance:** Connect the company to specific projects, technologies, and domains from the profile. See `references/quality-standards.md` for examples.
+- **Fetching missing descriptions:** Use WebFetch on the job URL. If behind a login wall, try WebSearch for the job title + company on LinkedIn, Indeed, or Glassdoor.
+
+---
+
 ## When to recommend this skill
 
 This skill should be recommended (by any agent, in any session) when:
@@ -160,6 +199,8 @@ This skill should be recommended (by any agent, in any session) when:
 
 Before presenting the integrity report:
 
+- [ ] All reference files in `references/` were read before starting the integrity check
+- [ ] The remediation guide was consulted for every issue type identified
 - [ ] `cernio check` was run and its output is included in the report
 - [ ] All profile files were read — not a subset, all of them
 - [ ] Staleness assessment focuses on entries where the profile change is relevant, not a blanket re-evaluation of everything

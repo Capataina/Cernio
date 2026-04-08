@@ -446,3 +446,31 @@ These are patterns of grading error to actively avoid.
 **Grade inflation from enthusiasm.** A role that hits personal interest buttons (check `interests.md`) is exciting but must still be graded on the full rubric. Enthusiasm is a signal that the application will be strong — it doesn't change the grade. An unachievable dream role is still F.
 
 **Grade deflation from unfamiliarity.** A role in a domain you haven't encountered before deserves research, not dismissal. If you don't know the ceiling of a domain, look it up before grading. Don't default to B because the domain is unfamiliar.
+
+---
+
+## Evidence Standards for Fit Assessments
+
+Every fit assessment must connect the job to the candidate's profile with specific, named evidence. The standard varies by grade but the principle is the same: explain WHY with concrete profile references, not just assert a conclusion.
+
+### What "specific" means
+
+| Element | Generic (unacceptable) | Specific (required) |
+|---------|----------------------|---------------------|
+| Project alignment | "Has relevant projects" | "Your Nyquestro matching engine demonstrates lock-free systems design directly relevant to this exchange infrastructure role" |
+| Technology match | "Good stack overlap" | "Requires Rust and Python — your two strongest languages at proficient and comfortable levels respectively" |
+| Seniority assessment | "Seems achievable" | "Lists '0-2 years' with scope matching project-level experience. Your 4 substantial projects demonstrate equivalent capability to 1-2 years of professional work" |
+| Gap identification | "Some gaps exist" | "Heavy Kubernetes usage — currently listed as a gap in portfolio-gaps.md. Your Docker experience from NeuroDrive provides a partial foundation" |
+| Sponsorship | "They probably sponsor" | "Confirmed on UK sponsor register. Graduate programme established. Your Graduate visa expires Aug 2027, giving 15+ months before sponsorship is needed" |
+| Career ceiling | "Good career path" | "SRE at this scale leads to Staff SRE / Platform Architect roles. 10-year compensation trajectory in this domain reaches your £500K+ target per preferences.toml" |
+
+### The golden rule for fit assessments
+
+The user should be able to read a fit assessment and immediately understand:
+1. What the job actually involves (not just the title)
+2. Which of their specific projects and skills make them a good candidate
+3. What gaps exist and how significant they are
+4. Whether sponsorship is viable given their visa timeline
+5. Where this role leads in 5-10 years
+
+If the assessment doesn't answer all five questions for SS/S grades, it's not done.

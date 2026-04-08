@@ -6,6 +6,20 @@ Grades ungraded companies in the Cernio database against the user's structured p
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before grading any company, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all 15 files, no exceptions. Missing even one file (e.g., skipping `visa.md`) leads to grading errors on critical dimensions like sponsorship.
+2. **`references/grading-rubric.md`** — the complete rubric with evaluation dimensions, worked examples, and boundary cases. This is HOW you grade.
+3. **`references/profile-context.md`** — tells you what to extract from each profile file and how to synthesise it for company evaluation. This bridges the profile to the rubric.
+
+**When delegating grading to subagents:** embed the FULL TEXT of both reference files and all relevant profile data in each agent's prompt. Subagents cannot read files from the repo.
+
+**Do not begin evaluating any company until all mandatory reads are complete.**
+
+---
+
 ## Why company grading exists
 
 Company grading answers one question: **is this company worth monitoring for jobs?**
@@ -64,7 +78,29 @@ Apply the rubric from `references/grading-rubric.md`. Each company gets:
 - **Grade reasoning**: A concise paragraph explaining which dimensions drove the grade, what the company's strengths and weaknesses are, and any notable uncertainties. This reasoning is stored in the database and read by both the user and future agents — make it genuinely informative.
 - **Why relevant** (update if the existing value is thin or outdated): What makes this company relevant to the profile specifically.
 
-The grade reasoning should be written as if explaining to a smart colleague why you put this company in this tier and not the adjacent one. "Good company" is not reasoning. "Strong engineering reputation (active OSS, eng blog, conference presence), core product is infrastructure-level (CDN, DNS, edge compute), confirmed Skilled Worker sponsor, clear IC progression to Staff+, but entry-level hiring is competitive and may prefer candidates with more conventional credentials" is reasoning.
+The grade reasoning must include **specific, verifiable evidence** across these categories:
+
+**Profile connection (mandatory):**
+- Name specific projects from `profile/projects.md` that align with the company's work (e.g., "Nyquestro's lock-free matching engine maps directly to their exchange infrastructure")
+- Name specific technologies from `profile/skills.md` the company uses (e.g., "Production Rust shop — the candidate's primary language")
+- Reference the candidate's career targets from `preferences.toml` where relevant
+
+**Company evidence (include what you can verify — absence of evidence is not evidence of absence):**
+- Recent funding, growth signals, or hiring activity IF you can find it — but do not penalise a company simply because you couldn't find public funding data. Private companies and profitable bootstrapped companies may have no public funding information.
+- Engineering reputation signals: OSS contributions, engineering blog, conference talks, known engineers
+- Sponsorship evidence: UK sponsor register check, international team composition, job listing mentions
+- Number of open engineering roles IF visible on their careers page or ATS
+
+**Boundary clarity (mandatory):**
+- Explicitly state why this grade and not the adjacent one (e.g., "A rather than S because engineering reputation is strong but technical alignment is moderate — their core work is application-layer payments, not systems infrastructure")
+
+**Important:** Grade based on evidence you can actually find and verify. If you cannot find funding information, hiring numbers, or growth metrics for a company, say so honestly in the reasoning rather than guessing. A company with no public funding data might be bootstrapped and profitable. A company with no visible open roles might hire through referrals. Do not downgrade companies solely because information is unavailable — downgrade only when you find actual negative signals.
+
+An example of **unacceptable** grade reasoning:
+> "Good company, sponsors visas, relevant tech."
+
+An example of **acceptable** grade reasoning:
+> "S-tier. Core product is a distributed time-series database built in Rust — direct overlap with the candidate's Nyquestro (lock-free matching engine) and systems programming depth. Active OSS presence (12 public repos, regular commits). Engineering blog with substantive posts on storage engine internals. Confirmed Skilled Worker sponsor (licence active on gov.uk register). Series B ($45M, 2025) — actively growing, 8 open engineering roles on Greenhouse. Clear IC ladder visible on Levels.fyi. Technical alignment is near-perfect; the only weakness is relatively low brand recognition outside the database community, which limits CV signal compared to tier-1 names."
 
 ### 5. Handle C-tier archival
 
@@ -86,25 +122,28 @@ Format:
 ## Grading Results
 
 ### S-tier
-- **Cloudflare** — Strong engineering reputation (active OSS, eng blog, Rust in production),
-  core infrastructure product, confirmed sponsor, clear Staff+ IC track.
-  Why relevant: CDN/edge infrastructure aligns with systems engineering focus;
-  known for hiring strong builders regardless of credential gaps.
+- **Cloudflare** — Exceptional infrastructure company. Core product (CDN, edge compute, Workers
+  runtime) directly overlaps with the candidate's systems engineering focus. Production Rust
+  usage aligns with primary language. Active OSS, substantive engineering blog. Confirmed
+  Skilled Worker sponsor. Clear IC track to Principal. Recent Q1 earnings show continued growth.
+  Why relevant: Edge infrastructure and performance-critical networking maps to Nyquestro's
+  matching engine architecture and NeuroDrive's real-time distributed simulation. Rust in
+  production stack.
 
 ### A-tier
-- **Form3** — Solid payments infrastructure engineering, Go-heavy but systems-oriented,
-  backed by Goldman/Lloyds, confirmed sponsor. Weaker on brand recognition.
-  Why relevant: Payment infrastructure is technically deep; good first-job signal.
-
-### B-tier
-- **Coadjute** — Interesting settlement infrastructure, small team (30-50),
-  early stage but funded. Sponsorship uncertain at this size.
-  Why relevant: Niche infrastructure work, Rust-adjacent problem space.
+- **Form3** — Solid payments infrastructure. Core work (Faster Payments, BACS, CHAPS processing)
+  involves distributed systems, strict ordering, and fault tolerance — technically deep and
+  adjacent to exchange infrastructure. Go-heavy but systems-oriented. Series C, 200+ employees,
+  confirmed sponsor. Weaker on brand recognition outside fintech.
+  Why relevant: Payment message routing and transaction ordering are structurally similar to
+  order matching. The candidate's distributed systems experience from NeuroDrive transfers well.
 
 ### C-tier (will be archived)
-- **SmallCo Ltd** — Marketing-focused consultancy, engineering team of 3,
-  no evidence of sponsorship capability, work is primarily application-layer.
-  Why relevant: Originally discovered via fintech list but core work is not infrastructure.
+- **SmallCo Ltd** — Marketing-focused consultancy. Engineering team of 3, no public repos,
+  no engineering blog. Core work is CMS customisation, not systems engineering. Not on the
+  sponsor register. No alignment with the candidate's infrastructure/systems focus.
+  Why relevant: Originally discovered via fintech list but core work is application-layer
+  marketing technology — no connection to the candidate's projects or technical interests.
 ```
 
 ### 7. Write to database

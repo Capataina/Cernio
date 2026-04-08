@@ -58,6 +58,24 @@ Synthesise from all files:
 - What are the biggest weaknesses or gaps that will affect how companies evaluate them?
 - What does the candidate need most from their first/next employer — brand signal, technical depth, sponsorship, mentorship, or something else?
 
+### 4. Profile elements to reference in grade reasoning
+
+When writing grade reasoning and why_relevant fields, you must connect companies to the profile concretely. Build a mental checklist of profile elements to reference:
+
+**Projects (from `projects.md`):**
+For each company, identify which projects from the portfolio align with the company's work. Name them explicitly. "The candidate's Nyquestro project demonstrates lock-free matching engine design" is useful. "The candidate has relevant projects" is not.
+
+**Technologies (from `skills.md`):**
+For each company, identify which of the candidate's technologies the company uses in production. "Production Rust — the candidate's primary language" is useful. "Good tech stack" is not.
+
+**Domain alignment (from `projects.md` + `interests.md`):**
+For each company, identify which domains from the candidate's project portfolio and interests overlap with the company's core work. "DeFi analytics from Aurix maps to their blockchain infrastructure" is useful. "Fintech alignment" is not.
+
+**Career targets (from `preferences.toml`):**
+Reference long-term trajectory targets when assessing career ceiling. "The company's IC track reaches Staff/Principal with compensation in the candidate's target range" is useful. "Good career prospects" is not.
+
+The standard: every grade reasoning should mention at least 2-3 specific profile elements by name. Every why_relevant should mention at least one specific project or technology. Generic assessments are not acceptable.
+
 ---
 
 ## What matters most for company evaluation

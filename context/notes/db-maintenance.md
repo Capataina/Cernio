@@ -73,18 +73,18 @@ This also reduces the cognitive load on Claude during evaluation sessions — fe
 
 ---
 
-## Future maintenance operations
+## Implemented maintenance operations
 
 ### ATS verification sweep
 
-Re-probe all resolved companies' ATS slugs to detect provider migrations, dead boards, or changed slugs. Companies that fail verification get flagged for re-resolution.
+Implemented in `cernio check`. Re-probes all resolved companies' ATS slugs to detect provider migrations, dead boards, or changed slugs. Companies that fail verification are flagged in the structured report.
 
-**Trigger:** Manual or periodic (monthly). Not urgent — ATS migrations are rare.
+**Trigger:** `cernio check` or `cernio check --ats-only`. Can also be invoked conversationally via the `check-integrity` skill.
 
 ### Stale company detection
 
-Flag companies whose last job search returned zero results for 3+ consecutive searches. They may have changed their ATS, stopped hiring, or gone under.
+Implemented in `cernio check`. Flags companies with stale grades, missing data, dead bespoke URLs, and other integrity issues. The `check-integrity` AI skill adds judgment-based assessment on top — detecting profile-driven staleness that timestamps alone cannot catch.
 
 ### Re-evaluation trigger
 
-When the user's profile changes significantly (new project added, new skill, shifted preferences), mark all jobs with strong/weak fit for re-evaluation. The original assessment may no longer be accurate.
+Implemented in the `check-integrity` skill. Compares profile modification dates against `graded_at` timestamps. When the profile has changed in ways relevant to a company's grade reasoning (e.g., new project fills a gap cited as a weakness), the skill flags the entry for regrading. The skill can also execute remediation when the user approves — regrading, rewriting shallow assessments, and fetching missing data.

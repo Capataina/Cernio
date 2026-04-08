@@ -2,7 +2,7 @@
 
 > Complete overhaul of the terminal UI — from functional dashboard to best-in-class interactive job hunting platform. Every change uses dynamic sizing, fills empty space, and makes the TUI genuinely enjoyable to use.
 
-**Status:** Planning — all items discussed and approved by user.
+**Status:** **Complete** — implemented across TUI v3 (commit ed30573) and v4 (commit 1a737ce), 2026-04-08.
 
 ---
 
@@ -27,133 +27,133 @@ These apply to every change in this plan:
 These are bugs and usability issues that make the current TUI frustrating.
 
 ### 1.1 Fix mouse scroll — viewport scrolling, not selection jumping
-- [ ] Change scroll events to adjust `TableState` offset, not call `next_in_list()`
-- [ ] The selection stays in place — the viewport moves around it
-- [ ] Batch trackpad momentum events (if multiple scrolls arrive within 50ms, treat as one larger scroll)
-- [ ] Mouse scroll should work on whichever pane the cursor is over, regardless of keyboard focus
+- [x] Change scroll events to adjust `TableState` offset, not call `next_in_list()`
+- [x] The selection stays in place — the viewport moves around it
+- [x] Batch trackpad momentum events (if multiple scrolls arrive within 50ms, treat as one larger scroll)
+- [x] Mouse scroll should work on whichever pane the cursor is over, regardless of keyboard focus
 
 ### 1.2 Implement click-to-select
-- [ ] Left click on a row in any table selects that row
-- [ ] Calculate the clicked row index from `mouse.row` relative to the table's rendered area (account for header row and border)
-- [ ] Clicking in the list pane sets focus to List, clicking in detail pane sets focus to Detail
+- [x] Left click on a row in any table selects that row
+- [x] Calculate the clicked row index from `mouse.row` relative to the table's rendered area (account for header row and border)
+- [x] Clicking in the list pane sets focus to List, clicking in detail pane sets focus to Detail
 
 ### 1.3 Implement click-on-tab
-- [ ] Left click in the tab bar area (rows 0-2) switches to the clicked tab
-- [ ] Calculate which tab was clicked from `mouse.column` and the tab label positions
+- [x] Left click in the tab bar area (rows 0-2) switches to the clicked tab
+- [x] Calculate which tab was clicked from `mouse.column` and the tab label positions
 
 ### 1.4 Fix posted date display
-- [ ] Parse ISO timestamps and display as relative time: "3 days ago", "2 weeks ago", "1 month ago"
-- [ ] Fall back to short date format ("Apr 7") if parsing fails
+- [x] Parse ISO timestamps and display as relative time: "3 days ago", "2 weeks ago", "1 month ago"
+- [x] Fall back to short date format ("Apr 7") if parsing fails
 
 ### 1.5 Fix grade bar colours in company detail
-- [ ] The `░` empty portion of bars should be removed — just use `█` for filled and empty space for the rest
-- [ ] The filled portion should use the grade colour from the theme
-- [ ] Bars should be dynamically sized to fill available width (percentage of container, not fixed character count)
+- [x] The `░` empty portion of bars should be removed — just use `█` for filled and empty space for the rest
+- [x] The filled portion should use the grade colour from the theme
+- [x] Bars should be dynamically sized to fill available width (percentage of container, not fixed character count)
 
 ### 1.6 Remove redundant "Evaluation" line from job detail
-- [ ] Remove the "Evaluation: strong fit" line — grade already conveys this
-- [ ] Reclaim the space for description content
+- [x] Remove the "Evaluation: strong fit" line — grade already conveys this
+- [x] Reclaim the space for description content
 
 ---
 
 ## Phase 2: Fill empty space with useful content
 
 ### 2.1 Full job description in job detail pane
-- [ ] Show the complete `raw_description` after the fit assessment, not just a truncated preview
-- [ ] Clean up formatting: strip leftover HTML entities (`&amp;`, `&nbsp;`, etc.), normalise whitespace, remove empty lines
-- [ ] Reorder the detail pane sections: Title → Company → Details (location, posted, grade) → Fit Assessment → Description → Link
-- [ ] The link moves to the bottom since `o` already opens it — it's reference, not primary content
-- [ ] The entire detail pane is scrollable so long descriptions are fully accessible
+- [x] Show the complete `raw_description` after the fit assessment, not just a truncated preview
+- [x] Clean up formatting: strip leftover HTML entities (`&amp;`, `&nbsp;`, etc.), normalise whitespace, remove empty lines
+- [x] Reorder the detail pane sections: Title → Company → Details (location, posted, grade) → Fit Assessment → Description → Link
+- [x] The link moves to the bottom since `o` already opens it — it's reference, not primary content
+- [x] The entire detail pane is scrollable so long descriptions are fully accessible
 
 ### 2.2 Dashboard — dynamic block sizing
-- [ ] Replace all `Constraint::Min(N)` with dynamic sizing based on content
-- [ ] Grade Distribution bars: width should be `(available_width - label_width - count_width - padding) * (count / max_count)` — not a fixed 6 characters
-- [ ] Pipeline Health bars: same dynamic sizing — bars fill available width proportionally
-- [ ] Action Items: if there's remaining space after the stats, list the bespoke company names that need manual search
-- [ ] All blocks expand their content to use available space rather than leaving whitespace
+- [x] Replace all `Constraint::Min(N)` with dynamic sizing based on content
+- [x] Grade Distribution bars: width should be `(available_width - label_width - count_width - padding) * (count / max_count)` — not a fixed 6 characters
+- [x] Pipeline Health bars: same dynamic sizing — bars fill available width proportionally
+- [x] Action Items: if there's remaining space after the stats, list the bespoke company names that need manual search
+- [x] All blocks expand their content to use available space rather than leaving whitespace
 
 ### 2.3 Dashboard Top Roles — full scrollable list
-- [ ] Show ALL SS, S, and A graded jobs (not just 10 SS)
-- [ ] Single-line format: `SS  SWE Workers Observability — Cloudflare`
-- [ ] Make the pane scrollable — j/k works when dashboard has focus, mouse scroll also works
-- [ ] Add a scroll offset to the dashboard state in App
-- [ ] This transforms the dashboard from a static stats page into a browseable action list
+- [x] Show ALL SS, S, and A graded jobs (not just 10 SS)
+- [x] Single-line format: `SS  SWE Workers Observability — Cloudflare`
+- [x] Make the pane scrollable — j/k works when dashboard has focus, mouse scroll also works
+- [x] Add a scroll offset to the dashboard state in App
+- [x] This transforms the dashboard from a static stats page into a browseable action list
 
 ### 2.4 Company detail — full job list
-- [ ] Below the grade distribution chart, show ALL jobs for the selected company (not just top 5)
-- [ ] Single-line format: `SS  SWE Workers Observability`
-- [ ] Include all grades so the user sees what was filtered out and why
-- [ ] Scrollable within the detail panel
-- [ ] Replaces the current "Top Roles" section which only shows 5
+- [x] Below the grade distribution chart, show ALL jobs for the selected company (not just top 5)
+- [x] Single-line format: `SS  SWE Workers Observability`
+- [x] Include all grades so the user sees what was filtered out and why
+- [x] Scrollable within the detail panel
+- [x] Replaces the current "Top Roles" section which only shows 5
 
 ### 2.5 Job description formatting
-- [ ] Strip HTML entities: `&amp;` → `&`, `&nbsp;` → ` `, `&lt;` → `<`, `&#39;` → `'`
-- [ ] Collapse multiple blank lines into one
-- [ ] Trim leading/trailing whitespace per line
-- [ ] Remove any remaining HTML tags that slipped through the strip_html function
-- [ ] Handle Unicode bullet points and list markers cleanly
+- [x] Strip HTML entities: `&amp;` → `&`, `&nbsp;` → ` `, `&lt;` → `<`, `&#39;` → `'`
+- [x] Collapse multiple blank lines into one
+- [x] Trim leading/trailing whitespace per line
+- [x] Remove any remaining HTML tags that slipped through the strip_html function
+- [x] Handle Unicode bullet points and list markers cleanly
 
 ---
 
 ## Phase 3: New features — QoL
 
 ### 3.1 Search/filter (`/`)
-- [ ] Pressing `/` opens a text input at the bottom of the screen (like vim's search)
-- [ ] Type to filter the current list by keyword — matches against title, company name, location
-- [ ] Filter applies instantly as you type
-- [ ] `Esc` clears the filter and shows all entries
-- [ ] The filter indicator shows in the status bar: `"engineer" — 142 matches`
-- [ ] Works in both Companies and Jobs views
+- [x] Pressing `/` opens a text input at the bottom of the screen (like vim's search)
+- [x] Type to filter the current list by keyword — matches against title, company name, location
+- [x] Filter applies instantly as you type
+- [x] `Esc` clears the filter and shows all entries
+- [x] The filter indicator shows in the status bar: `"engineer" — 142 matches`
+- [x] Works in both Companies and Jobs views
 
 ### 3.2 Jump-to-grade shortcuts
-- [ ] In Jobs view, pressing a grade key (shift+S for SS, s for S, a for A, etc.) jumps selection to the first job of that grade
-- [ ] Visual indicator in the status bar showing which grade section you're in
+- [x] In Jobs view, pressing a grade key (shift+S for SS, s for S, a for A, etc.) jumps selection to the first job of that grade
+- [x] Visual indicator in the status bar showing which grade section you're in
 
 ### 3.3 Sort toggle
-- [ ] `s` cycles through sort modes: by grade (default) → by company → by date posted → by location
-- [ ] Current sort mode shown in the table header or status bar
-- [ ] Persists within the session (resets on restart)
+- [x] `s` cycles through sort modes: by grade (default) → by company → by date posted → by location
+- [x] Current sort mode shown in the table header or status bar
+- [x] Persists within the session (resets on restart)
 
 ### 3.4 Copy URL to clipboard
-- [ ] `y` copies the selected job's URL to the system clipboard
-- [ ] Toast notification: "URL copied to clipboard"
-- [ ] Uses `pbcopy` on macOS (the platform we're on)
+- [x] `y` copies the selected job's URL to the system clipboard
+- [x] Toast notification: "URL copied to clipboard"
+- [x] Uses `pbcopy` on macOS (the platform we're on)
 
 ### 3.5 Description indicator in job list
-- [ ] Add a small indicator in the job table showing whether `raw_description` exists
-- [ ] `·` (dim) = no description, `✓` (green) = has description
-- [ ] Helps identify which jobs were graded blind
+- [x] Add a small indicator in the job table showing whether `raw_description` exists
+- [x] `·` (dim) = no description, `✓` (green) = has description
+- [x] Helps identify which jobs were graded blind
 
 ### 3.6 Focused mode count
-- [ ] When focused mode is active, the Jobs tab shows: `Jobs (289/712) [FOCUSED]`
-- [ ] So you always know how many are hidden
+- [x] When focused mode is active, the Jobs tab shows: `Jobs (289/712) [FOCUSED]`
+- [x] So you always know how many are hidden
 
 ### 3.7 Inline grade override
-- [ ] `g` opens a grade picker popup: `SS S A B C F`
-- [ ] Select a grade and it updates the job's grade in the DB immediately
-- [ ] Toast notification: "Grade changed to S"
-- [ ] Useful for correcting AI grading errors without a full re-grading session
+- [x] `g` opens a grade picker popup: `SS S A B C F`
+- [x] Select a grade and it updates the job's grade in the DB immediately
+- [x] Toast notification: "Grade changed to S"
+- [x] Useful for correcting AI grading errors without a full re-grading session
 
 ---
 
 ## Phase 4: New features — major
 
 ### 4.1 Kanban view (4th tab)
-- [ ] New tab: `[4] Pipeline`
-- [ ] Three columns: **Watching** → **Applied** → **Interview**
-- [ ] Each column shows jobs as cards: `SS SWE New Grad Infra — Palantir`
-- [ ] Cards coloured by grade
-- [ ] `h`/`l` moves between columns, `j`/`k` moves within a column
-- [ ] `w`/`a` moves a card between columns (same keys as current decision marking)
-- [ ] Mouse: click to select, drag would be ideal but complex — start with click + keyboard move
-- [ ] The pipeline view makes the entire application process visible at a glance
+- [x] New tab: `[4] Pipeline`
+- [x] Three columns: **Watching** → **Applied** → **Interview**
+- [x] Each column shows jobs as cards: `SS SWE New Grad Infra — Palantir`
+- [x] Cards coloured by grade
+- [x] `h`/`l` moves between columns, `j`/`k` moves within a column
+- [x] `w`/`a` moves a card between columns (same keys as current decision marking)
+- [x] Mouse: click to select, drag would be ideal but complex — start with click + keyboard move
+- [x] The pipeline view makes the entire application process visible at a glance
 
 ### 4.2 Session summary (pre-generated)
-- [ ] A natural-language summary stored in a file (`state/tui-summary.md`) that the TUI reads at startup
-- [ ] Displayed at the top of the dashboard in a highlighted block
-- [ ] Content like: "17 roles to apply to. Strongest: Palantir New Grad Infra, Jane Street Linux. 6 bespoke companies unsearched. Last search: 2 hours ago."
-- [ ] Updated by Claude at the end of each session (before TUI launch) — no API key needed since Claude writes the file during the conversation
-- [ ] The skill/CLAUDE.md should instruct: "Before the user launches the TUI, write a fresh summary to `state/tui-summary.md`"
+- [x] A natural-language summary stored in a file (`state/tui-summary.md`) that the TUI reads at startup
+- [x] Displayed at the top of the dashboard in a highlighted block
+- [x] Content like: "17 roles to apply to. Strongest: Palantir New Grad Infra, Jane Street Linux. 6 bespoke companies unsearched. Last search: 2 hours ago."
+- [x] Updated by Claude at the end of each session (before TUI launch) — no API key needed since Claude writes the file during the conversation
+- [x] The skill/CLAUDE.md should instruct: "Before the user launches the TUI, write a fresh summary to `state/tui-summary.md`"
 
 ### 4.3 Application tracker enhancement
 - [ ] When marking a job as "applied", prompt for application date (default: today) and optional notes
@@ -162,19 +162,19 @@ These are bugs and usability issues that make the current TUI frustrating.
 - [ ] This requires a schema consideration — currently decisions are watching/applied/rejected. Adding interview/offer stages would need either new decision types or a separate tracking table.
 
 ### 4.4 Export from TUI
-- [ ] `e` exports the current view to markdown
-- [ ] In Jobs view (especially focused mode): exports all visible jobs grouped by grade with fit assessments
-- [ ] In Companies view: exports company list with grades and job counts
-- [ ] Saves to `exports/YYYY-MM-DD-jobs.md` or similar
-- [ ] Toast notification: "Exported 289 jobs to exports/2026-04-08-jobs.md"
+- [x] `e` exports the current view to markdown
+- [x] In Jobs view (especially focused mode): exports all visible jobs grouped by grade with fit assessments
+- [x] In Companies view: exports company list with grades and job counts
+- [x] Saves to `exports/YYYY-MM-DD-jobs.md` or similar
+- [x] Toast notification: "Exported 289 jobs to exports/2026-04-08-jobs.md"
 
 ---
 
 ## Phase 5: Code quality and architecture
 
 ### 5.1 Refactor TUI into smaller files
-- [ ] Current structure: `views/dashboard.rs` (200+ lines), `views/companies.rs` (300+ lines), `views/jobs.rs` (250+ lines)
-- [ ] Split into widget components:
+- [x] Current structure: `views/dashboard.rs` (200+ lines), `views/companies.rs` (300+ lines), `views/jobs.rs` (250+ lines)
+- [x] Split into widget components:
   ```
   src/tui/
   ├── widgets/
@@ -187,21 +187,21 @@ These are bugs and usability issues that make the current TUI frustrating.
   │   ├── grade_picker.rs      # Grade override popup
   │   └── kanban.rs            # Kanban column layout
   ```
-- [ ] Each widget is a standalone rendering function that takes data + theme + area
-- [ ] Views become composition of widgets, not monolithic rendering functions
+- [x] Each widget is a standalone rendering function that takes data + theme + area
+- [x] Views become composition of widgets, not monolithic rendering functions
 
 ### 5.2 Dynamic layout system
-- [ ] Create a layout helper that calculates block sizes based on content
-- [ ] Input: list of (content_lines, min_height, grow_priority) tuples
-- [ ] Output: `Vec<Constraint>` that distributes space proportionally
-- [ ] This replaces all the hardcoded `Constraint::Min(12)` and `Constraint::Length(3)` values
-- [ ] Blocks with more content get more space; blocks with less shrink to fit
+- [x] Create a layout helper that calculates block sizes based on content
+- [x] Input: list of (content_lines, min_height, grow_priority) tuples
+- [x] Output: `Vec<Constraint>` that distributes space proportionally
+- [x] This replaces all the hardcoded `Constraint::Min(12)` and `Constraint::Length(3)` values
+- [x] Blocks with more content get more space; blocks with less shrink to fit
 
 ### 5.3 Responsive terminal size handling
-- [ ] Detect terminal dimensions on each frame
-- [ ] Below 100 columns: switch to single-column layout (list above detail, not side-by-side)
-- [ ] Below 80 columns: compact mode with abbreviated labels and no detail panel
-- [ ] Above 160 columns: wider bars, more columns in the kanban view
+- [x] Detect terminal dimensions on each frame
+- [x] Below 100 columns: switch to single-column layout (list above detail, not side-by-side)
+- [x] Below 80 columns: compact mode with abbreviated labels and no detail panel
+- [x] Above 160 columns: wider bars, more columns in the kanban view
 
 ---
 
@@ -250,13 +250,13 @@ Phase 5: Code quality (enables maintainability)
 
 ## Completion criteria
 
-- [ ] Zero empty space on any page at any terminal size — every pixel shows useful information
-- [ ] Mouse scroll feels like scrolling a webpage, not teleporting through a list
-- [ ] Click works on everything clickable — rows, tabs, buttons
-- [ ] All bars and charts are dynamically sized to fill their container
-- [ ] Job descriptions are fully readable in the detail pane with clean formatting
-- [ ] The dashboard is an actionable command centre, not a static stats page
-- [ ] Search/filter lets you find any job or company in 2 keystrokes
-- [ ] The kanban view shows your entire application pipeline at a glance
-- [ ] The codebase is refactored into reusable widgets, not monolithic view files
-- [ ] The TUI feels as polished as lazygit or btop
+- [x] Zero empty space on any page at any terminal size — every pixel shows useful information
+- [x] Mouse scroll feels like scrolling a webpage, not teleporting through a list
+- [x] Click works on everything clickable — rows, tabs, buttons
+- [x] All bars and charts are dynamically sized to fill their container
+- [x] Job descriptions are fully readable in the detail pane with clean formatting
+- [x] The dashboard is an actionable command centre, not a static stats page
+- [x] Search/filter lets you find any job or company in 2 keystrokes
+- [x] The kanban view shows your entire application pipeline at a glance
+- [x] The codebase is refactored into reusable widgets, not monolithic view files
+- [x] The TUI feels as polished as lazygit or btop

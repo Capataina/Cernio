@@ -156,9 +156,9 @@ Each capability is independently completable. A working universe and resolver al
 - [x] Milestone 3: Universe Construction (skill designed, first discovery run: 73 companies)
 - [x] Milestone 4: Portal Resolution (script-based multi-provider resolver + AI fallback skill)
 - [x] Milestone 5: Parameterised Search Scripts (5 ATS fetchers, full pipeline CLI: resolve, search, clean, check)
-- [ ] Milestone 6: Data Store and Real-Time TUI (SQLite schema with 11 tests, 2 migrations, TUI v1 with cleanup — needs TUI v2 filtering/sorting)
-- [ ] Milestone 7: Job Evaluation Pipeline (grade-companies and grade-jobs skills designed with extensive rubrics — needs first real grading runs)
-- [ ] Milestone 8: Curation, Export, and Bespoke Tier
+- [x] Milestone 6: Data Store and Real-Time TUI (SQLite schema with 11 tests, 3 migrations, TUI v4 with 4 views, mouse support, search/filter, export, pipeline kanban)
+- [x] Milestone 7: Job Evaluation Pipeline (grade-companies and grade-jobs skills with extensive rubrics, parallel grading proven at scale — 14 SS, 53 S from 684 jobs)
+- [ ] Milestone 8: Curation, Export, and Bespoke Tier (TUI export implemented, bespoke tier manual search in progress)
 
 Milestones 1 through 8 constitute the core project. Each is independently shippable and adds value without depending on the next being polished.
 

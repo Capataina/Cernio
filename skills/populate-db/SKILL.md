@@ -4,6 +4,19 @@ Takes companies from the discovery stage, validates them, and uses the Rust pipe
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before populating any companies, you MUST read these files in full:**
+
+1. **Every file in `profile/`** — all files, no exceptions. You need the user's background, skills, and career targets to assess whether a company is worth tracking.
+2. **`skills/resolve-portals/references/ats-providers.md`** — the complete ATS provider reference. Even though the mechanical resolver handles most resolution, you need to understand ATS URL patterns for the AI fallback phase and to verify results correctly. This file is in a different skill's directory — read it from `skills/resolve-portals/references/ats-providers.md`.
+
+**When delegating to subagents:** embed the full ATS provider reference in each agent's prompt.
+
+**Do not begin processing any companies until all mandatory reads are complete.**
+
+---
+
 ## Why this skill exists
 
 Discovery produces a list of promising companies, but a company name and website alone cannot be scraped for jobs. To actually search for open roles, we need to know: does this company use Greenhouse, Ashby, Lever, Workable, or something else? What is the specific slug or URL to query? Population bridges the gap between "we know this company exists" and "we can programmatically find their open roles."

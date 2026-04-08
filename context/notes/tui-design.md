@@ -28,7 +28,7 @@ Terminal pie charts (braille circles) look like blobs. Rectangular cells distort
 - **Compact mode** (<100 columns): single-column layout, list above detail
 - **Minimal mode** (<80 columns): abbreviated labels, no detail panel
 
-Future enhancement — currently only full mode exists.
+Implemented in TUI v4. Three modes active based on terminal width: full (120+), stacked (<100), compact (<80). The `widgets/layout.rs` module provides a `distribute()` function for dynamic block sizing.
 
 ---
 

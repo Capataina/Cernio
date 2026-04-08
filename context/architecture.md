@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-08 (session 3, continued). Pipeline fully operational — 6 ATS fetchers (Workday added), 5 pipeline scripts (resolve, search, clean, check, import), 3 new AI skills (grade-companies, grade-jobs, resolve-portals redesigned), 1 new AI skill (check-integrity). 22 Rust source files, 11 tests, 8 skills. MIGRATION_002 adds archived status, MIGRATION_003 adds job archival. 684 jobs in DB (14 SS, 53 S), 79 companies (59 resolved).
+> Last updated: 2026-04-08 (session 3, final). TUI v4 implemented — 4 views (dashboard, companies, jobs, pipeline/kanban), mouse support, multi-select, search/filter, sort, grade override, export, responsive layout, widget refactor. Skill quality overhaul — all 8 skills have mandatory-read blocks, check-integrity has 3 reference files. 14 source files in `src/tui/` (views/ + widgets/). 6 ATS fetchers, 5 pipeline scripts, 8 skills. 684 jobs in DB (14 SS, 53 S), 79 companies (59 resolved).
 
 ---
 
@@ -60,8 +60,8 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 | HTTP | Reqwest | In use — ATS API calls across 6 providers (incl. Workday) |
 | Serialisation | Serde | In use — JSON (ATS responses), TOML (config) |
 | Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed config structs |
-| TUI | Ratatui 0.29 + Crossterm backend | v1 implemented — 3 views, ANSI theme, D key cleanup |
-| AI layer | Claude Code skills (conversational invocation) | 8 skills (3 original + grade-companies, grade-jobs, resolve-portals redesigned, search-jobs legacy, check-integrity) |
+| TUI | Ratatui 0.29 + Crossterm backend | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), multi-select, search/filter, sort, export, mouse support, responsive layout, widget refactor |
+| AI layer | Claude Code skills (conversational invocation) | 8 skills with mandatory-read blocks enforced on all skills. check-integrity has 3 reference files (remediation-guide, quality-standards, profile-context) |
 
 ---
 
@@ -93,16 +93,23 @@ cernio/
 │   │   ├── check.rs            # cernio check — integrity report
 │   │   └── import.rs           # cernio import — bulk import from external sources
 │   └── tui/
-│       ├── mod.rs              # Terminal setup, event loop
-│       ├── app.rs              # App state, data models, navigation
-│       ├── handler.rs          # Key event dispatch (includes D for cleanup)
+│       ├── mod.rs              # Terminal setup/teardown, event loop
+│       ├── app.rs              # App state, View/Focus enums, data models, navigation, multi-select, search, sort
+│       ├── handler.rs          # Key event dispatch — global + view/focus-specific + mouse handling
 │       ├── theme.rs            # Semantic ANSI colour palette
-│       ├── queries.rs          # DB read queries (excludes archived)
-│       └── views/
-│           ├── mod.rs          # Draw dispatcher, tabs, status bar, help
-│           ├── dashboard.rs    # Stats overview
-│           ├── companies.rs    # Company table + detail panel
-│           └── jobs.rs         # Job table + detail panel
+│       ├── queries.rs          # DB read queries (companies, jobs, stats, top matches, pipeline)
+│       ├── views/
+│       │   ├── mod.rs          # Draw dispatcher, tabs, status bar, help overlay, search bar, grade picker, toast
+│       │   ├── dashboard.rs    # Stats overview — dynamic sizing, session summary, scrollable top roles
+│       │   ├── companies.rs    # Company table + detail with full job list, grade bars, sort
+│       │   ├── jobs.rs         # Job table + detail with full descriptions, description indicator
+│       │   └── pipeline.rs     # Kanban/pipeline view — 3 columns (Watching/Applied/Interview), card rendering
+│       └── widgets/
+│           ├── mod.rs
+│           ├── grade_bar.rs    # Proportional grade bar (reused in dashboard + company detail)
+│           ├── text_utils.rs   # HTML cleanup, relative dates, truncation (shared across views)
+│           ├── toast.rs        # Toast notification rendering
+│           └── layout.rs       # Dynamic layout system with distribute() function
 ├── profile/                    # Structured personal profile (read every startup)
 │   ├── personal.md             # Name, contact, links
 │   ├── education.md            # Degrees, modules
@@ -131,7 +138,11 @@ cernio/
 │   │   ├── SKILL.md
 │   │   └── references/          # grading-rubric.md, profile-context.md, prioritisation-guide.md
 │   └── check-integrity/
-│       └── SKILL.md             # AI-driven re-evaluation and grade quality auditing
+│       ├── SKILL.md             # AI-driven re-evaluation and grade quality auditing
+│       └── references/
+│           ├── remediation-guide.md
+│           ├── quality-standards.md
+│           └── profile-context.md
 ├── state/
 │   └── cernio.db               # SQLite database (gitignored)
 ├── AgentCreationResearch/      # Skill authoring research (reference)
@@ -331,7 +342,7 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of session 3 (continued).** Pipeline fully operational end-to-end. Scripts handle all mechanical volume work (resolve, search, clean, check, import). AI skills handle all judgment work (grade-companies, grade-jobs, check-integrity). Six ATS fetchers implemented (Workday added). Parallel search and grading proven at scale.
+**End of session 3 (final).** Pipeline fully operational end-to-end. TUI v4 with 4 views, pipeline/kanban, multi-select, search, sort, export, mouse support, responsive layout. Skill quality overhaul — all 8 skills have mandatory-read blocks; CLAUDE.md updated with Skill Execution Protocol, Subagent Context Requirements, and Grade/Fit Assessment Quality Standard. Six ATS fetchers. Parallel search and grading proven at scale.
 
 | Component | Status |
 |-----------|--------|
@@ -347,18 +358,18 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | discover-companies skill | Designed with search-strategies reference, first run produced 73 companies |
 | populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
 | search-jobs skill | Legacy — job search moved to `cernio search` script |
-| check-integrity skill | New — AI-driven re-evaluation and grade quality auditing skill |
+| check-integrity skill | New — AI-driven re-evaluation and grade quality auditing, 3 reference files (remediation-guide, quality-standards, profile-context) |
 | resolve-portals skill | Redesigned — AI fallback only for companies that fail script resolution |
 | grade-companies skill | New — extensive SKILL.md, grading rubric with worked examples, profile context reference |
 | grade-jobs skill | New — extensive SKILL.md, grading rubric, profile context, prioritisation guide |
 | Company universe | 79 companies in DB (59 resolved), pipeline proven at scale |
 | Jobs | 684 jobs in DB (14 SS, 53 S), full pipeline run complete with parallel search and grading |
-| TUI (`src/tui/`) | v1 implemented — dashboard, companies, jobs views with detail panels, user decisions, help overlay, auto-refresh, D key for cleanup. Excludes archived companies. See `context/systems/tui.md` |
-| Export | Not started |
+| TUI (`src/tui/`, 14 files) | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), mouse support, multi-select, search/filter, sort, grade override, export, responsive layout, widget refactor. See `context/systems/tui.md` |
+| Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
 
 **Next priorities:**
-1. Continue grading remaining ungraded jobs (pipeline proven, scale up)
-2. Expand company universe — further discovery rounds
-3. TUI v2 — activity/progress view, filtering, sorting (see `context/systems/tui.md` deferred section)
-4. Export functionality
+1. Grade remaining ungraded companies (imported but not yet graded)
+2. Run job search on newly graded companies
+3. Grade pending jobs with improved quality standards
+4. Further discovery rounds to expand universe
 5. Portfolio gap analysis from grading patterns

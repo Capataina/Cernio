@@ -4,6 +4,18 @@ AI fallback for ATS resolution — finds the job board portal for companies that
 
 ---
 
+## Mandatory reads — do not proceed without completing these
+
+**STOP. Before resolving any company's ATS portal, you MUST read these files in full:**
+
+1. **`references/ats-providers.md`** — the complete reference for all ATS providers: supported providers with API details, unsupported providers to recognise, slug patterns, and verification methods. This file contains critical information like SmartRecruiters false positives that will cause incorrect results if not read.
+
+**When delegating resolution to subagents:** embed the FULL TEXT of `references/ats-providers.md` in each agent's prompt. Without it, agents will not know the correct API endpoints, verification methods, or provider-specific gotchas.
+
+**Do not begin resolving any company until the mandatory read is complete.**
+
+---
+
 ## Why this skill exists
 
 The pipeline has a mechanical first pass: `cernio resolve` probes predictable slug patterns against every supported ATS provider. It resolves the easy cases — companies whose slugs match their name or obvious variations. But many companies have non-obvious slugs (XTX Markets uses `xtxmarketstechnologies` — their legal entity name), use unsupported ATS providers, or have custom-built career portals. These are the companies that reach this skill.

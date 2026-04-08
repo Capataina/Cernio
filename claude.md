@@ -212,6 +212,59 @@ When recommending a skill run, name the skill, give a concrete reason, and wait 
 
 ---
 
+## Skill Execution Protocol
+
+Before executing ANY skill, you MUST complete the following reads in order. This is non-negotiable — do not skip, defer, or abbreviate any step.
+
+1. **Read the skill definition.** Read `skills/{skill-name}/SKILL.md` in full. Understand the skill's purpose, workflow steps, and expected outputs before doing anything else.
+
+2. **Read EVERY reference file.** If `skills/{skill-name}/references/` exists, read every `.md` file in that directory. Every file, no exceptions, no skimming. These references contain critical context — grading rubrics, search strategies, ATS provider details, profile evaluation frameworks, relevance criteria — that fundamentally change the quality of output. A skill executed without its references produces shallow, generic results that waste the user's time.
+
+3. **Read ALL files in `profile/`.** Every file, every time. The profile is the lens through which all evaluation, grading, and fit assessment happens. Without it loaded, every judgment is ungrounded.
+
+4. **Only then begin execution.** Only after steps 1–3 are complete may you begin the skill's workflow — parallelising tasks, spawning agents, writing SQL, making judgments, or producing any output.
+
+**The order matters.** References inform how to do the work. Profile data informs who the work is for. Reading them after you have already started producing output means the output was produced blind and must be discarded. Read first, execute second, always.
+
+Skills are located at `skills/{skill-name}/SKILL.md` with optional `skills/{skill-name}/references/*.md` files. If a skill directory does not contain a `references/` folder, steps 1 and 3 still apply.
+
+---
+
+## Subagent Context Requirements
+
+When delegating skill work to subagents, you are the only bridge between the skill's reference material and the agent's execution environment. Subagents spawned via the Agent tool do NOT have access to the `skills/` directory — they only know what you embed in their prompt. If you do not embed the reference content, the agent works blind and produces useless output.
+
+### What to embed in every subagent prompt
+
+Err on the side of providing too much context. Include:
+
+- **The full content of every reference file** the skill has. Not summaries, not excerpts — the complete text. Grading rubrics must be reproduced verbatim so the agent applies the correct weights and dimensions.
+- **The relevant profile data** — all files from `profile/`, reproduced in full. The agent cannot read these files itself.
+- **The complete instructions from SKILL.md** for the agent's specific task. Do not paraphrase the workflow — give the agent the exact steps it must follow.
+- **Any database state the agent needs** — query results, existing entries for deduplication, current grades for comparison. The agent cannot query the database itself unless you explicitly instruct it to.
+- **Explicit examples of what good output looks like** — a well-graded company entry, a properly reasoned job evaluation, a complete enrichment record. Concrete examples anchor quality far more than abstract instructions.
+
+### Why this matters
+
+Never assume an agent "knows" something. An agent that does not receive the grading rubric will invent its own criteria and produce shallow, inconsistent grades. An agent that does not receive the search strategies reference will produce generic company lists indistinguishable from a Google search. An agent that does not receive the profile will evaluate fit against nothing and produce vacuous assessments.
+
+The cost of over-sharing context is slightly longer prompts. The cost of under-sharing is useless output that wastes an entire agent run. **Always over-share.**
+
+---
+
+## Grade and Fit Assessment Quality Standard
+
+All grade reasoning (company grades, job grades) and fit assessments must reference specific elements from the user's profile by name — projects, technologies, skills, visa details, degree, experience level. Generic reasoning like "good company, decent tech" or "seems like a reasonable fit" is unacceptable.
+
+The reasoning must explain **why** with specific evidence, not just assert a conclusion. Examples:
+
+- **Unacceptable:** "Good tech stack, likely a decent fit. Grade: B."
+- **Acceptable:** "Stack aligns strongly — they use Rust (Caner's primary language) and PostgreSQL (used in Cernio and Nyquestro). The junior-to-mid seniority band matches 1 year of professional experience plus significant project depth. However, the role requires AWS certification which Caner does not hold, and the team is fully on-site in Edinburgh which conflicts with London preference. Grade: B-."
+
+This standard applies everywhere grades or fit assessments appear: company grading, job evaluation, enrichment, integrity checks, and any conversational assessment. If you cannot cite specific profile elements to support a judgment, you have not read the profile carefully enough — go back and read it again.
+
+---
+
 ## Engineering Standards
 
 Write code to a professional standard.
