@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use ratatui::widgets::TableState;
@@ -11,6 +12,14 @@ pub enum View {
     Dashboard,
     Companies,
     Jobs,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortMode {
+    ByGrade,
+    ByCompany,
+    ByDate,
+    ByLocation,
 }
 
 impl View {
@@ -125,6 +134,20 @@ pub struct App {
     pub stats: DashboardStats,
 
     pub db_path: PathBuf,
+
+    // ── TUI v2 additions ─────────────────────────────────────────
+    #[allow(dead_code)]
+    pub dashboard_scroll: u16,
+    #[allow(dead_code)]
+    pub search_mode: bool,
+    #[allow(dead_code)]
+    pub search_query: String,
+    #[allow(dead_code)]
+    pub sort_mode: SortMode,
+    #[allow(dead_code)]
+    pub show_grade_picker: bool,
+    #[allow(dead_code)]
+    pub total_jobs_unfiltered: i64,
 }
 
 impl App {
@@ -132,8 +155,9 @@ impl App {
         let conn = Connection::open(db_path)?;
 
         let companies = queries::fetch_companies(&conn);
-        let jobs = queries::fetch_jobs(&conn, None, false);
+        let jobs = queries::fetch_jobs(&conn, None, false, SortMode::ByGrade);
         let stats = queries::fetch_stats(&conn);
+        let total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
 
         let mut company_state = TableState::default();
         if !companies.is_empty() {
@@ -163,6 +187,12 @@ impl App {
             job_filter_company_name: None,
             stats,
             db_path: db_path.to_path_buf(),
+            dashboard_scroll: 0,
+            search_mode: false,
+            search_query: String::new(),
+            sort_mode: SortMode::ByGrade,
+            show_grade_picker: false,
+            total_jobs_unfiltered,
         })
     }
 
@@ -172,8 +202,26 @@ impl App {
         };
 
         self.companies = queries::fetch_companies(&conn);
-        self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode);
+        self.jobs = queries::fetch_jobs(
+            &conn,
+            self.job_filter_company,
+            self.focused_mode,
+            self.sort_mode,
+        );
         self.stats = queries::fetch_stats(&conn);
+        self.total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
+
+        // Re-apply search filter if active.
+        if self.search_mode || !self.search_query.is_empty() {
+            let query = self.search_query.to_lowercase();
+            self.jobs.retain(|j| {
+                j.title.to_lowercase().contains(&query)
+                    || j.company_name.to_lowercase().contains(&query)
+                    || j.location
+                        .as_deref()
+                        .map_or(false, |l| l.to_lowercase().contains(&query))
+            });
+        }
 
         // Clamp selections so they don't point past the end.
         clamp_selection(&mut self.company_state, self.companies.len());
@@ -272,7 +320,7 @@ impl App {
         self.detail_scroll = 0;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode);
+            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -287,7 +335,7 @@ impl App {
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode);
+            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -358,6 +406,82 @@ impl App {
     pub fn spinner_char(&self) -> char {
         const CHARS: [char; 4] = ['◐', '◑', '◒', '◓'];
         CHARS[(self.frame_count / 5) as usize % 4]
+    }
+
+    // ── Clipboard ───────────────────────────────────────────────
+
+    #[allow(dead_code)]
+    pub fn copy_url_to_clipboard(&self) {
+        let url = match self.view {
+            View::Jobs => self.selected_job().map(|j| j.url.as_str()),
+            View::Companies => self.selected_company().and_then(|c| {
+                c.careers_url.as_deref().or(Some(c.website.as_str()))
+            }),
+            View::Dashboard => None,
+        };
+        if let Some(url) = url {
+            if let Ok(mut child) = std::process::Command::new("pbcopy")
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(ref mut stdin) = child.stdin {
+                    let _ = stdin.write_all(url.as_bytes());
+                }
+                let _ = child.wait();
+            }
+        }
+    }
+
+    // ── Grade override ──────────────────────────────────────────
+
+    #[allow(dead_code)]
+    pub fn override_grade(&mut self, grade: &str) {
+        let Some(job) = self.selected_job() else {
+            return;
+        };
+        let job_id = job.id;
+
+        if let Ok(conn) = Connection::open(&self.db_path) {
+            let _ = conn.execute(
+                "UPDATE jobs SET grade = ?1 WHERE id = ?2",
+                rusqlite::params![grade, job_id],
+            );
+        }
+        self.add_toast(format!("Grade → {grade}"));
+        self.show_grade_picker = false;
+        self.refresh();
+    }
+
+    // ── Sort cycling ────────────────────────────────────────────
+
+    #[allow(dead_code)]
+    pub fn toggle_sort(&mut self) {
+        self.sort_mode = match self.sort_mode {
+            SortMode::ByGrade => SortMode::ByCompany,
+            SortMode::ByCompany => SortMode::ByDate,
+            SortMode::ByDate => SortMode::ByLocation,
+            SortMode::ByLocation => SortMode::ByGrade,
+        };
+        let label = match self.sort_mode {
+            SortMode::ByGrade => "grade",
+            SortMode::ByCompany => "company",
+            SortMode::ByDate => "date",
+            SortMode::ByLocation => "location",
+        };
+        self.add_toast(format!("Sort: {label}"));
+        self.refresh();
+    }
+
+    // ── Viewport scrolling (independent of selection) ───────────
+
+    #[allow(dead_code)]
+    pub fn scroll_viewport_down(&mut self, amount: u16) {
+        self.dashboard_scroll = self.dashboard_scroll.saturating_add(amount);
+    }
+
+    #[allow(dead_code)]
+    pub fn scroll_viewport_up(&mut self, amount: u16) {
+        self.dashboard_scroll = self.dashboard_scroll.saturating_sub(amount);
     }
 
     // ── Database cleanup ─────────────────────────────────────────

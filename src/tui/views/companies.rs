@@ -129,13 +129,18 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             .title(" Detail ")
             .title_style(t.title)
             .border_style(Style::default().fg(t.border));
-        frame.render_widget(Paragraph::new("  Select a company").style(t.dim).block(block), area);
+        frame.render_widget(
+            Paragraph::new("  Select a company")
+                .style(t.dim)
+                .block(block),
+            area,
+        );
         return;
     };
 
     let mut lines = Vec::new();
 
-    // Company name and website
+    // Company name and website.
     lines.push(Line::from(Span::styled(
         format!("  {}", c.name),
         Style::default().add_modifier(Modifier::BOLD),
@@ -146,13 +151,13 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     )));
     lines.push(Line::from(""));
 
-    // Description
+    // Description.
     for text_line in c.what_they_do.lines() {
         lines.push(Line::from(format!("  {text_line}")));
     }
     lines.push(Line::from(""));
 
-    // Details section
+    // Details section.
     lines.push(Line::from(Span::styled("  ── Details ──", t.header)));
     lines.push(Line::from(""));
 
@@ -161,7 +166,11 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     lines.push(detail_row(t, "Grade", Span::styled(grade, grade_style)));
 
     let status_style = t.status_style(&c.status);
-    lines.push(detail_row(t, "Status", Span::styled(&c.status, status_style)));
+    lines.push(detail_row(
+        t,
+        "Status",
+        Span::styled(&c.status, status_style),
+    ));
 
     if let (Some(provider), Some(slug)) = (&c.ats_provider, &c.ats_slug) {
         lines.push(detail_row(
@@ -185,7 +194,7 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(detail_row(t, "Careers", Span::styled(url, t.dim)));
     }
 
-    // Relevance section
+    // Relevance section.
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled("  ── Relevance ──", t.header)));
     lines.push(Line::from(""));
@@ -193,7 +202,7 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(format!("  {text_line}")));
     }
 
-    // Grade reasoning
+    // Grade reasoning.
     if let Some(reasoning) = &c.grade_reasoning {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -206,44 +215,59 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    // Job summary with grade distribution and top roles
+    // Job section with grade distribution and full job list.
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         format!("  ── Jobs ({}) ──", c.job_count),
         t.header,
     )));
     lines.push(Line::from(""));
+
     if c.job_count > 0 {
         if let Ok(conn) = Connection::open(&app.db_path) {
+            // Grade distribution bars — dynamic width.
             let grade_dist = fetch_company_grade_distribution(&conn, c.id);
-            let top_roles = fetch_company_top_roles(&conn, c.id);
+            let max_count = grade_dist
+                .iter()
+                .map(|(_, n)| *n)
+                .max()
+                .unwrap_or(1)
+                .max(1);
 
-            // Render grade distribution bars
-            let max_count = grade_dist.iter().map(|(_, n)| *n).max().unwrap_or(1).max(1);
-            let bar_width: usize = 20;
+            // Calculate bar width dynamically from the detail panel width.
+            // Inner width minus: 2 border + 2 pad + 3 grade + 1 space + 4 count = 12
+            let bar_width = area.width.saturating_sub(14);
 
-            for (grade, count) in &grade_dist {
-                let filled = (*count as usize * bar_width) / max_count as usize;
+            for (g, count) in &grade_dist {
+                let filled = if *count > 0 {
+                    ((*count as f64 / max_count as f64) * bar_width as f64)
+                        .ceil() as usize
+                } else {
+                    0
+                };
                 let filled = filled.max(if *count > 0 { 1 } else { 0 });
-                let empty = bar_width - filled;
-                let bar: String =
-                    "█".repeat(filled) + &"░".repeat(empty);
-                let grade_style = t.grade_style(Some(grade.as_str()));
+                let pad = (bar_width as usize).saturating_sub(filled);
+                let bar: String = "█".repeat(filled);
+                let gs = t.grade_style(Some(g.as_str()));
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {grade:<2} "), grade_style),
-                    Span::raw(format!("{bar} {count:>3}")),
+                    Span::styled(format!("  {g:<2} "), gs),
+                    Span::styled(bar, gs),
+                    Span::raw(" ".repeat(pad)),
+                    Span::styled(format!("{count:>3}"), t.stat_value),
                 ]));
             }
 
-            // Top roles section
-            if !top_roles.is_empty() {
+            // Full job list — ALL jobs sorted by grade, scrollable.
+            let all_jobs = fetch_company_all_jobs(&conn, c.id);
+            if !all_jobs.is_empty() {
                 lines.push(Line::from(""));
-                lines.push(Line::from(Span::styled("  ── Top Roles ──", t.header)));
+                lines.push(Line::from(Span::styled("  ── All Roles ──", t.header)));
                 lines.push(Line::from(""));
-                for (grade, title) in &top_roles {
-                    let grade_style = t.grade_style(Some(grade.as_str()));
+                for (g, title) in &all_jobs {
+                    let gs = t.grade_style(Some(g.as_str()));
                     lines.push(Line::from(vec![
-                        Span::styled(format!("  {grade:<3} "), grade_style),
+                        Span::raw("  "),
+                        Span::styled(format!("{g:<3}"), gs),
                         Span::raw(title.clone()),
                     ]));
                 }
@@ -282,8 +306,7 @@ fn detail_row<'a>(
 }
 
 /// Returns grade distribution for a company's jobs as (grade, count) pairs.
-/// Always returns all grades in SS/S/A/B/F order, even if count is zero.
-/// Excludes archived jobs.
+/// Only includes grades with count > 0. Excludes archived jobs.
 fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(String, i64)> {
     let sql = "
         SELECT COALESCE(grade, '—'), COUNT(*)
@@ -293,7 +316,8 @@ fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(
         GROUP BY grade
         ORDER BY CASE grade
             WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
-            WHEN 'B' THEN 4 WHEN 'F' THEN 5 ELSE 6
+            WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
+            ELSE 7
         END";
 
     let raw: Vec<(String, i64)> = conn
@@ -304,8 +328,7 @@ fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(
         })
         .unwrap_or_default();
 
-    // Build ordered result with all grade buckets
-    let grades = ["SS", "S", "A", "B", "F"];
+    let grades = ["SS", "S", "A", "B", "C", "F"];
     let mut result: Vec<(String, i64)> = grades
         .iter()
         .filter_map(|g| {
@@ -322,7 +345,7 @@ fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(
         })
         .collect();
 
-    // Include ungraded jobs if any
+    // Include ungraded jobs if any.
     if let Some((_, n)) = raw.iter().find(|(k, _)| k == "—") {
         if *n > 0 {
             result.push(("—".to_string(), *n));
@@ -332,19 +355,21 @@ fn fetch_company_grade_distribution(conn: &Connection, company_id: i64) -> Vec<(
     result
 }
 
-/// Returns the top 5 best-graded jobs at a company as (grade, title) pairs.
+/// Returns ALL jobs for a company sorted by grade, as (grade, title) pairs.
 /// Excludes archived jobs.
-fn fetch_company_top_roles(conn: &Connection, company_id: i64) -> Vec<(String, String)> {
+fn fetch_company_all_jobs(conn: &Connection, company_id: i64) -> Vec<(String, String)> {
     let sql = "
-        SELECT grade, title
+        SELECT COALESCE(grade, '—'), title
         FROM jobs
         WHERE company_id = ?1
-        AND grade IN ('SS', 'S', 'A')
         AND evaluation_status != 'archived'
         ORDER BY
-            CASE grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3 END,
-            title
-        LIMIT 5";
+            CASE grade
+                WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+                WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
+                ELSE 7
+            END,
+            title";
 
     conn.prepare(sql)
         .and_then(|mut stmt| {

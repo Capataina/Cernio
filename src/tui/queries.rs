@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-use super::app::{CompanyRow, DashboardStats, JobRow, TopMatch};
+use super::app::{CompanyRow, DashboardStats, JobRow, SortMode, TopMatch};
 
 pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
     let sql = "
@@ -50,7 +50,12 @@ pub fn fetch_companies(conn: &Connection) -> Vec<CompanyRow> {
     .unwrap_or_default()
 }
 
-pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>, focused: bool) -> Vec<JobRow> {
+pub fn fetch_jobs(
+    conn: &Connection,
+    company_filter: Option<i64>,
+    focused: bool,
+    sort_mode: SortMode,
+) -> Vec<JobRow> {
     let focus_filter = if focused {
         " AND (j.grade IS NULL OR j.grade NOT IN ('F', 'C'))"
     } else {
@@ -68,14 +73,22 @@ pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>, focused: bool)
         WHERE j.evaluation_status != 'archived'
         AND c.status != 'archived'{focus_filter}");
 
-    let order = "
-        ORDER BY
-            CASE j.grade
-                WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
-                WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
-                ELSE 7
-            END,
-            j.title";
+    let order = match sort_mode {
+        SortMode::ByGrade => "
+            ORDER BY
+                CASE j.grade
+                    WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+                    WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
+                    ELSE 7
+                END,
+                j.title",
+        SortMode::ByCompany => "
+            ORDER BY c.name, j.title",
+        SortMode::ByDate => "
+            ORDER BY j.posted_date DESC NULLS LAST, j.title",
+        SortMode::ByLocation => "
+            ORDER BY j.location, j.title",
+    };
 
     let map_row = |row: &rusqlite::Row| -> rusqlite::Result<JobRow> {
         Ok(JobRow {
@@ -113,6 +126,18 @@ pub fn fetch_jobs(conn: &Connection, company_filter: Option<i64>, focused: bool)
             })
             .unwrap_or_default()
     }
+}
+
+#[allow(dead_code)]
+pub fn fetch_total_job_count(conn: &Connection) -> i64 {
+    conn.query_row(
+        "SELECT COUNT(*) FROM jobs
+         WHERE evaluation_status != 'archived'
+         AND company_id IN (SELECT id FROM companies WHERE status != 'archived')",
+        [],
+        |r| r.get(0),
+    )
+    .unwrap_or(0)
 }
 
 pub fn fetch_stats(conn: &Connection) -> DashboardStats {
@@ -274,12 +299,11 @@ fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {
         "SELECT j.title, c.name, j.grade, COALESCE(j.location, c.location)
          FROM jobs j
          JOIN companies c ON c.id = j.company_id
-         WHERE j.grade IN ('SS', 'S')
+         WHERE j.grade IN ('SS', 'S', 'A')
          AND j.evaluation_status != 'archived'
          ORDER BY
-             CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 END,
-             j.title
-         LIMIT 10",
+             CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3 END,
+             j.title",
     )
     .and_then(|mut stmt| {
         stmt.query_map([], |row| {

@@ -3,6 +3,7 @@ mod handler;
 mod queries;
 mod theme;
 mod views;
+mod widgets;
 
 pub use app::App;
 

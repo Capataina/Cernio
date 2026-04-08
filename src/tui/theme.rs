@@ -125,6 +125,7 @@ impl Theme {
         }
     }
 
+    #[allow(dead_code)]
     pub fn eval_style(&self, status: &str) -> Style {
         match status {
             "pending" => self.eval_pending,

@@ -3,78 +3,174 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Wrap};
 use ratatui::Frame;
+use rusqlite::Connection;
 
 use crate::tui::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let rows = Layout::vertical([
-        Constraint::Length(3), // at-a-glance summary
+        Constraint::Length(3), // summary line
         Constraint::Fill(1),  // stats grid
     ])
     .split(area);
 
     draw_summary_line(frame, app, rows[0]);
 
-    let cols = Layout::horizontal([Constraint::Percentage(45), Constraint::Fill(1)]).split(rows[1]);
+    // Two-column layout: left (grade dist + pipeline) and right (action items + top roles).
+    let cols = Layout::horizontal([
+        Constraint::Ratio(2, 5),
+        Constraint::Fill(1),
+    ])
+    .split(rows[1]);
 
-    // Left column: grade distribution + pipeline health
-    let left = Layout::vertical([Constraint::Min(12), Constraint::Fill(1)]).split(cols[0]);
+    // Left column: grade distribution + pipeline health, sized to content.
+    let left = Layout::vertical([
+        Constraint::Length(left_grade_height(app)),
+        Constraint::Length(left_pipeline_height(app)),
+        Constraint::Fill(1), // absorb any remainder
+    ])
+    .split(cols[0]);
+
     draw_grade_distribution(frame, app, left[0]);
     draw_pipeline_health(frame, app, left[1]);
 
-    // Right column: action items + top roles
-    let right = Layout::vertical([Constraint::Min(12), Constraint::Fill(1)]).split(cols[1]);
+    // Right column: action items (fixed) + top roles (fills remaining).
+    let right = Layout::vertical([
+        Constraint::Length(action_items_height(app)),
+        Constraint::Fill(1),
+    ])
+    .split(cols[1]);
+
     draw_action_items(frame, app, right[0]);
     draw_top_roles(frame, app, right[1]);
 }
 
-fn draw_summary_line(frame: &mut Frame, app: &App, area: Rect) {
-    let t = &app.theme;
+/// Calculate height needed for grade distribution block.
+fn left_grade_height(app: &App) -> u16 {
+    let _s = &app.stats;
+    let company_grades = ["S", "A", "B", "C"];
+    let job_grades = ["SS", "S", "A", "B", "C", "F"];
+    let max_rows = company_grades.len().max(job_grades.len());
+    // 2 for border + 1 header line + rows
+    (max_rows as u16 + 3).min(12)
+}
+
+/// Calculate height needed for pipeline health block.
+fn left_pipeline_height(app: &App) -> u16 {
     let s = &app.stats;
+    let mut lines = s.ats_coverage.len();
+    if s.bespoke_count > 0 {
+        lines += 1;
+    }
+    if s.archived_count > 0 {
+        lines += 1;
+    }
+    if lines == 0 {
+        lines = 1; // "No ATS portals resolved yet"
+    }
+    // 2 for border
+    (lines as u16 + 2).min(10)
+}
 
-    // Count strong fits.
-    let strong: i64 = s
-        .jobs_by_grade
-        .iter()
-        .filter(|(g, _)| g == "SS" || g == "S")
-        .map(|(_, c)| c)
-        .sum();
+/// Calculate height needed for action items block.
+fn action_items_height(app: &App) -> u16 {
+    let s = &app.stats;
+    let mut lines: u16 = 3; // grade action lines (SS, S, A)
+    lines += 1; // blank
+    lines += 1; // decision counts
 
+    // Next steps.
+    let mut next_count: u16 = 0;
+    if s.bespoke_searchable > 0 {
+        next_count += 1;
+    }
+    if s.needs_description > 0 {
+        next_count += 1;
+    }
     let pending: i64 = s
         .jobs_by_eval
         .iter()
         .filter(|(e, _)| e == "pending")
         .map(|(_, c)| c)
         .sum();
+    if pending > 0 {
+        next_count += 1;
+    }
+    if next_count > 0 {
+        lines += 2 + next_count; // blank + header + items
+    }
 
-    let line = Line::from(vec![
-        Span::raw("  "),
-        Span::styled(format!("{}", s.total_companies), t.stat_value),
-        Span::raw(" companies · "),
-        Span::styled(format!("{}", s.total_jobs), t.stat_value),
-        Span::raw(" jobs · "),
-        Span::styled(format!("{strong}"), t.grade_s),
-        Span::raw(" strong matches · "),
-        Span::styled(format!("{pending}"), if pending > 0 { t.eval_evaluating } else { t.dim }),
-        Span::raw(" pending"),
-    ]);
+    // Bespoke company names.
+    let bespoke_names = fetch_bespoke_company_names(app);
+    if !bespoke_names.is_empty() {
+        lines += 1 + bespoke_names.len() as u16; // header + names
+    }
 
-    let block = Block::bordered()
-        .border_style(Style::default().fg(t.border));
+    // 2 for border
+    (lines + 2).min(20)
+}
+
+fn draw_summary_line(frame: &mut Frame, app: &App, area: Rect) {
+    let t = &app.theme;
+
+    // Try reading session summary from file.
+    let summary_content = std::fs::read_to_string("state/tui-summary.md").ok();
+
+    let line = if let Some(ref content) = summary_content {
+        // Use first non-empty line of the summary.
+        let first_line = content
+            .lines()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("No summary available");
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(first_line, t.stat_value),
+        ])
+    } else {
+        let s = &app.stats;
+        let strong: i64 = s
+            .jobs_by_grade
+            .iter()
+            .filter(|(g, _)| g == "SS" || g == "S")
+            .map(|(_, c)| c)
+            .sum();
+
+        let pending: i64 = s
+            .jobs_by_eval
+            .iter()
+            .filter(|(e, _)| e == "pending")
+            .map(|(_, c)| c)
+            .sum();
+
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(format!("{}", s.total_companies), t.stat_value),
+            Span::raw(" companies · "),
+            Span::styled(format!("{}", s.total_jobs), t.stat_value),
+            Span::raw(" jobs · "),
+            Span::styled(format!("{strong}"), t.grade_s),
+            Span::raw(" strong matches · "),
+            Span::styled(
+                format!("{pending}"),
+                if pending > 0 { t.eval_evaluating } else { t.dim },
+            ),
+            Span::raw(" pending"),
+        ])
+    };
+
+    let block = Block::bordered().border_style(Style::default().fg(t.border));
 
     frame.render_widget(Paragraph::new(line).block(block), area);
 }
 
-/// Render proportional bar using `█` characters scaled to the available width.
-/// `max_val` is the largest count in the group; bars are scaled relative to it.
-/// `max_bar_width` is the maximum number of `█` characters for the largest bar.
-fn proportional_bar(count: i64, max_val: i64, max_bar_width: usize) -> String {
+/// Render a proportional bar using `█` characters scaled to the available width.
+fn proportional_bar(count: i64, max_val: i64, max_bar_width: u16) -> String {
     if max_val == 0 || count == 0 {
         return String::new();
     }
-    let width = ((count as f64 / max_val as f64) * max_bar_width as f64)
-        .ceil() as usize;
-    let width = width.max(1); // at least one block if count > 0
+    let width =
+        ((count as f64 / max_val as f64) * max_bar_width as f64).ceil() as usize;
+    let width = width.max(1);
     "█".repeat(width)
 }
 
@@ -82,60 +178,87 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let s = &app.stats;
 
-    let mut lines = vec![
-        Line::from(vec![
-            Span::raw("  "),
-            Span::styled("Companies", t.header),
-            Span::raw("           "),
-            Span::styled("Jobs", t.header),
-        ]),
-    ];
+    // Calculate available width for bars dynamically.
+    // Layout: "  S  ████ 123  |  SS ████ 123"
+    // Each side: 2 padding + 3 grade + bar + 1 space + count_width
+    // We split the inner area (area.width - 2 borders) into two halves.
+    let inner_w = area.width.saturating_sub(2) as u16;
+    let half_w = inner_w / 2;
+    // label = "  XX " = 5 chars, count = " 999" = 4 chars, separator = 2
+    let bar_width = half_w.saturating_sub(5 + 4 + 1);
 
-    // Determine max values for proportional bars.
-    let max_company = s.companies_by_grade.iter().map(|(_, c)| *c).max().unwrap_or(1);
-    let max_job = s.jobs_by_grade.iter().map(|(_, c)| *c).max().unwrap_or(1);
+    let spacer = " ".repeat(half_w.saturating_sub(11) as usize);
+    let mut lines = vec![Line::from(vec![
+        Span::raw("  "),
+        Span::styled("Companies", t.header),
+        Span::raw(spacer),
+        Span::styled("Jobs", t.header),
+    ])];
 
-    // Build a unified grade list. Company grades are S/A/B/C; job grades are SS/S/A/B/C/F.
+    let max_company = s
+        .companies_by_grade
+        .iter()
+        .map(|(_, c)| *c)
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    let max_job = s
+        .jobs_by_grade
+        .iter()
+        .map(|(_, c)| *c)
+        .max()
+        .unwrap_or(1)
+        .max(1);
+
     let company_grades = ["S", "A", "B", "C"];
     let job_grades = ["SS", "S", "A", "B", "C", "F"];
-
-    // We want to show max(company_grades.len(), job_grades.len()) rows.
     let max_rows = company_grades.len().max(job_grades.len());
 
     for i in 0..max_rows {
         let mut spans = Vec::new();
         spans.push(Span::raw("  "));
 
-        // Company side
+        // Company side.
         if i < company_grades.len() {
             let grade = company_grades[i];
-            let count = s.companies_by_grade.iter()
+            let count = s
+                .companies_by_grade
+                .iter()
                 .find(|(g, _)| g == grade)
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let style = t.grade_style(Some(grade));
-            let bar = proportional_bar(count, max_company, 6);
-            spans.push(Span::styled(format!("{grade:<3}"), style));
-            spans.push(Span::styled(format!("{bar:<7}"), style));
-            spans.push(Span::styled(format!("{count:<4}"), t.stat_value));
+            let bar = proportional_bar(count, max_company, bar_width);
+            let bar_len = bar.chars().count();
+            let pad = bar_width.saturating_sub(bar_len as u16) as usize;
+            spans.push(Span::styled(format!("{grade:<2} "), style));
+            spans.push(Span::styled(bar, style));
+            spans.push(Span::raw(" ".repeat(pad)));
+            spans.push(Span::styled(format!("{count:>3}"), t.stat_value));
         } else {
-            spans.push(Span::raw("              "));
+            let pad = half_w.saturating_sub(2) as usize;
+            spans.push(Span::raw(" ".repeat(pad)));
         }
 
         spans.push(Span::raw("  "));
 
-        // Job side
+        // Job side.
         if i < job_grades.len() {
             let grade = job_grades[i];
-            let count = s.jobs_by_grade.iter()
+            let count = s
+                .jobs_by_grade
+                .iter()
                 .find(|(g, _)| g == grade)
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let style = t.grade_style(Some(grade));
-            let bar = proportional_bar(count, max_job, 6);
-            spans.push(Span::styled(format!("{grade:<3}"), style));
-            spans.push(Span::styled(format!("{bar:<7}"), style));
-            spans.push(Span::styled(format!("{count}"), t.stat_value));
+            let bar = proportional_bar(count, max_job, bar_width);
+            let bar_len = bar.chars().count();
+            let pad = bar_width.saturating_sub(bar_len as u16) as usize;
+            spans.push(Span::styled(format!("{grade:<2} "), style));
+            spans.push(Span::styled(bar, style));
+            spans.push(Span::raw(" ".repeat(pad)));
+            spans.push(Span::styled(format!("{count:>3}"), t.stat_value));
         }
 
         lines.push(Line::from(spans));
@@ -146,17 +269,30 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 
-    frame.render_widget(Paragraph::new(lines).block(block).wrap(Wrap { trim: false }), area);
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let s = &app.stats;
 
-    let mut lines = Vec::new();
+    let inner_w = area.width.saturating_sub(2);
+    // "  provider     ████ 123 (45%)"
+    // 2 pad + 14 name + bar + 1 + 3 count + 6 pct = ~26 fixed
+    let bar_width = inner_w.saturating_sub(26);
 
-    // Total active (non-archived, non-bespoke) companies with portals.
+    let mut lines = Vec::new();
     let total_with_ats: i64 = s.ats_coverage.iter().map(|(_, c)| *c).sum();
+    let max_ats = s
+        .ats_coverage
+        .iter()
+        .map(|(_, c)| *c)
+        .max()
+        .unwrap_or(1)
+        .max(1);
 
     if s.ats_coverage.is_empty() && s.bespoke_count == 0 {
         lines.push(Line::from(Span::styled(
@@ -170,9 +306,14 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 0
             };
+            let bar = proportional_bar(*count, max_ats, bar_width);
+            let bar_len = bar.chars().count();
+            let pad = bar_width.saturating_sub(bar_len as u16) as usize;
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(format!("{provider:<12}"), t.stat_value),
+                Span::styled(format!("{provider:<14}"), t.stat_value),
+                Span::styled(bar, t.grade_a),
+                Span::raw(" ".repeat(pad)),
                 Span::styled(format!("{count:>3}"), t.stat_value),
                 Span::styled(format!(" ({pct}%)"), t.dim),
             ]));
@@ -182,7 +323,7 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     if s.bespoke_count > 0 {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(format!("{:<12}", "bespoke"), t.status_bespoke),
+            Span::styled(format!("{:<14}", "bespoke"), t.status_bespoke),
             Span::styled(format!("{:>3}", s.bespoke_count), t.stat_value),
         ]));
     }
@@ -190,7 +331,7 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     if s.archived_count > 0 {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(format!("{:<12}", "archived"), t.dim),
+            Span::styled(format!("{:<14}", "archived"), t.dim),
             Span::styled(format!("{:>3}", s.archived_count), t.dim),
         ]));
     }
@@ -200,7 +341,10 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 
-    frame.render_widget(Paragraph::new(lines).block(block).wrap(Wrap { trim: false }), area);
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {
@@ -217,7 +361,9 @@ fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     for (grade, label, style) in &grade_actions {
-        let count = s.jobs_by_grade.iter()
+        let count = s
+            .jobs_by_grade
+            .iter()
             .find(|(g, _)| g == grade)
             .map(|(_, c)| *c)
             .unwrap_or(0);
@@ -233,15 +379,15 @@ fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(""));
 
     // Decision counts.
-    let mut decision_parts = Vec::new();
-    decision_parts.push(Span::raw("  "));
-    decision_parts.push(Span::styled(format!("{}", s.applied_count), t.decision_applied));
-    decision_parts.push(Span::raw(" applied · "));
-    decision_parts.push(Span::styled(format!("{}", s.watching_count), t.decision_watching));
-    decision_parts.push(Span::raw(" watching · "));
-    decision_parts.push(Span::styled(format!("{}", s.rejected_count), t.decision_rejected));
-    decision_parts.push(Span::raw(" rejected"));
-    lines.push(Line::from(decision_parts));
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{}", s.applied_count), t.decision_applied),
+        Span::raw(" applied · "),
+        Span::styled(format!("{}", s.watching_count), t.decision_watching),
+        Span::raw(" watching · "),
+        Span::styled(format!("{}", s.rejected_count), t.decision_rejected),
+        Span::raw(" rejected"),
+    ]));
 
     // Next steps section.
     let mut next_steps: Vec<String> = Vec::new();
@@ -249,14 +395,22 @@ fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {
         next_steps.push(format!(
             "{} bespoke {} need manual job search",
             s.bespoke_searchable,
-            if s.bespoke_searchable == 1 { "company" } else { "companies" }
+            if s.bespoke_searchable == 1 {
+                "company"
+            } else {
+                "companies"
+            }
         ));
     }
     if s.needs_description > 0 {
         next_steps.push(format!(
             "{} {} need descriptions",
             s.needs_description,
-            if s.needs_description == 1 { "job" } else { "jobs" }
+            if s.needs_description == 1 {
+                "job"
+            } else {
+                "jobs"
+            }
         ));
     }
 
@@ -286,55 +440,120 @@ fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    let block = Block::bordered()
-        .title(" Action Items ")
-        .title_style(t.title)
-        .border_style(Style::default().fg(t.border));
-
-    frame.render_widget(Paragraph::new(lines).block(block).wrap(Wrap { trim: false }), area);
-}
-
-fn draw_top_roles(frame: &mut Frame, app: &App, area: Rect) {
-    let t = &app.theme;
-    let s = &app.stats;
-
-    let mut lines = Vec::new();
-
-    if s.top_matches.is_empty() {
+    // List bespoke company names that need search.
+    let bespoke_names = fetch_bespoke_company_names(app);
+    if !bespoke_names.is_empty() {
+        lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "  No SS/S graded jobs yet",
-            t.dim,
+            "  Bespoke — need search:",
+            t.header,
         )));
-    } else {
-        for m in &s.top_matches {
-            let grade_str = m.grade.as_deref().unwrap_or("—");
-            let style = t.grade_style(m.grade.as_deref());
-
-            // First line: grade + title
+        for name in &bespoke_names {
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(format!("{grade_str:<3}"), style),
-                Span::styled(m.title.clone(), t.stat_value),
-            ]));
-
-            // Second line: company + location
-            let location_str = m.location.as_deref().unwrap_or("");
-            let detail = if location_str.is_empty() {
-                m.company.clone()
-            } else {
-                format!("{} · {}", m.company, location_str)
-            };
-            lines.push(Line::from(vec![
-                Span::raw("      "),
-                Span::styled(detail, t.dim),
+                Span::styled("• ", t.status_bespoke),
+                Span::raw(name.clone()),
             ]));
         }
     }
 
     let block = Block::bordered()
-        .title(" Top Roles ")
+        .title(" Action Items ")
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 
-    frame.render_widget(Paragraph::new(lines).block(block).wrap(Wrap { trim: false }), area);
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+fn draw_top_roles(frame: &mut Frame, app: &App, area: Rect) {
+    let t = &app.theme;
+
+    // Fetch ALL SS, S, and A jobs from DB for the scrollable list.
+    let roles = fetch_all_top_roles(app);
+
+    let mut lines = Vec::new();
+
+    if roles.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No SS/S/A graded jobs yet",
+            t.dim,
+        )));
+    } else {
+        // Single-line format: "SS  title — company"
+        for (grade, title, company) in &roles {
+            let style = t.grade_style(Some(grade.as_str()));
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(format!("{grade:<3}"), style),
+                Span::styled(title.clone(), t.stat_value),
+                Span::styled(format!(" — {company}"), t.dim),
+            ]));
+        }
+    }
+
+    // Apply scroll offset.
+    let scroll = app.dashboard_scroll;
+
+    let block = Block::bordered()
+        .title(format!(" Top Roles ({}) ", roles.len()))
+        .title_style(t.title)
+        .border_style(Style::default().fg(t.border));
+
+    let para = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
+
+    frame.render_widget(para, area);
+}
+
+/// Fetch bespoke company names that need manual job search.
+fn fetch_bespoke_company_names(app: &App) -> Vec<String> {
+    let Ok(conn) = Connection::open(&app.db_path) else {
+        return Vec::new();
+    };
+
+    let sql = "
+        SELECT name FROM companies
+        WHERE status = 'bespoke'
+        AND grade IN ('S', 'A')
+        AND id NOT IN (SELECT DISTINCT company_id FROM jobs)
+        ORDER BY
+            CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 END,
+            name";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(0))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// Fetch ALL SS, S, and A graded jobs for the scrollable top roles list.
+fn fetch_all_top_roles(app: &App) -> Vec<(String, String, String)> {
+    let Ok(conn) = Connection::open(&app.db_path) else {
+        return Vec::new();
+    };
+
+    let sql = "
+        SELECT j.grade, j.title, c.name
+        FROM jobs j
+        JOIN companies c ON c.id = j.company_id
+        WHERE j.grade IN ('SS', 'S', 'A')
+        AND j.evaluation_status != 'archived'
+        AND c.status != 'archived'
+        ORDER BY
+            CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3 END,
+            j.title";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
 }
