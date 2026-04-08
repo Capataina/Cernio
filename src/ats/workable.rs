@@ -29,6 +29,7 @@ struct WorkableJob {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct WorkableLocation {
     city: Option<String>,
     region: Option<String>,

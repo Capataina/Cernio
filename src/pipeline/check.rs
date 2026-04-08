@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 
 use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
 

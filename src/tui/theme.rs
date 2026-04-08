@@ -6,6 +6,7 @@ use ratatui::style::{Color, Modifier, Style};
 /// for backgrounds, the TUI inherits the user's terminal theme — including
 /// transparency, custom palettes (Catppuccin, Dracula, Nord, etc.), and dark/light
 /// mode. No hardcoded hex values.
+#[allow(dead_code)]
 pub struct Theme {
     pub border: Color,
     pub border_focused: Color,

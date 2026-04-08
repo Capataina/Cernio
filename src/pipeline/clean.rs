@@ -3,6 +3,7 @@ use rusqlite::{params, Connection};
 use crate::config::CleanupConfig;
 
 /// Summary of what the cleanup would or did remove.
+#[allow(dead_code)]
 pub struct CleanupReport {
     pub jobs_removed: u64,
     pub jobs_by_grade: Vec<(String, u64)>,

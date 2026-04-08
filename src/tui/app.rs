@@ -49,6 +49,7 @@ pub struct CompanyRow {
     pub fit_count: i64,
 }
 
+#[allow(dead_code)]
 pub struct JobRow {
     pub id: i64,
     pub company_id: i64,
@@ -66,6 +67,7 @@ pub struct JobRow {
     pub decision: Option<String>,
 }
 
+#[allow(dead_code)]
 pub struct DashboardStats {
     pub total_companies: i64,
     pub companies_by_grade: Vec<(String, i64)>,
@@ -85,6 +87,7 @@ pub struct DashboardStats {
     pub needs_description: i64,
 }
 
+#[allow(dead_code)]
 pub struct TopMatch {
     pub title: String,
     pub company: String,
@@ -94,6 +97,7 @@ pub struct TopMatch {
 
 // ── Application state ────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct Toast {
     pub message: String,
     pub created_at: std::time::Instant,
@@ -350,6 +354,7 @@ impl App {
     }
 
     /// Spinner character for animated status indicators.
+    #[allow(dead_code)]
     pub fn spinner_char(&self) -> char {
         const CHARS: [char; 4] = ['◐', '◑', '◒', '◓'];
         CHARS[(self.frame_count / 5) as usize % 4]

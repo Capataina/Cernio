@@ -14,6 +14,7 @@ struct ListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SmartRecruitersJob {
     id: String,
     name: String,
@@ -29,6 +30,7 @@ struct SmartRecruitersJob {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SmartRecruitersLocation {
     city: Option<String>,
     region: Option<String>,
@@ -39,23 +41,27 @@ struct SmartRecruitersLocation {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SmartRecruitersLabel {
     label: Option<String>,
 }
 
 /// Detail endpoint response — for fetching full description.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DetailResponse {
     #[serde(rename = "jobAd")]
     job_ad: Option<JobAd>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct JobAd {
     sections: Option<JobAdSections>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct JobAdSections {
     #[serde(rename = "jobDescription")]
     job_description: Option<HtmlSection>,
@@ -65,6 +71,7 @@ struct JobAdSections {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct HtmlSection {
     text: Option<String>,
 }
@@ -119,6 +126,7 @@ pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<AtsJo
 }
 
 /// Fetch the full description for a single SmartRecruiters posting.
+#[allow(dead_code)]
 pub async fn fetch_detail(
     client: &reqwest::Client,
     slug: &str,

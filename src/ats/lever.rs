@@ -161,6 +161,7 @@ pub async fn fetch_detail(
 }
 
 /// Strip HTML tags from a string.
+#[allow(dead_code)]
 pub fn strip_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut in_tag = false;

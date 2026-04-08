@@ -12,6 +12,7 @@ struct BoardResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AshbyJob {
     id: String,
     title: String,

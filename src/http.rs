@@ -14,6 +14,7 @@ pub fn build_client() -> reqwest::Client {
         .expect("failed to build HTTP client")
 }
 
+#[allow(dead_code)]
 /// Retry a future up to `max_retries` times with a short delay between attempts.
 /// Returns the first successful result, or the last error.
 pub async fn with_retry<F, Fut, T, E>(max_retries: u32, mut f: F) -> Result<T, E>
