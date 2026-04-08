@@ -110,21 +110,36 @@ The `fit_assessment` field carries the reasoning. Scale depth by grade:
 - **A/B**: Concise assessment. Key strengths, notable gaps, why it falls short of S-tier, whether it's worth pursuing if higher-grade options are scarce.
 - **C/F**: One to two sentences. The primary reason for the low grade.
 
-### 6. Batch discipline
+### 6. Parallel grading
 
-The orchestrator decides how many jobs to grade in each batch based on the queue and signal strength. There is no fixed number. The guiding principle: **grade everything important, not a random slice.**
+Job grading should always be parallelised using multiple agents. Split the pending queue into batches by company cluster (e.g. 5 agents each handling ~100-150 jobs) and run them simultaneously. Each agent reads the same profile, gets a different set of jobs with their descriptions, and outputs SQL UPDATE statements.
 
-When deciding what to include in a batch:
+**Why parallel:** 700 jobs graded in ~3 minutes with 5 parallel agents vs 30+ minutes sequentially. The grading is independent per job — no agent needs another agent's output. Each agent reads the full profile and makes independent judgments.
+
+**How to split:** Group by company so each agent has context about the companies it's grading. S-tier companies with many jobs should be in the same batch for consistency. Give each agent the job ID, company name, company grade, title, location, and description excerpt from the database.
+
+**Each agent outputs SQL only:**
+```sql
+UPDATE jobs SET grade = 'X', evaluation_status = 'strong_fit'/'weak_fit'/'no_fit', fit_assessment = 'reason' WHERE id = NNN;
+```
+
+The orchestrator collects all SQL outputs and executes them in a single batch against the database.
+
+### 7. Batch discipline
+
+The orchestrator decides how many jobs to grade based on signal strength. The guiding principle: **grade everything important, not a random slice.**
+
 - **Always include:** Every job with clear high-signal indicators (entry-level/graduate titles at S-tier companies, roles explicitly mentioning technologies from the profile, roles at companies with exceptional domain alignment). If there are 70 graduate roles, grade all 70 — they're all high priority.
 - **Include generously:** When uncertain whether a job should be in this batch or deferred, include it. The cost of grading an extra job is a few minutes. The cost of deferring a perfect opportunity is potentially missing an application deadline.
 - **Defer strategically:** Senior roles at B-tier companies, roles with generic titles and no clear signal, roles at companies with weaker alignment. These can wait for a later batch.
 
-After each batch:
+After grading completes:
 
 1. Report progress: "Graded X/Y pending. Breakdown: N SS, N S, N A, N B, N C, N F."
 2. Summarise highlights: name the SS and S roles with one-line reasons.
 3. Note any portfolio gap patterns observed (see below).
-4. Ask the user whether to continue with the next batch or stop.
+4. Flag any jobs graded without descriptions — these need verification.
+5. Ask the user whether to continue with remaining jobs or stop.
 
 If the pending count is manageable, grade everything in one pass. Grading is largely a one-time cost per job — once done, the user has a stable, browsable, actionable list.
 
