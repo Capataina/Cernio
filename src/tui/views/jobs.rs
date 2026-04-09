@@ -86,16 +86,40 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .enumerate()
         .map(|(idx, j)| {
             let is_multi = app.multi_select_jobs.contains(&idx);
-            let grade_raw = j.grade.as_deref().unwrap_or("—");
-            let grade_style = t.grade_style(j.grade.as_deref());
 
-            // Grade with decision indicator: "SS✓" for watching/applied, "SS·" otherwise.
-            let decision_indicator = match j.decision.as_deref() {
-                Some("watching") | Some("applied") => "✓",
-                Some("rejected") => "✗",
-                _ => "·",
+            // Animated spinner for pending/evaluating jobs, grade otherwise.
+            let (grade_display, grade_style) = match j.evaluation_status.as_str() {
+                "pending" => {
+                    let spinners = ['◐', '◑', '◒', '◓'];
+                    let ch = spinners[(app.frame_count / 5 % 4) as usize];
+                    let decision_indicator = match j.decision.as_deref() {
+                        Some("watching") | Some("applied") => "✓",
+                        Some("rejected") => "✗",
+                        _ => "·",
+                    };
+                    (format!("{ch}{decision_indicator}"), t.eval_pending)
+                }
+                "evaluating" => {
+                    let spinners = ['◐', '◑', '◒', '◓'];
+                    let ch = spinners[(app.frame_count / 5 % 4) as usize];
+                    let decision_indicator = match j.decision.as_deref() {
+                        Some("watching") | Some("applied") => "✓",
+                        Some("rejected") => "✗",
+                        _ => "·",
+                    };
+                    (format!("{ch}{decision_indicator}"), t.eval_evaluating)
+                }
+                _ => {
+                    let grade_raw = j.grade.as_deref().unwrap_or("—");
+                    let style = t.grade_style(j.grade.as_deref());
+                    let decision_indicator = match j.decision.as_deref() {
+                        Some("watching") | Some("applied") => "✓",
+                        Some("rejected") => "✗",
+                        _ => "·",
+                    };
+                    (format!("{grade_raw}{decision_indicator}"), style)
+                }
             };
-            let grade_display = format!("{grade_raw}{decision_indicator}");
 
             // Description indicator.
             let has_desc = j
@@ -252,8 +276,37 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             t.header,
         )));
         lines.push(Line::from(""));
+        let section_header_style = Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD);
+        let bold_style = Style::default().add_modifier(Modifier::BOLD);
         for text_line in assessment.lines() {
-            lines.push(Line::from(format!("  {text_line}")));
+            let trimmed = text_line.trim_start();
+            let style = if trimmed.starts_with("Q1")
+                || trimmed.starts_with("Q2")
+                || trimmed.starts_with("Q3")
+                || trimmed.starts_with("Q4")
+                || trimmed.starts_with("Q5")
+                || trimmed.starts_with("Overall:")
+                || trimmed.starts_with("Strengths:")
+                || trimmed.starts_with("Weaknesses:")
+                || trimmed.starts_with("Summary:")
+                || trimmed.starts_with("Achievability:")
+                || trimmed.starts_with("CV Signal:")
+                || trimmed.starts_with("Background:")
+                || trimmed.starts_with("Engagement:")
+                || trimmed.starts_with("Constraints:")
+            {
+                section_header_style
+            } else if trimmed.starts_with("Grade:") || trimmed.contains("Grade:") {
+                bold_style
+            } else {
+                Style::default()
+            };
+            lines.push(Line::from(Span::styled(
+                format!("  {text_line}"),
+                style,
+            )));
         }
     }
 

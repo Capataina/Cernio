@@ -101,7 +101,14 @@ fn draw_column(
         return;
     }
 
-    let mut lines = Vec::new();
+    // Inner height after borders (top + bottom = 2 rows).
+    let visible_height = area.height.saturating_sub(2) as usize;
+
+    // Build one-line-per-card format: "  {grade:<3} {title} — {company}"
+    // Max content width = column width minus borders (2) minus prefix (2) minus grade (3) minus spacing.
+    let inner_width = area.width.saturating_sub(2) as usize; // subtract left+right border
+
+    let mut lines = Vec::with_capacity(cards.len());
 
     for (i, card) in cards.iter().enumerate() {
         let grade = card.grade.as_deref().unwrap_or("—");
@@ -118,25 +125,37 @@ fn draw_column(
                 .add_modifier(Modifier::BOLD);
         }
 
+        // Build the text portion: "{title} — {company}"
+        let text_part = format!("{} — {}", card.title, card.company);
+        // Available width for text: inner_width - prefix(2) - grade(3) - space(1)
+        let max_text = inner_width.saturating_sub(6);
+        let truncated = if text_part.len() > max_text {
+            format!("{}…", &text_part[..max_text.saturating_sub(1)])
+        } else {
+            text_part
+        };
+
         lines.push(Line::from(vec![
             Span::styled(prefix, card_style),
-            Span::styled(format!("{grade:<3}"), if is_selected { card_style } else { grade_style }),
-            Span::styled(&card.title, card_style),
+            Span::styled(
+                format!("{grade:<3}"),
+                if is_selected { card_style } else { grade_style },
+            ),
+            Span::styled(truncated, card_style),
         ]));
-        lines.push(Line::from(vec![
-            Span::raw("    "),
-            Span::styled(&card.company, t.dim),
-        ]));
-
-        // Separator between cards (except last).
-        if i < cards.len() - 1 {
-            lines.push(Line::from(""));
-        }
     }
+
+    // Scroll to keep selection visible (centre the selection in the viewport).
+    let scroll_offset = if cards.len() > visible_height {
+        selection.saturating_sub(visible_height / 2) as u16
+    } else {
+        0
+    };
 
     let para = Paragraph::new(lines)
         .block(block)
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll((scroll_offset, 0));
 
     frame.render_widget(para, area);
 }

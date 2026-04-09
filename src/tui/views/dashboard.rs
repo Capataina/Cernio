@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use chrono::{Datelike, Local, NaiveDate};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -35,6 +38,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         BlockSpec { content_lines: grade_content, min_height: 5, grow_priority: 0 },
         BlockSpec { content_lines: pipeline_content, min_height: 4, grow_priority: 0 },
         BlockSpec { content_lines: 12, min_height: 8, grow_priority: 1 }, // session stats grows
+        BlockSpec { content_lines: 9, min_height: 9, grow_priority: 0 },  // activity heatmap (7 rows + header + pad)
     ];
     let left_constraints = distribute(&left_specs, cols[0].height);
     let left = Layout::vertical(left_constraints).split(cols[0]);
@@ -42,6 +46,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     draw_grade_distribution(frame, app, left[0]);
     draw_pipeline_health(frame, app, left[1]);
     draw_session_stats(frame, app, left[2]);
+    draw_activity_chart(frame, app, left[3]);
 
     // Right column: action items (dynamic) + top roles (grows to fill).
     let action_content = action_items_content_lines(app);
@@ -135,20 +140,70 @@ fn draw_summary_block(frame: &mut Frame, app: &App, area: Rect, has_summary: boo
         .map(|(_, c)| c)
         .sum();
 
-    let mut lines = vec![Line::from(vec![
+    // Search pulse: time since last search with freshness colouring.
+    let search_pulse = if let Some(ref ts) = app.last_search_at {
+        if let Ok(parsed) = chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S") {
+            let now = Local::now().naive_local();
+            let hours = (now - parsed).num_hours();
+            let (label, style) = if hours < 24 {
+                (format!("{hours}h ago"), t.freshness_green)
+            } else if hours < 72 {
+                (format!("{}d ago", hours / 24), t.freshness_yellow)
+            } else if hours < 168 {
+                (format!("{}d ago", hours / 24), t.freshness_red)
+            } else {
+                (format!("{}d ago", hours / 24), t.dim)
+            };
+            vec![
+                Span::raw(" · search: "),
+                Span::styled(label, style),
+            ]
+        } else {
+            vec![]
+        }
+    } else {
+        vec![
+            Span::raw(" · search: "),
+            Span::styled("never", t.dim),
+        ]
+    };
+
+    // Visa countdown.
+    let visa_spans = {
+        let expiry = NaiveDate::from_ymd_opt(2027, 8, 31).unwrap();
+        let today = Local::now().date_naive();
+        let days = (expiry - today).num_days();
+        let style = if days > 365 {
+            t.countdown_ok
+        } else if days >= 180 {
+            t.countdown_warn
+        } else {
+            t.countdown_urgent
+        };
+        vec![
+            Span::raw(" · visa: "),
+            Span::styled(format!("{days}d"), style),
+        ]
+    };
+
+    let mut summary_spans = vec![
         Span::raw("  "),
         Span::styled(format!("{}", s.total_companies), t.stat_value),
         Span::raw(" companies · "),
         Span::styled(format!("{}", s.total_jobs), t.stat_value),
         Span::raw(" jobs · "),
         Span::styled(format!("{strong}"), t.grade_s),
-        Span::raw(" strong matches · "),
+        Span::raw(" strong · "),
         Span::styled(
             format!("{pending}"),
             if pending > 0 { t.eval_evaluating } else { t.dim },
         ),
         Span::raw(" pending"),
-    ])];
+    ];
+    summary_spans.extend(search_pulse);
+    summary_spans.extend(visa_spans);
+
+    let mut lines = vec![Line::from(summary_spans)];
 
     // Show session summary if the file exists.
     if has_summary {
@@ -374,6 +429,34 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
 
     let mut lines = Vec::new();
 
+    // Application progress bar: Applied ██████░░░░ 22/110 SS+S+A
+    let ssa_total: i64 = s
+        .jobs_by_grade
+        .iter()
+        .filter(|(g, _)| g == "SS" || g == "S" || g == "A")
+        .map(|(_, c)| *c)
+        .sum();
+    {
+        let inner_w = area.width.saturating_sub(2) as usize; // minus borders
+        // "  Applied: " = 11, " 999/999 SS+S+A" = 16 => overhead ~27
+        let overhead = 27;
+        let bar_width = inner_w.saturating_sub(overhead);
+        let filled = if ssa_total > 0 {
+            ((s.applied_count as f64 / ssa_total as f64) * bar_width as f64).round() as usize
+        } else {
+            0
+        };
+        let filled = filled.min(bar_width);
+        let empty = bar_width.saturating_sub(filled);
+
+        lines.push(Line::from(vec![
+            Span::raw("  Applied: "),
+            Span::styled("█".repeat(filled), t.activity_applied),
+            Span::styled("░".repeat(empty), t.dim),
+            Span::raw(format!(" {}/{} SS+S+A", s.applied_count, ssa_total)),
+        ]));
+    }
+
     // Application pipeline.
     lines.push(Line::from(vec![
         Span::raw("  "),
@@ -466,8 +549,106 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(" avg jobs/company"),
     ]));
 
+    // Top companies leaderboard.
+    if !app.top_companies_by_hits.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("  Top producing companies:", t.header)));
+        for (name, count) in &app.top_companies_by_hits {
+            // Truncate long names to fit.
+            let display_name = if name.len() > 16 {
+                format!("{}…", &name[..15])
+            } else {
+                name.clone()
+            };
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(format!("{display_name:<16} "), t.stat_value),
+                Span::styled(format!("{count}"), t.grade_s),
+                Span::styled(" strong", t.dim),
+            ]));
+        }
+    }
+
     let block = Block::bordered()
         .title(" Session Stats ")
+        .title_style(t.title)
+        .border_style(Style::default().fg(t.border));
+
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+/// Draw a GitHub-style activity heatmap: 7 rows (Mon-Sun) x 12 columns (weeks).
+///
+/// Each cell is a coloured `█` character representing the highest-priority action
+/// that day. Priority: applied > searched > graded > discovered. No activity = dim `░`.
+fn draw_activity_chart(frame: &mut Frame, app: &App, area: Rect) {
+    let t = &app.theme;
+
+    // Build a map: date_string -> list of action types.
+    let mut by_date: HashMap<String, Vec<String>> = HashMap::new();
+    for (date, action) in &app.activity_data {
+        by_date.entry(date.clone()).or_default().push(action.clone());
+    }
+
+    let today = Local::now().date_naive();
+    // Start 83 days ago (12 weeks = 84 days including today).
+    let start = today - chrono::Duration::days(83);
+
+    // Day labels for rows (Monday = 0 through Sunday = 6).
+    let day_labels = ["M", "T", "W", "T", "F", "S", "S"];
+
+    let mut rows: Vec<Vec<Span>> = Vec::new();
+    for dow in 0..7u32 {
+        let mut spans = Vec::new();
+        spans.push(Span::styled(format!("  {} ", day_labels[dow as usize]), t.dim));
+
+        // Iterate through each week (column).
+        for week in 0..12 {
+            // Calculate the date for this cell.
+            // The grid starts at `start`. We need to find the date for row=dow, col=week.
+            // start's weekday (Mon=0, ..., Sun=6).
+            let start_dow = start.weekday().num_days_from_monday(); // 0=Mon
+            // First Monday on or before start.
+            let grid_origin = start - chrono::Duration::days(start_dow as i64);
+            let cell_date = grid_origin + chrono::Duration::days((week * 7 + dow) as i64);
+
+            if cell_date > today || cell_date < start {
+                spans.push(Span::styled(" ", t.dim));
+            } else {
+                let date_str = cell_date.format("%Y-%m-%d").to_string();
+                let style = if let Some(actions) = by_date.get(&date_str) {
+                    // Priority: applied > searched > graded > discovered.
+                    if actions.iter().any(|a| a == "applied") {
+                        t.activity_applied
+                    } else if actions.iter().any(|a| a == "searched") {
+                        t.activity_searched
+                    } else if actions.iter().any(|a| a == "graded") {
+                        t.activity_graded
+                    } else {
+                        t.activity_discovered
+                    }
+                } else {
+                    t.dim
+                };
+
+                if by_date.contains_key(&cell_date.format("%Y-%m-%d").to_string()) {
+                    spans.push(Span::styled("█", style));
+                } else {
+                    spans.push(Span::styled("░", t.dim));
+                }
+            }
+            spans.push(Span::raw(" "));
+        }
+        rows.push(spans);
+    }
+
+    let lines: Vec<Line> = rows.into_iter().map(Line::from).collect();
+
+    let block = Block::bordered()
+        .title(" Activity (12 weeks) ")
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 

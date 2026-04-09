@@ -11,27 +11,67 @@ use crate::tui::app::{App, Focus, SortMode, View};
 pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
     let focused_indicator = if app.focused_mode { " [FOCUSED]" } else { "" };
 
-    let jobs_label = if app.focused_mode {
-        format!(
-            " Jobs ({}/{}){} ",
-            app.jobs.len(),
-            app.total_jobs_unfiltered,
-            focused_indicator
-        )
+    // Dashboard tab — plain text, no count.
+    let dashboard_tab = Line::from(" Dashboard ");
+
+    // Companies tab — count coloured yellow if any ungraded, dim otherwise.
+    let companies_count = app.companies.len();
+    let has_ungraded_company = app.companies.iter().any(|c| c.grade.is_none());
+    let company_count_style = if has_ungraded_company {
+        Style::default().fg(Color::Yellow)
     } else {
-        format!(" Jobs ({}) ", app.jobs.len())
+        Style::default().fg(Color::DarkGray)
+    };
+    let companies_tab = Line::from(vec![
+        Span::raw(" Companies ("),
+        Span::styled(format!("{companies_count}"), company_count_style),
+        Span::raw(") "),
+    ]);
+
+    // Jobs tab — count coloured by best grade present: magenta for SS, green for S, cyan for A.
+    let jobs_count = app.jobs.len();
+    let has_ss = app.jobs.iter().any(|j| j.grade.as_deref() == Some("SS"));
+    let has_s = app.jobs.iter().any(|j| j.grade.as_deref() == Some("S"));
+    let has_a = app.jobs.iter().any(|j| j.grade.as_deref() == Some("A"));
+    let job_count_style = if has_ss {
+        Style::default().fg(Color::Magenta)
+    } else if has_s {
+        Style::default().fg(Color::Green)
+    } else if has_a {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+    let jobs_tab = if app.focused_mode {
+        Line::from(vec![
+            Span::raw(" Jobs ("),
+            Span::styled(format!("{jobs_count}"), job_count_style),
+            Span::raw(format!("/{}){focused_indicator} ", app.total_jobs_unfiltered)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::raw(" Jobs ("),
+            Span::styled(format!("{jobs_count}"), job_count_style),
+            Span::raw(") "),
+        ])
     };
 
+    // Pipeline tab — count in green if applied > 0.
     let pipeline_count = app.pipeline_watching.len()
         + app.pipeline_applied.len()
         + app.pipeline_interview.len();
+    let pipeline_count_style = if !app.pipeline_applied.is_empty() {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+    let pipeline_tab = Line::from(vec![
+        Span::raw(" Pipeline ("),
+        Span::styled(format!("{pipeline_count}"), pipeline_count_style),
+        Span::raw(") "),
+    ]);
 
-    let titles = vec![
-        " Dashboard ".to_string(),
-        format!(" Companies ({}) ", app.companies.len()),
-        jobs_label,
-        format!(" Pipeline ({}) ", pipeline_count),
-    ];
+    let titles = vec![dashboard_tab, companies_tab, jobs_tab, pipeline_tab];
 
     let tabs = Tabs::new(titles)
         .block(
@@ -136,19 +176,58 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
+    // ── Right-side contextual info ──
     let mut right_parts: Vec<Span> = Vec::new();
 
-    if app.view == View::Jobs {
-        let sort_label = match app.sort_mode {
-            SortMode::ByGrade => "grade",
-            SortMode::ByCompany => "company",
-            SortMode::ByDate => "date",
-            SortMode::ByLocation => "location",
-        };
-        right_parts.push(Span::styled(
-            format!(" sort:{sort_label} "),
-            app.theme.dim,
-        ));
+    match app.view {
+        View::Dashboard => {
+            right_parts.push(Span::styled(
+                format!(
+                    " {} companies · {} jobs ",
+                    app.stats.total_companies, app.stats.total_jobs
+                ),
+                app.theme.dim,
+            ));
+        }
+        View::Companies => {
+            let sort_label = match app.sort_mode {
+                SortMode::ByGrade => "grade",
+                SortMode::ByCompany => "name",
+                SortMode::ByDate => "date",
+                SortMode::ByLocation => "location",
+            };
+            right_parts.push(Span::styled(
+                format!(" {} visible · sort:{sort_label} ", app.companies.len()),
+                app.theme.dim,
+            ));
+        }
+        View::Jobs => {
+            let sort_label = match app.sort_mode {
+                SortMode::ByGrade => "grade",
+                SortMode::ByCompany => "company",
+                SortMode::ByDate => "date",
+                SortMode::ByLocation => "location",
+            };
+            let focus_indicator = if app.focused_mode { " · FOCUS" } else { "" };
+            right_parts.push(Span::styled(
+                format!(
+                    " {} visible · sort:{sort_label}{focus_indicator} ",
+                    app.jobs.len()
+                ),
+                app.theme.dim,
+            ));
+        }
+        View::Pipeline => {
+            right_parts.push(Span::styled(
+                format!(
+                    " {} watching · {} applied · {} interview ",
+                    app.pipeline_watching.len(),
+                    app.pipeline_applied.len(),
+                    app.pipeline_interview.len(),
+                ),
+                app.theme.dim,
+            ));
+        }
     }
 
     if !app.search_query.is_empty() && !app.search_mode {

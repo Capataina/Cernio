@@ -1,5 +1,5 @@
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use ratatui::Frame;
@@ -88,52 +88,70 @@ pub fn draw_help_overlay(frame: &mut Frame, app: &App) {
     let area = centered_rect(50, 70, frame.area());
 
     let t = &app.theme;
+    let section_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+    let rule_style = Style::default().fg(Color::DarkGray);
 
-    let lines = vec![
-        Line::from(""),
-        Line::from(Span::styled("  Navigation", t.help_section)),
-        Line::from(""),
-        help_line(t, "  j / k / ↑ / ↓", "Move selection up/down"),
-        help_line(t, "  g / G", "Jump to top / bottom (Companies)"),
-        help_line(t, "  Enter / l / →", "Drill into company jobs"),
-        help_line(t, "  Esc / h / ←", "Go back"),
-        help_line(t, "  Tab", "Toggle list / detail focus"),
-        help_line(t, "  1  2  3  4", "Dashboard / Companies / Jobs / Pipeline"),
-        Line::from(""),
-        Line::from(Span::styled("  Actions", t.help_section)),
-        Line::from(""),
-        help_line(t, "  w", "Mark job as watching"),
-        help_line(t, "  a", "Mark job as applied"),
-        help_line(t, "  x", "Mark job as rejected"),
-        help_line(t, "  i", "Mark job as interview"),
-        help_line(t, "  o", "Open URL in browser (+ mark applied)"),
-        help_line(t, "  p", "Autofill application form in Chrome"),
-        help_line(t, "  y", "Copy URL to clipboard"),
-        help_line(t, "  e", "Export current view to markdown"),
-        help_line(t, "  D", "Clean database (from dashboard)"),
-        help_line(t, "  f", "Toggle focused mode (hide F/C)"),
-        help_line(t, "  A", "Toggle show archived items"),
-        help_line(t, "  s", "Cycle sort mode"),
-        help_line(t, "  /", "Search / filter"),
-        help_line(t, "  g", "Override grade (in Jobs view)"),
-        help_line(t, "  [ / ]", "Jump to prev/next grade section"),
-        Line::from(""),
-        Line::from(Span::styled("  Pipeline", t.help_section)),
-        Line::from(""),
-        help_line(t, "  h / l", "Move between columns"),
-        help_line(t, "  w / a / i", "Move card to watching/applied/interview"),
-        Line::from(""),
-        Line::from(Span::styled("  General", t.help_section)),
-        Line::from(""),
-        help_line(t, "  ?", "Toggle this help"),
-        help_line(t, "  q / Ctrl+C", "Quit"),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  Press any key to close",
-            t.dim,
-        )),
-        Line::from(""),
-    ];
+    let mut lines = Vec::new();
+    lines.push(Line::from(""));
+
+    // ── Navigation section ──
+    lines.push(section_header("Navigation", section_style, rule_style));
+    lines.push(help_line(t, "  j/k  ↑/↓      ", "Navigate list"));
+    lines.push(help_line(t, "  g / G         ", "Top / bottom"));
+    help_line_push(&mut lines, t, "  Enter / l / → ", "Drill into company jobs");
+    help_line_push(&mut lines, t, "  Esc / h / ←   ", "Go back");
+    help_line_push(&mut lines, t, "  Tab           ", "Toggle list ↔ detail");
+    help_line_push(&mut lines, t, "  1  2  3  4    ", "Switch view");
+    lines.push(Line::from(""));
+
+    // ── Decisions section ──
+    lines.push(section_header("Decisions", section_style, rule_style));
+    help_line_push(&mut lines, t, "  w             ", "Mark watching");
+    help_line_push(&mut lines, t, "  a             ", "Mark applied");
+    help_line_push(&mut lines, t, "  x             ", "Mark rejected");
+    help_line_push(&mut lines, t, "  i             ", "Mark interview");
+    help_line_push(&mut lines, t, "  o             ", "Open URL + apply");
+    help_line_push(&mut lines, t, "  p             ", "Autofill application form");
+    help_line_push(&mut lines, t, "  y             ", "Copy URL to clipboard");
+    lines.push(Line::from(""));
+
+    // ── Filtering section ──
+    lines.push(section_header("Filtering", section_style, rule_style));
+    help_line_push(&mut lines, t, "  /             ", "Search / filter");
+    help_line_push(&mut lines, t, "  f             ", "Focus mode (hide F/C + applied)");
+    help_line_push(&mut lines, t, "  A             ", "Toggle archived");
+    help_line_push(&mut lines, t, "  s             ", "Cycle sort mode");
+    help_line_push(&mut lines, t, "  [ / ]         ", "Jump prev/next grade section");
+    lines.push(Line::from(""));
+
+    // ── Grading section ──
+    lines.push(section_header("Grading", section_style, rule_style));
+    help_line_push(&mut lines, t, "  g             ", "Override grade (Jobs view)");
+    help_line_push(&mut lines, t, "  W             ", "Bulk action by grade");
+    help_line_push(&mut lines, t, "  e             ", "Export current view");
+    help_line_push(&mut lines, t, "  D             ", "Clean database (Dashboard)");
+    lines.push(Line::from(""));
+
+    // ── Pipeline section ──
+    lines.push(section_header("Pipeline", section_style, rule_style));
+    help_line_push(&mut lines, t, "  h / l         ", "Switch column");
+    help_line_push(&mut lines, t, "  w / a / i     ", "Move card");
+    help_line_push(&mut lines, t, "  o             ", "Open card URL");
+    lines.push(Line::from(""));
+
+    // ── General section ──
+    lines.push(section_header("General", section_style, rule_style));
+    help_line_push(&mut lines, t, "  ?             ", "Toggle this help");
+    help_line_push(&mut lines, t, "  q / Ctrl+C    ", "Quit");
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(Span::styled(
+        "  Press any key to close",
+        t.dim,
+    )));
+    lines.push(Line::from(""));
 
     let block = Block::bordered()
         .title(" Help ")
@@ -144,6 +162,15 @@ pub fn draw_help_overlay(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, area);
     frame.render_widget(help, area);
+}
+
+/// Build a section header line with box-drawing rule characters.
+fn section_header<'a>(title: &'a str, title_style: Style, rule_style: Style) -> Line<'a> {
+    Line::from(vec![
+        Span::styled(" ─── ", rule_style),
+        Span::styled(title, title_style),
+        Span::styled(" ─────────────────────────", rule_style),
+    ])
 }
 
 // ── Toast notifications ──────────────────────────────────────────
@@ -183,9 +210,18 @@ fn help_line<'a>(
     desc: &'a str,
 ) -> Line<'a> {
     Line::from(vec![
-        Span::styled(format!("{key:<18}"), t.help_key),
+        Span::styled(key, t.help_key),
         Span::styled(desc, Style::default()),
     ])
+}
+
+fn help_line_push<'a>(
+    lines: &mut Vec<Line<'a>>,
+    t: &'a crate::tui::theme::Theme,
+    key: &'a str,
+    desc: &'a str,
+) {
+    lines.push(help_line(t, key, desc));
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {

@@ -352,6 +352,75 @@ pub fn fetch_pipeline_cards(
     (fetch("watching"), fetch("applied"), fetch("interview"))
 }
 
+/// Fetch activity data for the contribution heatmap (last 84 days).
+///
+/// Returns `(date_string, action_type)` pairs aggregated across four sources:
+/// user decisions, company searches, company grading, and job discovery.
+pub fn fetch_activity_data(conn: &Connection) -> Vec<(String, String)> {
+    let sql = "
+        SELECT DATE(decided_at) AS d, decision FROM user_decisions
+        WHERE decided_at >= datetime('now', '-84 days')
+        UNION ALL
+        SELECT DATE(last_searched_at), 'searched' FROM companies
+        WHERE last_searched_at IS NOT NULL AND last_searched_at >= datetime('now', '-84 days')
+        UNION ALL
+        SELECT DATE(graded_at), 'graded' FROM companies
+        WHERE graded_at IS NOT NULL AND graded_at >= datetime('now', '-84 days')
+        UNION ALL
+        SELECT DATE(discovered_at), 'discovered' FROM jobs
+        WHERE discovered_at IS NOT NULL AND discovered_at >= datetime('now', '-84 days')
+    ";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// Fetch the most recent search timestamp.
+pub fn fetch_last_search_at(conn: &Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT MAX(last_searched_at) FROM companies",
+        [],
+        |r| r.get(0),
+    )
+    .unwrap_or(None)
+}
+
+/// Fetch the most recent grading timestamp.
+pub fn fetch_last_graded_at(conn: &Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT MAX(graded_at) FROM companies",
+        [],
+        |r| r.get(0),
+    )
+    .unwrap_or(None)
+}
+
+/// Fetch top companies by SS+S+A job count.
+pub fn fetch_top_companies_by_hits(conn: &Connection) -> Vec<(String, i64)> {
+    let sql = "
+        SELECT c.name, COUNT(*) AS cnt
+        FROM jobs j
+        JOIN companies c ON c.id = j.company_id
+        WHERE j.grade IN ('SS', 'S', 'A')
+        AND j.evaluation_status != 'archived'
+        AND c.status != 'archived'
+        GROUP BY c.id
+        ORDER BY cnt DESC
+        LIMIT 5
+    ";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
 fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {
     conn.prepare(
         "SELECT j.title, c.name, j.grade, COALESCE(j.location, c.location)

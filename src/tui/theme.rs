@@ -39,6 +39,19 @@ pub struct Theme {
     pub help_section: Style,
     pub stat_label: Style,
     pub stat_value: Style,
+
+    // ── Dashboard enhancement styles ────────────────────────────
+    pub freshness_green: Style,
+    pub freshness_yellow: Style,
+    pub freshness_red: Style,
+    pub activity_applied: Style,
+    pub activity_searched: Style,
+    pub activity_graded: Style,
+    pub activity_discovered: Style,
+    pub badge_hot: Style,
+    pub countdown_ok: Style,
+    pub countdown_warn: Style,
+    pub countdown_urgent: Style,
 }
 
 impl Default for Theme {
@@ -108,6 +121,20 @@ impl Default for Theme {
                 .add_modifier(Modifier::BOLD),
             stat_label: Style::default().fg(Color::DarkGray),
             stat_value: Style::default().add_modifier(Modifier::BOLD),
+
+            freshness_green: Style::default().fg(Color::Green),
+            freshness_yellow: Style::default().fg(Color::Yellow),
+            freshness_red: Style::default().fg(Color::Red),
+            activity_applied: Style::default().fg(Color::Green),
+            activity_searched: Style::default().fg(Color::Cyan),
+            activity_graded: Style::default().fg(Color::Yellow),
+            activity_discovered: Style::default().fg(Color::DarkGray),
+            badge_hot: Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+            countdown_ok: Style::default().fg(Color::Green),
+            countdown_warn: Style::default().fg(Color::Yellow),
+            countdown_urgent: Style::default().fg(Color::Red),
         }
     }
 }

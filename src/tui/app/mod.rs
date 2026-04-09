@@ -43,6 +43,11 @@ impl App {
         let (pipeline_watching, pipeline_applied, pipeline_interview) =
             queries::fetch_pipeline_cards(&conn);
 
+        let activity_data = queries::fetch_activity_data(&conn);
+        let last_search_at = queries::fetch_last_search_at(&conn);
+        let last_graded_at = queries::fetch_last_graded_at(&conn);
+        let top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);
+
         Ok(Self {
             running: true,
             view: View::Dashboard,
@@ -66,6 +71,11 @@ impl App {
             anchor_job: None,
             anchor_company: None,
             stats,
+            activity_data,
+            last_search_at,
+            last_graded_at,
+            session_start: std::time::Instant::now(),
+            top_companies_by_hits,
             db_path: db_path.to_path_buf(),
             dashboard_scroll: 0,
             search_mode: false,
@@ -103,6 +113,10 @@ impl App {
         );
         self.stats = queries::fetch_stats(&conn);
         self.total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
+        self.activity_data = queries::fetch_activity_data(&conn);
+        self.last_search_at = queries::fetch_last_search_at(&conn);
+        self.last_graded_at = queries::fetch_last_graded_at(&conn);
+        self.top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);
 
         let (pw, pa, pi) = queries::fetch_pipeline_cards(&conn);
         self.pipeline_watching = pw;

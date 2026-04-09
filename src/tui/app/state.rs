@@ -159,6 +159,13 @@ pub struct App {
 
     pub stats: DashboardStats,
 
+    // ── Dashboard enhancement data ──────────────────────────────
+    pub activity_data: Vec<(String, String)>,   // (date, action_type) for heatmap
+    pub last_search_at: Option<String>,          // MAX(last_searched_at)
+    pub last_graded_at: Option<String>,          // MAX(graded_at)
+    pub session_start: std::time::Instant,       // for session timer
+    pub top_companies_by_hits: Vec<(String, i64)>, // top companies by SS+S+A count
+
     pub db_path: PathBuf,
 
     // ── TUI v2/v3 additions ──────────────────────────────────────
