@@ -10,7 +10,7 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 
 | File | What to extract for job grading |
 |------|--------------------------------|
-| `profile/projects.md` | **Critical.** The project portfolio is the primary evidence of engineering capability. For each project, extract: what it demonstrates, what technologies it uses, and what domain knowledge it proves. This is what you match against job requirements. |
+| `profile/projects.md` | **Critical.** The project portfolio is the primary evidence of engineering capability. For each project, extract: what it demonstrates, what technologies it uses, what domain knowledge it proves, its **Tier** (Flagship/Notable/Minor), and its **Status** (active/completed/abandoned). Tier determines evidence weight — flagship projects are primary evidence, minor projects are weak evidence at best. This is what you match against job requirements. |
 | `profile/skills.md` | **Critical.** Technical skills inventory. Use this to assess stack alignment — does the candidate know the languages, frameworks, and tools the job requires? Distinguish primary strengths from secondary familiarity. |
 | `profile/experience.md` | Formal work experience. Determines seniority assessment — how many years of professional experience exist, and what that means for roles requiring specific tenure. |
 | `profile/education.md` | Degree details. Some roles filter on degree classification or institution. Know the candidate's credentials to assess whether HR screening filters will pass or reject. |
@@ -34,15 +34,17 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 
 Synthesise from `projects.md`, `skills.md`, and `experience.md`:
 
-- **Primary technical strengths** — The candidate's core competencies, ordered by depth. What are they strongest at? What evidence supports each strength? Build a table:
+- **Primary technical strengths** — The candidate's core competencies, ordered by depth. What are they strongest at? What evidence supports each strength? Build a table using **Flagship-tier projects as primary evidence**:
 
-  | Strength | Evidence (from projects/experience) | What it means for job fit |
-  |----------|-------------------------------------|---------------------------|
-  | (filled from profile) | (specific projects/roles) | (which job types this maps to) |
+  | Strength | Evidence (from projects/experience) | Project tier | What it means for job fit |
+  |----------|-------------------------------------|--------------|---------------------------|
+  | (filled from profile) | (specific projects/roles) | Flagship/Notable/Minor | (which job types this maps to) |
 
-- **Secondary strengths** — Skills the candidate has but that are not the primary focus. Comfortable, not expert.
+- **Secondary strengths** — Skills the candidate has but that are not the primary focus. Comfortable, not expert. Notable-tier projects often demonstrate these.
 
 - **Known weaknesses / portfolio gaps** — Read `portfolio-gaps.md` and cross-reference with `projects.md` and `skills.md`. If a role requires one of these as a hard prerequisite, the candidate cannot credibly claim the skill. If it is a "nice to have," note the gap but do not force a grade reduction.
+
+**Project tiers guide evidence weight.** Each project has a Tier (Flagship, Notable, Minor) and a Status (active, completed, abandoned). Flagship projects are the candidate's deepest, most actively invested work — these are primary evidence of capability. Notable projects are solid but less depth or no longer active — supporting evidence. Minor or abandoned projects show breadth of interest but should not be used as primary evidence of capability. When a role requirement matches only a minor/abandoned project, the candidate's evidence for that requirement is weak.
 
 ### Career targets and what they mean for grading
 
@@ -134,12 +136,12 @@ Read `preferences.toml` for explicit dealbreakers, then also watch for:
 When writing fit assessments, you must connect jobs to the profile concretely. Here is a checklist of profile elements to reference:
 
 **For every job (minimum):**
-- At least one project from `projects.md` that demonstrates relevant capability, named explicitly
+- At least one project from `projects.md` that demonstrates relevant capability, named explicitly — preferably a Flagship-tier project. If the best match is a Minor-tier project, acknowledge that the evidence is weaker.
 - The candidate's proficiency level for the job's required technologies from `skills.md`
 - Seniority assessment grounded in `experience.md` and `projects.md`
 
 **For SS/S jobs (mandatory):**
-- All projects from `projects.md` that are relevant, with explanation of what each demonstrates
+- All Flagship and Notable projects from `projects.md` that are relevant, with explanation of what each demonstrates. Minor-tier projects should only be included if they add something the flagships don't cover.
 - Full technology overlap analysis from `skills.md`
 - Gaps identified from `portfolio-gaps.md` with severity assessment
 - Visa timeline from `visa.md` and sponsorship viability

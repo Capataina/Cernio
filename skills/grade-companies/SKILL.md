@@ -47,7 +47,7 @@ Then read `references/grading-rubric.md` for the full rubric with evaluation dim
 
 Both are essential. The profile files tell you what matters for this specific candidate. The rubric tells you how to apply those priorities systematically. The profile-context reference tells you how to bridge the two.
 
-### 2. Query the database
+### 2. Query the database and pull calibration anchors
 
 Find companies that need grading:
 
@@ -57,6 +57,20 @@ FROM companies
 WHERE grade IS NULL
   AND status != 'archived';
 ```
+
+Then pull calibration anchors — real examples at each grade tier that define what each grade looks like in this database:
+
+```sql
+SELECT grade, name, grade_reasoning
+FROM companies
+WHERE grade IS NOT NULL
+  AND status != 'archived'
+ORDER BY
+    CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 WHEN 'C' THEN 4 END,
+    RANDOM();
+```
+
+Select 2-3 examples per tier. Grade each new company against these anchors — ask "does this belong alongside the S examples or the A examples?" rather than comparing against other companies in the current batch. This prevents grade deflation when a batch is legitimately skewed toward high-quality companies. Embed these anchors in every parallel agent's prompt.
 
 This returns companies that have been populated (resolved or bespoke) but never graded, plus any potential-status companies that entered the database without a grade. Archived companies are excluded — they were already evaluated and set aside.
 

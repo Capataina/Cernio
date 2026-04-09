@@ -42,6 +42,8 @@ Synthesise from `projects.md`, `skills.md`, and `experience.md`:
 - What is the depth vs. breadth balance?
 - Where does the portfolio convert most effectively — i.e., which company types would see this work and immediately recognise its relevance?
 
+**Project tiers matter.** Each project in `projects.md` has a Tier field (Flagship, Notable, Minor) and a Status field. Flagship projects represent the candidate's strongest, deepest work — these are what demonstrate real capability. Minor or abandoned projects show breadth of interest but not depth. When assessing technical identity, weight flagship projects heavily; treat minor/abandoned projects as background context, not primary evidence.
+
 ### 2. Career targets and constraints
 
 Synthesise from `preferences.toml`, `visa.md`, `education.md`, and `experience.md`:
@@ -64,6 +66,8 @@ When writing grade reasoning and why_relevant fields, you must connect companies
 
 **Projects (from `projects.md`):**
 For each company, identify which projects from the portfolio align with the company's work. Name them explicitly. "The candidate's Nyquestro project demonstrates lock-free matching engine design" is useful. "The candidate has relevant projects" is not.
+
+**Weight projects by their Tier field.** Each project has a Tier (Flagship, Notable, Minor) reflecting how much the candidate values it and how much engineering depth it demonstrates. Flagship projects are the candidate's strongest evidence — alignment with flagships is a much stronger signal than alignment with minor or abandoned projects. If a company's work only aligns with minor-tier projects, that is weak technical alignment regardless of nominal technology overlap.
 
 **Technologies (from `skills.md`):**
 For each company, identify which of the candidate's technologies the company uses in production. "Production Rust — the candidate's primary language" is useful. "Good tech stack" is not.

@@ -64,6 +64,29 @@ ORDER BY
 
 Report the total count immediately: "142 jobs pending. Starting with the highest-signal batch."
 
+### 1b. Pull calibration anchors
+
+Before grading any job, pull a calibration sample from the existing graded jobs. These anchors define what each grade tier looks like in this database and prevent batch-relative grade deflation.
+
+```sql
+SELECT j.grade, j.title, c.name AS company_name, c.grade AS company_grade,
+       j.fit_assessment
+FROM jobs j
+JOIN companies c ON c.id = j.company_id
+WHERE j.grade IS NOT NULL
+  AND j.evaluation_status <> 'archived'
+ORDER BY
+    CASE j.grade
+        WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+        WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
+    END,
+    RANDOM()
+```
+
+Select 2-3 examples per grade tier. These are the reference points — when grading a new job, ask "does this belong alongside the SS anchors or the A anchors?" rather than comparing against other jobs in the current batch. Embed these anchors in every parallel agent's prompt.
+
+**Note:** If existing fit assessments are shallow (one-line summaries from a previous rubric version), the anchors are imperfect. Use them for grade-level calibration (what kind of role deserves SS vs A) rather than as examples of assessment quality.
+
 ### 2. Prioritise the batch
 
 Do not grade in database insertion order. Use the prioritisation logic in `references/prioritisation-guide.md` to select the most promising jobs first. The compound signal is:

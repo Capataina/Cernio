@@ -10,6 +10,8 @@ Grading happens in batches of ~30 jobs per session. If 142 jobs are pending, the
 
 If the first batch prioritises the highest-signal jobs, the user sees the strongest opportunities immediately and can start preparing applications while later batches process the tail. The first batch should contain the jobs most likely to be SS or S.
 
+**Important interaction with grading:** Because prioritisation deliberately puts the best jobs first, every batch is skewed toward high-quality roles. This means within-batch relative grading would systematically deflate grades. The grading rubric addresses this with calibration-anchored grading — agents compare each job against real examples from the existing database at each grade tier, not against other jobs in the batch. See the grading rubric's "Cross-referencing and Relative Grading" section for the full mechanism.
+
 ---
 
 ## The compound signal

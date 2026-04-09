@@ -30,7 +30,7 @@ Grading happens in four steps. Each step informs the next.
 
 **Step 3: Cross-reference questions and dimensions.** Do they agree? When they conflict, reason through why. If the questions say "this would be amazing" but a critical dimension (seniority match) fails — the dimension wins; an unachievable role is F regardless. If the dimensions say "weak alignment" but the questions reveal this would be a transformative career move — the questions might be seeing something the dimensions missed.
 
-**Step 4: Relative comparison.** Compare this job against others at the same grade. Does it genuinely belong there? Would the candidate really be indifferent between all the jobs at this tier?
+**Step 4: Calibration check.** Compare this job against the calibration anchors — real examples from the database at each grade tier. Does it belong alongside the examples at the grade you've assigned? If it's clearly stronger than the A-tier anchors but weaker than the SS anchors, it's S. Do NOT compare against other jobs in the current batch to enforce a distribution.
 
 The fit assessment written to the database should be the output of this process — the actual reasoning, not a summary.
 
@@ -73,14 +73,26 @@ The company name, the role title, and what the candidate would actually learn al
 
 This is where the profile matching actually matters — not as an abstract dimension score, but as a practical question: would the candidate's specific projects, skills, and experience make them a standout applicant for this role?
 
-Read `projects.md` carefully. For each major project, ask: does this demonstrate something this role requires? Be specific:
+Read `projects.md` carefully. Every project has a **Tier** field (Flagship, Notable, Minor) and a **Status** field. Both matter:
+
+**Project tiers determine evidence weight:**
+
+| Tier | Meaning | How to use in fit assessment |
+|------|---------|------------------------------|
+| **Flagship** | Deep, substantial, actively maintained — the candidate's strongest work | Primary evidence. Cite these by name when assessing fit. A role that aligns with 2-3 flagship projects is one where the candidate has a genuine edge. |
+| **Notable** | Solid projects showing real skill, but less depth or no longer active | Supporting evidence. Cite when directly relevant to the role, but don't build the entire fit case on these. |
+| **Minor** | Small, abandoned early, or completed but not valued by the candidate | Mention only if directly relevant. Never use as primary evidence of capability. An abandoned particle sim website does not demonstrate the same thing as a lock-free matching engine. |
+
+**Status matters too.** An "In Progress" flagship that the candidate is actively investing in demonstrates current capability and genuine interest. An "Abandoned" project — regardless of how interesting the concept was — shows the candidate started but didn't follow through, which is weaker evidence. A "Completed" project shows the candidate can finish what they start. Weight accordingly.
+
+**What the flagship projects demonstrate:**
 - Nyquestro → lock-free concurrency, low-latency systems, financial domain knowledge
 - NeuroDrive → ML from scratch, RL, performance engineering under real-time constraints
 - Aurix → DeFi analytics, quantitative risk modelling, financial mathematics
-- Xyntra → compiler engineering, graph rewriting, GPU code generation
 - Cernio → async networking, database integration, TUI development, systems architecture
+- Image Browser → local ML inference, desktop application architecture, ONNX/CLIP integration
 
-A role where 2-3 projects map directly to the requirements is one where the candidate has a genuine edge over typical applicants. A role where none of the projects are relevant means the candidate is competing without their strongest evidence.
+A role where 2-3 flagship projects map directly to the requirements is one where the candidate has a genuine edge over typical applicants. A role where only minor/abandoned projects are relevant means the candidate is competing without their strongest evidence — that's a weaker fit even if the technology nominally matches.
 
 Also check `portfolio-gaps.md` — does this role require something the profile explicitly lacks? A gap in a "nice to have" is different from a gap in a core requirement.
 
@@ -164,15 +176,27 @@ These add precision to the question-based reasoning. They are not a replacement 
 
 **Mandatory after every batch.** Do not write grades to the database without completing this.
 
-### Within a batch
+### Calibration-anchored grading, not batch-relative grading
 
-1. **Compare within each tier.** All jobs at the same grade should be genuinely comparable. If "Graduate SWE at Bloomberg" and "Junior Developer at a 5-person agency" are both B, re-examine.
+**Critical design principle:** Grades must be calibrated against the full universe of graded jobs in the database, NOT against the current batch. Batches are never representative — the prioritisation system deliberately puts the best jobs first, and re-assessment batches may contain only top-tier jobs. Within-batch distribution enforcement ("surely these can't all be S") produces grade deflation when the batch is legitimately skewed toward high-quality jobs.
 
-2. **Compare across adjacent tiers.** For boundary jobs: "Would the candidate genuinely prefer every A-tier job over this B-tier job?" If not, adjust.
+**How calibration works:**
 
-3. **The "which offer would you take" test.** For any two jobs at different grades — if the candidate had offers from both, would they take the higher-graded one? If not, the grades are wrong.
+1. **Before grading begins**, pull a calibration sample from the database: 2-3 real examples at each grade tier (SS, S, A, B, C, F) with their fit assessments and the company name/grade. These are the grade anchors — they define what each tier looks like in this specific database.
 
-4. **Cross-reference with company grades.** A graduate role at an S-tier company should rarely grade lower than A unless there's a specific problem with the role itself (not the company). If the company is S but the graduate SWE role is C, something is likely wrong — re-examine. It CAN happen (the "role" might be pre-sales disguised by title), but it demands explicit justification.
+2. **Grade each job against the calibration anchors**, not against other jobs in the batch. Ask: "Does this job belong alongside the SS examples, or alongside the A examples?" The batch composition is irrelevant — a batch of 20 genuinely excellent jobs should produce 20 high grades.
+
+3. **Within-batch comparison is a consistency check**, not a distribution enforcer. After grading, scan for: did I grade two very similar jobs at different tiers? Did I grade two very different jobs at the same tier? These are errors to fix — but "too many S grades in one batch" is NOT an error if each job individually deserves S against the calibration anchors.
+
+### Cross-referencing checks
+
+After grading against calibration anchors, verify:
+
+1. **Cross-reference with company grades.** A graduate role at an S-tier company should rarely grade lower than A unless there's a specific problem with the role itself (not the company). If the company is S but the graduate SWE role is C, something is likely wrong — re-examine. It CAN happen (the "role" might be pre-sales disguised by title), but it demands explicit justification.
+
+2. **Consistency within the batch.** Two roles with very similar descriptions, requirements, and company quality should land at the same grade. If they don't, one of them is wrong.
+
+3. **The "which offer would you take" test.** For any two jobs you graded at different tiers — if the candidate had offers from both, would they take the higher-graded one? If not, the grades are wrong.
 
 ### Sanity checks
 
@@ -182,6 +206,10 @@ Before writing to the database, scan for:
 - Any role at an S-tier company graded C or F without hard seniority mismatch — why?
 
 These are not automatic corrections. They are red flags that demand re-examination and explicit justification in the fit assessment.
+
+### When grading in parallel across agents
+
+Each agent receives the same calibration sample and grades independently against those anchors. The orchestrator MUST still do a cross-batch consistency check before writing to the database — pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other and the calibration anchors. But do NOT redistribute grades to fit a target distribution.
 
 ---
 

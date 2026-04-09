@@ -30,7 +30,7 @@ Grading happens in four steps. Do not skip any.
 
 **Step 3: Cross-reference questions and dimensions.** Do they agree? If the questions say "I'd be proud to work here, they can hire me, I'd grow" but the dimensions say "C tier because tech stack mismatch" — the dimensions are wrong, not the questions. If the dimensions say "strong on everything" but the questions reveal "the work wouldn't actually be engaging" — that matters too. When they conflict, reason through why and decide which signal is more reliable.
 
-**Step 4: Relative comparison.** Compare this company against others at the same grade and adjacent grades. Does it genuinely belong where you've put it? Would the candidate really be indifferent between all the companies at this tier?
+**Step 4: Calibration check.** Compare this company against the calibration anchors — real examples from the database at each grade tier. Does it belong alongside the examples at the grade you've assigned? If it's clearly stronger than the B-tier anchors but weaker than the S anchors, it's A. Do NOT compare against other companies in the current batch to enforce a distribution.
 
 The grade reasoning written to the database should reflect this process — not just a conclusion, but the thinking that led to it.
 
@@ -96,7 +96,7 @@ These dimensions provide structure and precision. Use them to support and valida
 | Dimension | What to assess | Why it matters |
 |-----------|---------------|---------------|
 | **Engineering reputation** | Is this company known for strong engineering? Eng blog, OSS, conference talks, Glassdoor engineering reviews, known engineers. | Read `experience.md` — with limited formal experience, the first employer's name compensates for credential gaps. The higher the reputation, the more doors it opens. |
-| **Technical alignment** | Does the company's core work involve problems that match the portfolio? Map `projects.md` and `skills.md` against their engineering work. | The portfolio is the primary evidence of capability. A company whose problems resemble the candidate's projects is a company where the portfolio converts in interviews. |
+| **Technical alignment** | Does the company's core work involve problems that match the portfolio? Map `projects.md` and `skills.md` against their engineering work. **Weight by project tier** — alignment with flagship projects (Nyquestro, NeuroDrive, Aurix, Cernio, Image Browser) is strong evidence; alignment only with minor/abandoned projects is weak evidence. | The portfolio is the primary evidence of capability. A company whose problems resemble the candidate's flagship projects is a company where the portfolio converts in interviews. Alignment with abandoned or minor projects is not the same signal. |
 | **Growth trajectory** | Growing, stable, or declining? Funding, hiring activity, headcount trends, product launches. | Read `visa.md` — growth means they're more likely to hire at entry level, budget for sponsorship, and offer career progression. |
 
 ### Medium weight
@@ -139,19 +139,31 @@ These dimensions provide structure and precision. Use them to support and valida
 
 **This step is mandatory.** Do not write grades to the database without completing it.
 
-### After grading a batch
+### Calibration-anchored grading, not batch-relative grading
 
-1. **Compare within each tier.** Look at all companies you've put at the same grade. Do they genuinely belong together? Would it make sense to tell the candidate "these are all equally worth pursuing"? If a trillion-dollar tech company and a 10-person unfunded startup are both B, something is wrong.
+**Critical design principle:** Grades must be calibrated against the full universe of graded companies in the database, NOT against the current batch. Batches are never representative — they may be sector-focused, discovery-source-skewed, or contain only high-quality companies. Within-batch distribution enforcement ("surely these can't all be A") produces grade deflation when the batch is legitimately strong.
 
-2. **Compare across adjacent tiers.** For every company near a boundary, ask: "Is this genuinely less valuable than everything in the tier above?" If a B-tier company would clearly be a better career move than an A-tier company, adjust.
+**How calibration works:**
 
-3. **The "which offer would you take" test.** For any two companies at different grades, imagine the candidate has a graduate SWE offer from both. Would they take the higher-graded one? If the answer consistently contradicts the grades, the grades are wrong.
+1. **Before grading begins**, pull a calibration sample from the database: 2-3 real examples at each grade tier (S, A, B, C) with their grade reasoning. These are the grade anchors — they define what each tier looks like in this specific database.
 
-4. **Sanity check.** Scan for obvious anomalies: a well-known employer at C, a tiny startup with no sponsorship at S. These aren't automatic corrections — but each one demands re-examination and explicit justification.
+2. **Grade each company against the calibration anchors**, not against other companies in the batch. Ask: "Does this company belong alongside the S examples, or alongside the A examples?" The batch composition is irrelevant — a batch of 10 genuinely excellent companies should produce 10 high grades.
+
+3. **Within-batch comparison is a consistency check**, not a distribution enforcer. After grading, scan for: did I grade two very similar companies at different tiers? Did I grade two very different companies at the same tier? These are errors to fix — but "too many A grades in one batch" is NOT an error if each company individually deserves A against the calibration anchors.
+
+### Cross-referencing checks
+
+After grading against calibration anchors, verify:
+
+1. **Consistency within the batch.** Two companies with very similar engineering profiles, sponsorship capability, and career ceiling should land at the same grade. If they don't, one of them is wrong.
+
+2. **The "which offer would you take" test.** For any two companies at different grades, imagine the candidate has a graduate SWE offer from both. Would they take the higher-graded one? If the answer consistently contradicts the grades, the grades are wrong.
+
+3. **Sanity check.** Scan for obvious anomalies: a well-known employer at C, a tiny startup with no sponsorship at S. These aren't automatic corrections — but each one demands re-examination and explicit justification.
 
 ### When grading in parallel across agents
 
-Each agent grades its batch independently, but the orchestrator MUST do a cross-batch comparison before writing to the database. Pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other.
+Each agent receives the same calibration sample and grades independently against those anchors. The orchestrator MUST still do a cross-batch consistency check before writing to the database — pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other and the calibration anchors. But do NOT redistribute grades to fit a target distribution.
 
 ---
 
