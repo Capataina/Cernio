@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-use super::app::{CompanyRow, DashboardStats, JobRow, PipelineCard, SortMode, TopMatch};
+use super::app::{ActivityEntry, CompanyRow, DashboardStats, JobRow, PipelineCard, SortMode, TopMatch};
 
 pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow> {
     let archive_filter = if show_archived { "" } else { "WHERE c.status != 'archived'" };
@@ -417,6 +417,73 @@ pub fn fetch_top_companies_by_hits(conn: &Connection) -> Vec<(String, i64)> {
         .and_then(|mut stmt| {
             stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
                 .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// Fetch a rich activity timeline for the Activity tab.
+///
+/// Returns individual decision entries (with job title + company) and
+/// aggregated search/grading/discovery events, ordered by date descending.
+pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
+    let sql = "
+        SELECT d AS date, action, detail FROM (
+            -- Individual user decisions with job + company detail
+            SELECT DATE(ud.decided_at) AS d, ud.decision AS action,
+                   j.title || ' — ' || c.name AS detail,
+                   ud.decided_at AS sort_ts,
+                   1 AS priority
+            FROM user_decisions ud
+            JOIN jobs j ON j.id = ud.job_id
+            JOIN companies c ON c.id = j.company_id
+
+            UNION ALL
+
+            -- Aggregated search events per day
+            SELECT DATE(last_searched_at) AS d, 'searched' AS action,
+                   CAST(COUNT(*) AS TEXT) || ' companies searched' AS detail,
+                   MAX(last_searched_at) AS sort_ts,
+                   3 AS priority
+            FROM companies
+            WHERE last_searched_at IS NOT NULL
+            GROUP BY DATE(last_searched_at)
+
+            UNION ALL
+
+            -- Aggregated grading events per day
+            SELECT DATE(graded_at) AS d, 'graded' AS action,
+                   CAST(COUNT(*) AS TEXT) || ' companies graded' AS detail,
+                   MAX(graded_at) AS sort_ts,
+                   4 AS priority
+            FROM companies
+            WHERE graded_at IS NOT NULL
+            GROUP BY DATE(graded_at)
+
+            UNION ALL
+
+            -- Aggregated discovery events per day
+            SELECT DATE(discovered_at) AS d, 'discovered' AS action,
+                   CAST(COUNT(*) AS TEXT) || ' jobs discovered' AS detail,
+                   MAX(discovered_at) AS sort_ts,
+                   5 AS priority
+            FROM jobs
+            WHERE discovered_at IS NOT NULL
+            GROUP BY DATE(discovered_at)
+        )
+        ORDER BY date DESC, priority ASC
+        LIMIT 200
+    ";
+
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| {
+                Ok(ActivityEntry {
+                    date: row.get(0)?,
+                    action: row.get(1)?,
+                    detail: row.get(2)?,
+                })
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
         })
         .unwrap_or_default()
 }

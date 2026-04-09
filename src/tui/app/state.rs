@@ -12,6 +12,7 @@ pub enum View {
     Companies,
     Jobs,
     Pipeline,
+    Activity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,8 +30,15 @@ impl View {
             View::Companies => 1,
             View::Jobs => 2,
             View::Pipeline => 3,
+            View::Activity => 4,
         }
     }
+}
+
+pub struct ActivityEntry {
+    pub date: String,       // "2026-04-09"
+    pub action: String,     // "applied", "searched", "graded", "discovered", "watching", "rejected"
+    pub detail: String,     // "Software Engineer — Citadel" or "270 companies searched"
 }
 
 /// Which column is focused in the Pipeline/Kanban view.
@@ -190,4 +198,8 @@ pub struct App {
     pub pipeline_applied: Vec<PipelineCard>,
     pub pipeline_interview: Vec<PipelineCard>,
     pub pipeline_selections: [usize; 3], // selection index per column
+
+    // ── Activity timeline ───────────────────────────────────────
+    pub activity_timeline: Vec<ActivityEntry>,
+    pub activity_scroll: u16,
 }

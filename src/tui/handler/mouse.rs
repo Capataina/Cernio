@@ -26,6 +26,9 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 View::Dashboard => {
                     app.scroll_viewport_down(3);
                 }
+                View::Activity => {
+                    app.activity_scroll = app.activity_scroll.saturating_add(3);
+                }
                 View::Pipeline => {
                     app.pipeline_next();
                     app.pipeline_next();
@@ -46,6 +49,9 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             match app.view {
                 View::Dashboard => {
                     app.scroll_viewport_up(3);
+                }
+                View::Activity => {
+                    app.activity_scroll = app.activity_scroll.saturating_sub(3);
                 }
                 View::Pipeline => {
                     app.pipeline_prev();
@@ -70,14 +76,16 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             // Click on tab bar (rows 0–2).
             if mouse.row < 3 {
                 let col = mouse.column;
-                if col < 15 {
+                if col < 14 {
                     app.view = View::Dashboard;
-                } else if col < 35 {
+                } else if col < 32 {
                     app.view = View::Companies;
-                } else if col < 55 {
+                } else if col < 48 {
                     app.view = View::Jobs;
-                } else {
+                } else if col < 64 {
                     app.view = View::Pipeline;
+                } else {
+                    app.view = View::Activity;
                 }
                 app.focus = Focus::List;
                 app.detail_scroll = 0;
@@ -86,7 +94,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             }
 
             // Below tab bar.
-            if matches!(app.view, View::Dashboard) {
+            if matches!(app.view, View::Dashboard | View::Activity) {
                 return;
             }
 

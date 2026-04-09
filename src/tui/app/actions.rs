@@ -83,7 +83,7 @@ impl App {
                 }),
                 false,
             ),
-            View::Dashboard | View::Pipeline => (None, false),
+            View::Dashboard | View::Pipeline | View::Activity => (None, false),
         };
         if let Some(url) = url {
             let _ = std::process::Command::new("open").arg(&url).spawn();
@@ -175,7 +175,7 @@ impl App {
             View::Companies => self.selected_company().and_then(|c| {
                 c.careers_url.as_deref().or(Some(c.website.as_str()))
             }),
-            View::Dashboard | View::Pipeline => None,
+            View::Dashboard | View::Pipeline | View::Activity => None,
         };
         if let Some(url) = url {
             if let Ok(mut child) = std::process::Command::new("pbcopy")
@@ -245,7 +245,7 @@ impl App {
             View::Jobs => self.export_jobs_markdown(),
             View::Companies => self.export_companies_markdown(),
             View::Pipeline => self.export_pipeline_markdown(),
-            View::Dashboard => self.export_jobs_markdown(), // default to jobs
+            View::Dashboard | View::Activity => self.export_jobs_markdown(), // default to jobs
         };
 
         let date = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -253,7 +253,7 @@ impl App {
             View::Jobs => "jobs",
             View::Companies => "companies",
             View::Pipeline => "pipeline",
-            View::Dashboard => "jobs",
+            View::Dashboard | View::Activity => "jobs",
         };
         let dir = Path::new("exports");
         let _ = std::fs::create_dir_all(dir);

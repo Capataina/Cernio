@@ -68,7 +68,7 @@ impl App {
         match self.view {
             View::Companies => (&mut self.company_state, self.companies.len()),
             View::Jobs => (&mut self.job_state, self.jobs.len()),
-            View::Dashboard | View::Pipeline => (&mut self.company_state, 0),
+            View::Dashboard | View::Pipeline | View::Activity => (&mut self.company_state, 0),
         }
     }
 

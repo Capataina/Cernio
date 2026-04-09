@@ -71,7 +71,20 @@ pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(") "),
     ]);
 
-    let titles = vec![dashboard_tab, companies_tab, jobs_tab, pipeline_tab];
+    // Activity tab — count in cyan if entries exist.
+    let activity_count = app.activity_timeline.len();
+    let activity_count_style = if activity_count > 0 {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+    let activity_tab = Line::from(vec![
+        Span::raw(" Activity ("),
+        Span::styled(format!("{activity_count}"), activity_count_style),
+        Span::raw(") "),
+    ]);
+
+    let titles = vec![dashboard_tab, companies_tab, jobs_tab, pipeline_tab, activity_tab];
 
     let tabs = Tabs::new(titles)
         .block(
@@ -164,6 +177,11 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ("?", "help"),
             ("q", "quit"),
         ],
+        (View::Activity, _) => vec![
+            ("j/k", "scroll"),
+            ("?", "help"),
+            ("q", "quit"),
+        ],
     };
 
     let mut spans: Vec<Span> = keys
@@ -228,6 +246,12 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 app.theme.dim,
             ));
         }
+        View::Activity => {
+            right_parts.push(Span::styled(
+                format!(" {} entries ", app.activity_timeline.len()),
+                app.theme.dim,
+            ));
+        }
     }
 
     if !app.search_query.is_empty() && !app.search_mode {
@@ -236,6 +260,35 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             format!(" \"{}\" — {} matches ", app.search_query, count),
             Style::default().fg(Color::Cyan),
         ));
+    }
+
+    // Session timer.
+    let elapsed = app.session_start.elapsed();
+    let mins = elapsed.as_secs() / 60;
+    let hours = mins / 60;
+    let session_str = if hours > 0 {
+        format!(" {}h {:02}m ", hours, mins % 60)
+    } else {
+        format!(" {}m ", mins)
+    };
+    right_parts.push(Span::styled(session_str, app.theme.dim));
+
+    // URL preview when a job is selected in Jobs view.
+    if app.view == View::Jobs {
+        if let Some(job) = app.selected_job() {
+            let url = &job.url;
+            // Extract domain + path, truncate to ~40 chars.
+            let display_url = url
+                .strip_prefix("https://")
+                .or(url.strip_prefix("http://"))
+                .unwrap_or(url);
+            let truncated = if display_url.len() > 40 {
+                format!("{}…", &display_url[..39])
+            } else {
+                display_url.to_string()
+            };
+            right_parts.push(Span::styled(format!(" {truncated} "), app.theme.dim));
+        }
     }
 
     if !right_parts.is_empty() {

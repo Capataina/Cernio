@@ -63,6 +63,21 @@ pub fn handle_job_list(app: &mut App, key: KeyEvent) {
     }
 }
 
+pub fn handle_activity(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.activity_scroll = app.activity_scroll.saturating_add(1);
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.activity_scroll = app.activity_scroll.saturating_sub(1);
+        }
+        KeyCode::Home => {
+            app.activity_scroll = 0;
+        }
+        _ => {}
+    }
+}
+
 pub fn handle_pipeline(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => app.pipeline_next(),

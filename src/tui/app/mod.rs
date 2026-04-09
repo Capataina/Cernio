@@ -44,6 +44,7 @@ impl App {
             queries::fetch_pipeline_cards(&conn);
 
         let activity_data = queries::fetch_activity_data(&conn);
+        let activity_timeline = queries::fetch_activity_timeline(&conn);
         let last_search_at = queries::fetch_last_search_at(&conn);
         let last_graded_at = queries::fetch_last_graded_at(&conn);
         let top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);
@@ -94,6 +95,8 @@ impl App {
             pipeline_applied,
             pipeline_interview,
             pipeline_selections: [0; 3],
+            activity_timeline,
+            activity_scroll: 0,
         })
     }
 
@@ -114,6 +117,7 @@ impl App {
         self.stats = queries::fetch_stats(&conn);
         self.total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
         self.activity_data = queries::fetch_activity_data(&conn);
+        self.activity_timeline = queries::fetch_activity_timeline(&conn);
         self.last_search_at = queries::fetch_last_search_at(&conn);
         self.last_graded_at = queries::fetch_last_graded_at(&conn);
         self.top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);

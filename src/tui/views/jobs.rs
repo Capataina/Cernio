@@ -143,11 +143,27 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 t.dim
             };
 
+            // "New" badge: magenta ● for jobs discovered in last 24 hours.
+            let is_new = j.posted_date.as_deref().map_or(false, |d| {
+                chrono::NaiveDate::parse_from_str(&d[..10.min(d.len())], "%Y-%m-%d")
+                    .map_or(false, |date| {
+                        let today = chrono::Local::now().date_naive();
+                        (today - date).num_days() <= 1
+                    })
+            });
+
             let mut row = Row::new(vec![
                 Cell::from(format!("{}{grade_display:<4}", if is_multi { "▪" } else { " " })).style(grade_style),
                 Cell::from(desc_indicator).style(desc_style),
                 Cell::from(pkg_indicator).style(pkg_style),
-                Cell::from(j.title.as_str()),
+                Cell::from(Line::from(if is_new {
+                    vec![
+                        Span::styled("● ", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+                        Span::raw(&j.title),
+                    ]
+                } else {
+                    vec![Span::raw(&j.title)]
+                })),
                 Cell::from(j.company_name.as_str()),
                 Cell::from(truncate(location, 16)),
             ]);
@@ -251,13 +267,31 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let grade_style = t.grade_style(j.grade.as_deref());
     lines.push(detail_row(t, "Grade", Span::styled(grade, grade_style)));
 
-    if let Some(decision) = &j.decision {
-        let dec_style = t.decision_style(Some(decision));
-        lines.push(detail_row(
-            t,
-            "Decision",
-            Span::styled(decision, dec_style),
-        ));
+    // Decision history: show full journey, not just latest.
+    {
+        let history = fetch_decision_history(app, j.id);
+        if !history.is_empty() {
+            let mut spans = vec![
+                Span::styled("  Decision  ", t.stat_label),
+            ];
+            for (i, (decision, date)) in history.iter().enumerate() {
+                if i > 0 {
+                    spans.push(Span::styled(" → ", t.dim));
+                }
+                let dec_style = t.decision_style(Some(decision));
+                let short_date = if date.len() >= 10 { &date[5..10] } else { date };
+                spans.push(Span::styled(decision.clone(), dec_style));
+                spans.push(Span::styled(format!(" ({short_date})"), t.dim));
+            }
+            lines.push(Line::from(spans));
+        } else if let Some(decision) = &j.decision {
+            let dec_style = t.decision_style(Some(decision));
+            lines.push(detail_row(
+                t,
+                "Decision",
+                Span::styled(decision, dec_style),
+            ));
+        }
     }
 
     if let Some(score) = j.fit_score {
@@ -362,6 +396,24 @@ fn detail_row<'a>(
 
 fn truncate(s: &str, max: usize) -> String {
     text_utils::truncate_chars(s, max)
+}
+
+/// Fetch full decision history for a job (watching → applied → interview, etc.).
+fn fetch_decision_history(app: &App, job_id: i64) -> Vec<(String, String)> {
+    let Ok(conn) = rusqlite::Connection::open(&app.db_path) else {
+        return Vec::new();
+    };
+    conn.prepare(
+        "SELECT decision, decided_at FROM user_decisions
+         WHERE job_id = ?1 ORDER BY decided_at ASC",
+    )
+    .and_then(|mut stmt| {
+        stmt.query_map([job_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    })
+    .unwrap_or_default()
 }
 
 
