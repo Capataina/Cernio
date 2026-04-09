@@ -41,6 +41,7 @@ impl Database {
         self.migrate_003_add_job_archival()?;
         self.migrate_004_add_last_searched_at()?;
         self.migrate_005_add_archived_at()?;
+        self.migrate_006_add_application_packages()?;
         Ok(())
     }
 
@@ -261,6 +262,23 @@ impl Database {
             )?;
         }
 
+        Ok(())
+    }
+
+    /// Migration 006: Add application_packages table.
+    ///
+    /// Stores pre-generated application answers for jobs. Created by the
+    /// prepare-applications skill, consumed by the autofill system when
+    /// the user presses 'p' in the TUI. Automatically cleaned up when a
+    /// job is marked as applied.
+    fn migrate_006_add_application_packages(&self) -> Result<()> {
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS application_packages (
+                job_id      INTEGER PRIMARY KEY REFERENCES jobs(id),
+                answers     TEXT NOT NULL,
+                created_at  TEXT NOT NULL
+            );"
+        )?;
         Ok(())
     }
 

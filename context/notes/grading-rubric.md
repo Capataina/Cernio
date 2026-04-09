@@ -127,3 +127,11 @@ All jobs (712), user decisions (120), and company metadata wiped. The 273 compan
 **What changed in grade-companies skill:** Company grading now also writes enriched `what_they_do` (3-5 sentence paragraph, no stale info), `location`, `sector_tags`, and profile-grounded `why_relevant` alongside the grade. This was previously handled superficially during population. The grading agents are already researching each company — routing that knowledge into the description field is zero extra work.
 
 **Rebuild sequence:** Enrich+grade all 273 companies → search jobs with updated filters → grade jobs with new rubric.
+
+---
+
+## Exclusion keyword purge (session 6, 2026-04-09)
+
+Deleted 1,064 jobs matching exclusion keywords from the database (both active and archived). The DB went from ~2,001 to 937 jobs. This was a bulk retroactive application of the 34 exclusion keywords added in session 5 — the keywords had only been applied to new search results, not to the existing corpus.
+
+Also in session 6: all 167 potential companies were resolved via 8 parallel agents. 64 resolved to supported ATS, 98 marked bespoke with careers URLs, 5 dead/duplicate archived then deleted (Eisler Capital shut down, Nivaura acquired, OpenSSF podcast not employer, Qatalog acquired by ClickUp, Oxbotica duplicate of Oxa). Final company count: 408 (287 resolved, 121 bespoke, 0 potential).

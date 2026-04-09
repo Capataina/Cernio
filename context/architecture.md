@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-09 (session 5). Full database reset and rebuild. 434 companies (27S/124A/182B/99C), 2,001 jobs (10 SS, 27 S, 71 A). Grading systems overhauled: project tiers (Flagship/Notable/Minor), calibration-anchored grading replacing batch-relative, mandatory description citation. Tiered job archival (SS=28d, S=21d, A=14d, B=7d, C/F=3d). 34 new exclusion keywords validated against historical data. Bespoke search tracking via last_searched_at. HTML tag stripper handles quoted attributes. 6 ATS fetchers, 5 pipeline scripts, 8 skills, 5 DB migrations.
+> Last updated: 2026-04-09 (session 6). 408 companies (287 resolved, 121 bespoke, 0 potential), 937 jobs. All 167 potential companies resolved — 0 remaining. Exclusion keyword purge deleted 1,064 jobs. New `cernio format` pipeline command (HTML→plaintext). Autofill system scaffolded (Chrome CDP via chromiumoxide — launches but React form filling broken). `application_packages` DB table + `prepare-applications` skill. TUI: `o` auto-marks applied, `p` launches autofill, `●` package indicator. 7 ATS fetchers, 6 pipeline scripts, 9 skills, 6 DB migrations.
 
 ---
 
@@ -54,14 +54,15 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 | Component | Choice | Status |
 |-----------|--------|--------|
 | Core language | Rust (edition 2024) | In use |
-| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — schema, 2 migrations, 11 tests |
+| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — schema, 6 migrations, 11 tests |
 | Date handling | `chrono` | In use |
 | Async runtime | Tokio | In use — pipeline scripts (resolve, search, clean, check) |
 | HTTP | Reqwest | In use — ATS API calls across 6 providers (incl. Workday) |
 | Serialisation | Serde | In use — JSON (ATS responses), TOML (config) |
 | Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed config structs |
 | TUI | Ratatui 0.29 + Crossterm backend | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), multi-select, search/filter, sort, export, mouse support, responsive layout, widget refactor |
-| AI layer | Claude Code skills (conversational invocation) | 8 skills with mandatory-read blocks enforced on all skills. check-integrity has 3 reference files (remediation-guide, quality-standards, profile-context) |
+| Browser automation | `chromiumoxide` (Chrome CDP) + `futures` | Scaffolded — Chrome launches, navigates; form filling broken on React forms |
+| AI layer | Claude Code skills (conversational invocation) | 9 skills with mandatory-read blocks enforced on all skills. check-integrity has 3 reference files (remediation-guide, quality-standards, profile-context) |
 
 ---
 
@@ -85,13 +86,18 @@ cernio/
 │   │   ├── workable.rs         # Workable API fetcher
 │   │   ├── smartrecruiters.rs  # SmartRecruiters API fetcher (totalFound>0 check)
 │   │   └── workday.rs          # Workday API fetcher (variable subdomain + site)
+│   ├── autofill/
+│   │   ├── mod.rs              # ApplicantProfile, provider dispatch, package JSON parsing
+│   │   ├── common.rs           # Chrome launch via chromiumoxide CDP, field filling helpers
+│   │   └── greenhouse.rs       # Greenhouse-specific form selectors (broken — React state issue)
 │   ├── pipeline/
 │   │   ├── mod.rs              # Pipeline module exports
 │   │   ├── resolve.rs          # cernio resolve — slug probing, multi-provider
 │   │   ├── search.rs           # cernio search — fetch → filter → insert
 │   │   ├── clean.rs            # cernio clean — job removal, company archival
 │   │   ├── check.rs            # cernio check — integrity report
-│   │   └── import.rs           # cernio import — bulk import from external sources
+│   │   ├── import.rs           # cernio import — bulk import from external sources
+│   │   └── format.rs           # cernio format — HTML/entity-encoded descriptions → clean plaintext
 │   └── tui/
 │       ├── mod.rs              # Terminal setup/teardown, event loop
 │       ├── app.rs              # App state, View/Focus enums, data models, navigation, multi-select, search, sort
@@ -137,17 +143,19 @@ cernio/
 │   ├── grade-jobs/
 │   │   ├── SKILL.md
 │   │   └── references/          # grading-rubric.md, profile-context.md, prioritisation-guide.md
-│   └── check-integrity/
-│       ├── SKILL.md             # AI-driven re-evaluation and grade quality auditing
-│       └── references/
-│           ├── remediation-guide.md
-│           ├── quality-standards.md
-│           └── profile-context.md
+│   ├── check-integrity/
+│   │   ├── SKILL.md             # AI-driven re-evaluation and grade quality auditing
+│   │   └── references/
+│   │       ├── remediation-guide.md
+│   │       ├── quality-standards.md
+│   │       └── profile-context.md
+│   └── prepare-applications/
+│       └── SKILL.md             # Generate tailored application answers per job
 ├── state/
 │   └── cernio.db               # SQLite database (gitignored)
 ├── AgentCreationResearch/      # Skill authoring research (reference)
 ├── context/                    # Project memory
-├── Cargo.toml                  # rusqlite, chrono, tokio, reqwest, serde, toml
+├── Cargo.toml                  # rusqlite, chrono, tokio, reqwest, serde, toml, chromiumoxide, futures
 ├── claude.md                   # Session configuration
 └── README.md                   # Project vision and milestones
 ```
@@ -178,7 +186,8 @@ Skills handle slow, fuzzy, infrequent work that requires reasoning. Invoked conv
 | `grade-companies` | Designed | Grade ungraded companies (S/A/B/C) with extensive rubric and profile context |
 | `grade-jobs` | Designed | Grade ungraded jobs (SS/S/A/B/C/F) with smart prioritisation by company grade × title signal |
 | `search-jobs` | Legacy | Original job search skill — search logic moved to `cernio search` script |
-| `check-integrity` | Designed | AI-driven re-evaluation and grade quality auditing |
+| `check-integrity` | Designed | AI-driven re-evaluation and grade quality auditing (runs `cernio format` as step 2) |
+| `prepare-applications` | Designed | Generate tailored application answers per job, stored in `application_packages` table |
 
 Skills live in `skills/` within this repo, not in the upstream `agent-skills` framework. They are project-specific.
 
@@ -193,6 +202,7 @@ Scripts handle all mechanical volume work. Each has a single purpose and takes n
 | `clean` | `cernio clean [--dry-run] [--jobs-only]` | Remove F/C jobs, stale jobs, archive C companies | Implemented |
 | `check` | `cernio check [--ats-only] [--fix]` | Integrity report: health, completeness, staleness, recommendations | Implemented |
 | `import` | `cernio import <file>` | Bulk import companies from external sources (CSV/JSON) | Implemented |
+| `format` | `cernio format` | Convert raw HTML/entity-encoded descriptions to clean plaintext. Idempotent. Runs on TUI startup via `run_silent()`. | Implemented |
 | `export` | — | Markdown export of curated results | Not started |
 
 ### Data Layer
@@ -217,6 +227,9 @@ jobs
 user_decisions
   id, job_id → jobs, decision (watching/applied/rejected),
   decided_at, notes
+
+application_packages
+  job_id → jobs (PRIMARY KEY), answers (JSON), created_at
 ```
 
 #### Field Categories
@@ -342,36 +355,39 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of session 5 (2026-04-09).** Full database reset and rebuild. Session 5 overhauled every grading system (project tiers, calibration-anchored grading, mandatory description citation, enriched company descriptions), wiped all jobs and company metadata, then rebuilt from scratch with 9 discovery agents, 6 company grading agents, and 16 job grading agents. Tiered job archival replaced flat staleness. 34 exclusion keywords added (data-validated, 0 false negatives). Bespoke search tracking and HTML parser improvements. Resolve and search scripts hardened with retry and wider slug patterns.
+**End of session 6 (2026-04-09).** Exclusion keyword purge deleted 1,064 jobs (DB: 2,001→937). All 167 potential companies resolved via 8 parallel agents (64 resolved to ATS, 98 bespoke, 5 dead/duplicate removed). New `cernio format` command converts HTML descriptions to plaintext (922 formatted, runs on TUI startup). Autofill system scaffolded: `src/autofill/` with Chrome CDP via chromiumoxide — launches correctly but React form filling broken (needs nativeInputValueSetter or CDP Input.insertText). `application_packages` DB table (migration 006) stores pre-generated answers as JSON. `prepare-applications` skill generates tailored answers. TUI: `o` auto-marks applied, `p` launches autofill, yellow `●` package indicator. Dead companies removed (Eisler, Nivaura, OpenSSF, Qatalog, Oxbotica duplicate).
 
 | Component | Status |
 |-----------|--------|
 | Profile (15 files) | Fully populated. Project tiers added (Flagship/Notable/Minor). Portfolio-gaps.md actively maintained by grading agents. |
-| SQLite schema | 4 tables, 5 migrations (001 base, 002 archived status, 003 job archival, 004 last_searched_at, 005 archived_at), 18 tests passing, WAL mode |
+| SQLite schema | 5 tables, 6 migrations (001 base, 002 archived status, 003 job archival, 004 last_searched_at, 005 archived_at, 006 application_packages), 18 tests passing, WAL mode |
 | Config (`src/config.rs`) | TOML parser for `preferences.toml` — search filters, cleanup config, location patterns |
 | ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. All fetchers use `get_with_retry`. Attribute-aware HTML stripping. |
 | Pipeline: resolve (`src/pipeline/resolve.rs`) | Expanded slug generator (punctuation stripping, domain suffixes, acronyms, first-two-words). No early termination — probes all providers for all slugs. SmartRecruiters probed for all companies. |
 | Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert. Retry on empty results. Sets `last_searched_at` per company. |
 | Pipeline: clean (`src/pipeline/clean.rs`) | Tiered archival: SS=28d, S=21d, A=14d, B=7d, C/F=3d. Archive expires after 14 days (tracked via `archived_at`). No company auto-archival. |
 | Pipeline: check (`src/pipeline/check.rs`) | ATS re-verification, stale detection, completeness, dead URLs, duplicates, profile-change, structured report |
+| Pipeline: format (`src/pipeline/format.rs`) | Converts raw HTML/entity-encoded descriptions to clean plaintext. Idempotent. Runs on TUI startup via `run_silent()`. Also step 2 in check-integrity skill. |
 | Pipeline: import (`src/pipeline/import.rs`) | Bulk import from discovery files. Supports `--file` flag. Dedup via website URL unique constraint. |
 | profile-scrape skill | Designed, tested on NeuroDrive |
 | discover-companies skill | 9-agent discovery run produced 228 raw companies (161 new after dedup). Agents write to individual files. |
 | populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
 | search-jobs skill | Legacy — job search moved to `cernio search` script |
-| check-integrity skill | AI-driven re-evaluation, cross-checking guide (4 reference files), active portfolio gap maintenance (10 jobs per grade tier) |
+| check-integrity skill | AI-driven re-evaluation, cross-checking guide (4 reference files), active portfolio gap maintenance (10 jobs per grade tier). Step 2 runs `cernio format`. |
 | resolve-portals skill | AI fallback for companies that fail script resolution |
+| prepare-applications skill | Generate tailored application answers per job. Reads profile + job description + fit assessment, stores JSON answers in `application_packages` table. |
+| Autofill (`src/autofill/`) | Scaffolded. Chrome CDP via `chromiumoxide`. Provider dispatch (Greenhouse first). TUI `p` key triggers. **Broken:** JS value injection doesn't trigger React state. Needs nativeInputValueSetter or CDP Input.insertText. |
 | grade-companies skill | Enriches + grades: writes `what_they_do` (3-5 sentences), `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`. Calibration-anchored grading. |
 | grade-jobs skill | Question-first rubric, project tier awareness, calibration-anchored grading, mandatory description citation, prioritisation guide |
-| Company universe | 434 total (27 S, 124 A, 182 B, 99 C). 223 resolved, 23 bespoke, 167 potential. 18 duplicates archived. |
-| Jobs | 2,001 jobs (10 SS, 27 S, 71 A, 149 B, 226 C, 1,518 F). Every SS/S assessment is multi-paragraph with description citations. |
-| TUI (`src/tui/`, 14 files) | v4 — 4 views (dashboard, companies, jobs, pipeline). Dynamic grade bars, 18-char provider column, 4-digit job counts. Tiered cleanup via D key. Bespoke search tracking in dashboard. |
+| Company universe | 408 total (287 resolved, 121 bespoke, 0 potential). ATS: 114 Greenhouse, 70 Ashby, 31 Workable, 26 Lever, 20 Workday, 8 SmartRecruiters, 1 Eightfold. Every company has a known path to job discovery. |
+| Jobs | 937 jobs (after exclusion purge of 1,064). Every SS/S assessment is multi-paragraph with description citations. |
+| TUI (`src/tui/`, 14 files) | v4 — 4 views (dashboard, companies, jobs, pipeline). Dynamic grade bars, 18-char provider column, 4-digit job counts. Tiered cleanup via D key. Bespoke search tracking in dashboard. `o` auto-marks applied. `p` launches autofill. Yellow `●` package indicator. |
 | Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
 | Unarchive | `cernio unarchive --jobs [--grade G]` restores archived jobs with timer reset |
 
 **Next priorities:**
-1. Resolve 167 potential companies using resolve-portals AI skill
+1. Fix autofill React form filling (nativeInputValueSetter or CDP Input.insertText)
 2. Bespoke search S/A companies (Apple, Arm, Citadel, D.E. Shaw, Two Sigma, Google, etc.)
 3. Interview prep skill design and implementation
-4. Deduplicate remaining company pairs if any emerge
-5. Second integrity check after bespoke companies are searched
+4. Second integrity check after bespoke companies are searched
+5. Add Lever and Ashby autofill modules once Greenhouse works

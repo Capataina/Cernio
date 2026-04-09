@@ -1,4 +1,5 @@
 mod ats;
+mod autofill;
 mod config;
 mod db;
 mod http;
@@ -19,6 +20,7 @@ async fn main() {
         Some("search") => cmd_search(&args).await,
         Some("clean") => cmd_clean(&args),
         Some("check") => cmd_check(&args).await,
+        Some("format") => cmd_format(&args),
         Some("stats") => cmd_stats(),
         Some("pending") => cmd_pending(&args),
         Some("unarchive") => cmd_unarchive(&args),
@@ -76,6 +78,14 @@ fn cmd_clean(args: &[String]) {
     let jobs_only = args.iter().any(|a| a == "--jobs-only");
 
     pipeline::clean::run(db.conn(), &prefs.cleanup, dry_run, jobs_only);
+}
+
+/// Format job descriptions and fit assessments.
+fn cmd_format(args: &[String]) {
+    let db = open_db();
+    let dry_run = args.iter().any(|a| a == "--dry-run");
+
+    pipeline::format::run(db.conn(), dry_run);
 }
 
 /// Run integrity checks.
@@ -379,6 +389,7 @@ fn print_usage() {
     println!("  search [--company NAME] [--grade G] [--dry-run]  Search resolved companies for jobs");
     println!("  clean [--dry-run] [--jobs-only]          Archive stale/low-grade entries");
     println!("  unarchive <--jobs|--companies|--all>     Restore archived entries for re-evaluation");
+    println!("  format [--dry-run]                        Format job descriptions and assessments");
     println!("  check [--ats-only]                       Run integrity checks");
     println!();
     println!("Info commands:");

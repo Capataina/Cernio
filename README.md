@@ -152,10 +152,11 @@ The filter chain:
 ```
 Raw jobs from ATS APIs
   → Location filter (London/UK/Remote patterns, configurable per ATS provider)
-  → Exclusion filter (Principal, Director, VP, Intern — title keywords that are categorically wrong)
+  → Exclusion filter (34 keywords: Principal, Director, VP, Intern, etc. — title keywords that are categorically wrong)
   → Inclusion filter (Engineer, Infrastructure, ML, Systems — at least one must match)
   → Deduplication (skip jobs already in the database by URL)
   → Insert into SQLite as pending evaluation
+  → cernio format — HTML/entity descriptions cleaned to plaintext (runs automatically on TUI startup)
 ```
 
 Every filter is configurable in `profile/preferences.toml` with inline documentation. The bias at every stage is toward inclusion — a false positive costs 30 seconds of AI evaluation time, but a false negative means a perfect job is silently lost forever.
@@ -263,7 +264,8 @@ Cernio uses Claude Code skills for work that requires judgment — the slow, fuz
 | `resolve-portals` | AI fallback for companies that fail mechanical ATS resolution |
 | `grade-companies` | Evaluates companies against the profile across engineering reputation, technical alignment, growth, sponsorship, and career ceiling |
 | `grade-jobs` | Evaluates jobs against the profile with structured fit assessments, parallelised across agents |
-| `check-integrity` | Audits database health — detects stale grades, shallow assessments, missing data, profile-driven staleness |
+| `check-integrity` | Audits database health — detects stale grades, shallow assessments, missing data, profile-driven staleness. Runs `cernio format` as step 2. |
+| `prepare-applications` | Generates tailored application answers per job using profile + job description + fit assessment. Answers stored in DB for autofill. |
 | `search-jobs` | Orchestrates the search pipeline — runs the script, reviews results, handles bespoke companies |
 
 Every skill has a mandatory-read protocol: before execution, Claude must read the skill's SKILL.md, all reference files in the skill's `references/` directory, and every file in `profile/`. When delegating to parallel agents, the full content of every reference file is embedded in each agent's prompt — because agents can't read files from the repo, and a grading agent without the rubric produces useless output.
@@ -367,11 +369,15 @@ The `interview-prep` skill will take the SS, S, and A-tier jobs from the databas
 - Interview format expectations
 - How to frame your projects in terms the company cares about
 
-### Application autofill
+### Application autofill (in progress)
 
-When you press `o` to open a job link, the browser opens with application fields pre-filled from your profile. Name, email, education, work history — populated automatically. For platforms like Greenhouse that support URL parameters, this is straightforward.
+The autofill system is partially built. The `prepare-applications` skill generates tailored answers to common application questions (cover letter, "why this company", "why this role") using your full profile and the job's fit assessment. These answers are stored in the database as JSON packages.
 
-The more interesting extension: **personalised cover letters and custom question responses.** Claude reads the job description, reads your profile, and drafts a cover letter that connects your specific projects to what the role actually asks for. Same for those "why do you want to work here" text boxes — genuine, specific answers grounded in your real background, not generic templates.
+When you press `p` on a job with a prepared package, Chrome launches via CDP (`chromiumoxide`) and navigates to the application URL. The architecture supports per-provider form filling modules (`src/autofill/greenhouse.rs`, with Lever and Ashby planned). The TUI shows a yellow `●` indicator for jobs with prepared packages.
+
+**What works:** Package generation, DB storage, TUI integration, Chrome launch and navigation. **What's broken:** JavaScript value injection doesn't trigger React-controlled form state on Greenhouse forms. The fix path is documented — either `nativeInputValueSetter` tricks or CDP `Input.insertText`.
+
+The `prepare-applications` skill handles the interesting part: **personalised cover letters and custom question responses.** Claude reads the job description, reads your profile, and drafts answers that connect your specific projects to what the role actually asks for. Same for those "why do you want to work here" text boxes — genuine, specific answers grounded in your real background, not generic templates.
 
 The critical constraint: Cernio still never submits anything. The form is pre-filled, the cover letter is drafted, but you review everything and click submit yourself. This keeps the human in the loop while eliminating the mechanical drudgery of re-typing the same information 50 times.
 
@@ -400,8 +406,9 @@ Cernio is three layers communicating through a shared SQLite data store:
 │                       │         │                                 │
 │  resolve: probe ATS   │         │  companies (lifecycle, grades)  │
 │  search: scan boards  │         │  jobs (evaluations, grades)     │
-│  clean: remove noise  │         │  user_decisions (watching,      │
-│  check: verify health │         │    applied, rejected)           │
+│  format: clean HTML   │         │  user_decisions (watching,      │
+│  clean: remove noise  │         │    applied, rejected)           │
+│  check: verify health │         │  application_packages (JSON)    │
 │  import: bulk ingest  │         │  company_portals (ATS slugs)    │
 └───────────────────────┘         └──────────────┬────────────────┘
                                                  │ auto-refresh
@@ -434,26 +441,35 @@ For the full architectural deep-dive — module structure, schema details, depen
 | **AI** | Claude Code skills | Conversational invocation, structured workflows with reference files |
 | **Config** | TOML | `preferences.toml` — self-documenting, human-editable search filters and thresholds |
 
-Six ATS fetchers: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday. Companies on unsupported providers (iCIMS, Taleo, Personio, Pinpoint HQ, BambooHR, Jobvite) are marked bespoke with careers URL preserved.
+Seven ATS fetchers: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday, Eightfold. Companies on unsupported providers (iCIMS, Taleo, Personio, Pinpoint HQ, BambooHR, Jobvite) are marked bespoke with careers URL preserved.
 
 ---
 
 ## Current State
 
-The core pipeline is fully operational. 79 companies in the database (59 resolved across 6 ATS providers), 684 jobs evaluated (14 SS, 53 S), 8 skills with comprehensive reference files, TUI v4 with 4 views and full interactivity.
+The core pipeline is fully operational. 408 companies in the database (287 resolved across 7 ATS providers, 121 bespoke — 0 potential remaining), 937 jobs, 9 skills with comprehensive reference files, TUI v4 with 4 views and full interactivity. Every company in the universe has a known path to job discovery.
 
 ### What's working
 
-- Full pipeline: discover → resolve → search → grade → curate → export
-- 6 ATS fetchers with parallel search across all resolved companies
+- Full pipeline: discover → resolve → search → format → grade → curate → export
+- 7 ATS fetchers with parallel search across all 287 resolved companies
 - Company and job grading with profile-specific reasoning and evidence standards
+- `cernio format` — HTML/entity-encoded descriptions converted to clean plaintext (idempotent, runs on TUI startup)
 - TUI with dashboard, company browser, job browser, and pipeline kanban
-- Database maintenance: cleanup, integrity checks, staleness detection
+- TUI: `o` auto-marks applied, `p` launches autofill, yellow `●` package indicator for prepared applications
+- `prepare-applications` skill generates tailored application answers stored in the database
+- Database maintenance: cleanup, integrity checks, staleness detection, format-on-startup
 - Profile auto-update from GitHub repos
+- All 408 companies resolved — 0 potential remaining (287 ATS-resolved, 121 bespoke with careers URLs)
+
+### What's in progress
+
+- **Application autofill** — Chrome launches via CDP (`chromiumoxide`), navigates to application URLs, but React-controlled form filling is broken. Needs `nativeInputValueSetter` or CDP `Input.insertText` to trigger React state updates. Architecture is solid: per-provider modules (`src/autofill/greenhouse.rs`), application packages in DB, TUI integration complete.
 
 ### What's next
 
-- Expanding the company universe with further discovery rounds
+- Fix autofill React form filling
+- Bespoke search for S/A-tier companies without supported ATS
 - Interview preparation engine (study materials, personalised practice problems)
-- Application autofill (pre-filled forms, personalised cover letters)
+- Add Lever and Ashby autofill modules once Greenhouse works
 - Personalised resume generation per application

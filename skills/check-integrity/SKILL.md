@@ -41,7 +41,17 @@ Execute `cernio check` and capture the output. This provides the baseline report
 
 Review the mechanical report and note any issues that need attention.
 
-### 2. Load the current profile
+### 2. Format job descriptions
+
+Run `cernio format` to clean all raw HTML descriptions and fit assessments in the database. This must happen before any judgment-based evaluation — grading agents working on HTML-laden descriptions waste tokens on `data-*` attributes and nested tag soup, and may produce confused assessments. The formatter is idempotent and fast (no-op when already formatted), so it is always safe to run.
+
+```bash
+cargo run -- format
+```
+
+If any descriptions were formatted, note the count in the integrity report.
+
+### 3. Load the current profile
 
 Read **all files in `profile/`**. Every file, no exceptions. The profile is the reference point against which all grades and evaluations are assessed. Without the full profile loaded, you cannot judge whether existing evaluations are still valid.
 
@@ -51,7 +61,7 @@ Pay particular attention to:
 - Changed preferences — these shift which companies and roles are relevant
 - Visa status — this affects sponsorship weighting
 
-### 3. Detect profile-driven staleness
+### 4. Detect profile-driven staleness
 
 Compare the current profile state against graded entries to find evaluations that may no longer be accurate.
 
@@ -73,7 +83,7 @@ For each graded company, assess whether the grade reasoning still holds given th
 
 Do not re-evaluate every company. Focus on entries where the profile change is *relevant* to the grade reasoning. A new Rust project does not affect the grade of a company graded on sponsorship concerns.
 
-### 4. Audit grade quality
+### 5. Audit grade quality
 
 Spot-check a sample of graded entries to verify reasoning quality. Pull 3-5 graded jobs and 3-5 graded companies and verify:
 
@@ -84,7 +94,7 @@ Spot-check a sample of graded entries to verify reasoning quality. Pull 3-5 grad
 
 Flag any entries where the reasoning is thin, generic, or contradicted by the current profile state.
 
-### 5. Cross-check grades across the full universe
+### 6. Cross-check grades across the full universe
 
 This is the most important step and the one that catches errors no individual grading session can detect. Follow the full procedure in `references/cross-checking-guide.md`.
 
@@ -96,7 +106,7 @@ This is the most important step and the one that catches errors no individual gr
 
 Present all findings as recommendations, not executed changes. The user decides what to act on.
 
-### 6. Check for missing data
+### 7. Check for missing data
 
 Identify gaps in the database that prevent effective operation:
 
@@ -126,7 +136,7 @@ WHERE (j.description IS NULL OR j.description = '')
   AND j.status != 'archived';
 ```
 
-### 7. Portfolio gap analysis — active maintenance
+### 8. Portfolio gap analysis — active maintenance
 
 This step does not just check whether portfolio-gaps.md is being maintained — it actively maintains it. Read 10 jobs from EACH grade tier (SS, S, A, B, C, F — fewer if the tier has fewer than 10 jobs), prioritising jobs at S-tier companies, then A, then B.
 
@@ -164,11 +174,11 @@ Also check staleness:
 - If `portfolio-gaps.md` has no entries in "Patterns from Job Evaluations" despite graded jobs existing, flag this prominently
 - Check whether "Known Gaps" entries have been closed by recent profile changes
 
-### 8. Relevance refresh
+### 9. Relevance refresh
 
 For companies where `why_relevant` is generic (e.g., "interesting tech company", "found on fintech list") or stale (references profile details that have changed), draft updated relevance statements that connect the company to the current profile specifically.
 
-### 9. Present findings
+### 10. Present findings
 
 Present a structured integrity report to the user, organised by severity:
 

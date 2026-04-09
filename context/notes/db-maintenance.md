@@ -84,6 +84,20 @@ Implemented in `cernio check`. Re-probes all resolved companies' ATS slugs to de
 
 Implemented in `cernio check`. Flags companies with stale grades, missing data, dead bespoke URLs, and other integrity issues. The `check-integrity` AI skill adds judgment-based assessment on top — detecting profile-driven staleness that timestamps alone cannot catch.
 
+### Format command (`cernio format`)
+
+Implemented in `src/pipeline/format.rs`. Converts raw HTML/entity-encoded job descriptions to clean plaintext directly in the database. Session 6 formatted 922 descriptions.
+
+**Key properties:**
+- **Idempotent** — safe to run repeatedly, only processes descriptions that still contain HTML/entities
+- **Runs on TUI startup** — called via `run_silent()` so descriptions are always clean when browsing
+- **Step 2 in check-integrity** — ensures descriptions are formatted before judgment-based evaluation
+- **In-place** — modifies `raw_description` column directly, no separate "formatted" column
+
+### Application package cleanup
+
+The `application_packages` table (migration 006) stores pre-generated JSON answers for job applications. Packages are auto-deleted when a job is marked "applied" through any path (`o` key, `p` key, `a` key). This prevents stale packages accumulating for jobs already applied to.
+
 ### Re-evaluation trigger
 
 Implemented in the `check-integrity` skill. Compares profile modification dates against `graded_at` timestamps. When the profile has changed in ways relevant to a company's grade reasoning (e.g., new project fills a gap cited as a weakness), the skill flags the entry for regrading. The skill can also execute remediation when the user approves — regrading, rewriting shallow assessments, and fetching missing data.

@@ -86,6 +86,7 @@ pub struct JobRow {
     pub grade: Option<String>,
     pub raw_description: Option<String>,
     pub decision: Option<String>,
+    pub has_package: bool,
 }
 
 #[allow(dead_code)]
@@ -189,6 +190,11 @@ pub struct PipelineCard {
 impl App {
     pub fn new(db_path: &Path) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(db_path)?;
+
+        // Auto-format any unformatted job descriptions on TUI launch.
+        // This is fast (no-op when already formatted) and ensures grading
+        // agents and TUI display always see clean text.
+        crate::pipeline::format::run_silent(&conn);
 
         let companies = queries::fetch_companies(&conn, false);
         let jobs = queries::fetch_jobs(&conn, None, false, false, SortMode::ByGrade);
@@ -421,6 +427,14 @@ impl App {
                     "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
                     rusqlite::params![id, decision, now],
                 );
+
+                // Clean up application package when a job is marked applied.
+                if decision == "applied" {
+                    let _ = conn.execute(
+                        "DELETE FROM application_packages WHERE job_id = ?1",
+                        rusqlite::params![id],
+                    );
+                }
             }
         }
         if count == 1 {
@@ -570,21 +584,99 @@ impl App {
         }
     }
 
-    // ── URL opening ──────────────────────────────────────────────
+    // ── URL opening and autofill ───────────────────────────────
 
-    pub fn open_selected_url(&self) {
-        let url = match self.view {
-            View::Jobs => self.selected_job().map(|j| j.url.as_str()),
-            View::Companies => self.selected_company().and_then(|c| {
-                c.careers_url
-                    .as_deref()
-                    .or(Some(c.website.as_str()))
-            }),
-            View::Dashboard | View::Pipeline => None,
+    pub fn open_selected_url(&mut self) {
+        let (url, is_job) = match self.view {
+            View::Jobs => (self.selected_job().map(|j| j.url.clone()), true),
+            View::Companies => (
+                self.selected_company().and_then(|c| {
+                    c.careers_url.clone().or(Some(c.website.clone()))
+                }),
+                false,
+            ),
+            View::Dashboard | View::Pipeline => (None, false),
         };
         if let Some(url) = url {
-            let _ = std::process::Command::new("open").arg(url).spawn();
+            let _ = std::process::Command::new("open").arg(&url).spawn();
+
+            // Auto-mark as applied when opening a job URL.
+            if is_job {
+                self.record_decision_multi("applied");
+            }
         }
+    }
+
+    /// Launch autofill for the selected job — opens Chrome with the
+    /// application form pre-filled from the user's profile.
+    pub fn autofill_selected_job(&mut self) {
+        if self.view != View::Jobs {
+            return;
+        }
+
+        let Some(job) = self.selected_job() else {
+            return;
+        };
+
+        let job_url = job.url.clone();
+        let job_id = job.id;
+        let company_id = job.company_id;
+
+        // Look up the ATS provider and application package from the DB.
+        let (ats_provider, package_answers) = if let Ok(conn) = Connection::open(&self.db_path) {
+            let provider = conn
+                .query_row(
+                    "SELECT cp.ats_provider FROM company_portals cp
+                     WHERE cp.company_id = ?1 AND cp.is_primary = 1 LIMIT 1",
+                    rusqlite::params![company_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .ok();
+
+            let answers = conn
+                .query_row(
+                    "SELECT answers FROM application_packages WHERE job_id = ?1",
+                    rusqlite::params![job_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .ok();
+
+            (provider, answers)
+        } else {
+            (None, None)
+        };
+
+        let has_package = package_answers.is_some();
+
+        // For unsupported providers, fall back to regular open.
+        if ats_provider.as_deref() != Some("greenhouse") {
+            let _ = std::process::Command::new("open").arg(&job_url).spawn();
+            self.add_toast("Autofill not supported — opened in browser");
+            self.record_decision_multi("applied");
+            return;
+        }
+
+        // Spawn the autofill on the Tokio runtime (no stderr output — TUI is in raw mode).
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                let profile = crate::autofill::ApplicantProfile::load(
+                    std::path::Path::new("profile"),
+                );
+                let _ = crate::autofill::fill_application(
+                    &job_url,
+                    Some("greenhouse"),
+                    &profile,
+                    package_answers.as_deref(),
+                )
+                .await;
+            });
+        }
+
+        // Mark as applied and show toast.
+        let provider_name = ats_provider.as_deref().unwrap_or("unknown");
+        let pkg_status = if has_package { " + answers" } else { "" };
+        self.add_toast(format!("Autofilling ({provider_name}{pkg_status})..."));
+        self.record_decision_multi("applied");
     }
 
     // ── User decisions ───────────────────────────────────────────

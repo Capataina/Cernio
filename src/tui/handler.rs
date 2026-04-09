@@ -246,6 +246,7 @@ fn handle_job_list(app: &mut App, key: KeyEvent) {
         KeyCode::Home => app.go_to_top(),
         KeyCode::End => app.go_to_bottom(),
         KeyCode::Char('o') => app.open_selected_url(),
+        KeyCode::Char('p') => app.autofill_selected_job(),
         KeyCode::Char('w') => app.record_decision_multi("watching"),
         KeyCode::Char('a') => app.record_decision_multi("applied"),
         KeyCode::Char('x') => app.record_decision_multi("rejected"),
@@ -471,6 +472,7 @@ fn handle_detail_scroll(app: &mut App, key: KeyEvent) {
         KeyCode::Char('k') | KeyCode::Up => app.scroll_detail_up(),
         KeyCode::Home => { app.detail_scroll = 0; }
         KeyCode::Char('o') => app.open_selected_url(),
+        KeyCode::Char('p') if app.view == View::Jobs => app.autofill_selected_job(),
         KeyCode::Char('w') if app.view == View::Jobs => app.record_decision_multi("watching"),
         KeyCode::Char('a') if app.view == View::Jobs => app.record_decision_multi("applied"),
         KeyCode::Char('x') if app.view == View::Jobs => app.record_decision_multi("rejected"),

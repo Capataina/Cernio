@@ -75,7 +75,8 @@ pub fn fetch_jobs(
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
                j.fit_score, j.grade, j.raw_description,
                (SELECT ud.decision FROM user_decisions ud
-                WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1)
+                WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1),
+               (SELECT 1 FROM application_packages ap WHERE ap.job_id = j.id) IS NOT NULL
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
         WHERE 1=1{archive_filter}{focus_filter}");
@@ -113,6 +114,7 @@ pub fn fetch_jobs(
             grade: row.get(11)?,
             raw_description: row.get(12)?,
             decision: row.get(13)?,
+            has_package: row.get::<_, bool>(14).unwrap_or(false),
         })
     };
 

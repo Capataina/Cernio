@@ -72,6 +72,7 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let header = Row::new(vec![
         Cell::from(" Gr"),
         Cell::from("D"),  // description indicator
+        Cell::from("P"),  // application package ready indicator
         Cell::from("Title"),
         Cell::from("Company"),
         Cell::from("Location"),
@@ -110,9 +111,18 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
 
             let location = j.location.as_deref().unwrap_or("—");
 
+            // Application package indicator.
+            let pkg_indicator = if j.has_package { "●" } else { " " };
+            let pkg_style = if j.has_package {
+                Style::default().fg(Color::Yellow)
+            } else {
+                t.dim
+            };
+
             let mut row = Row::new(vec![
                 Cell::from(format!("{}{grade_display:<4}", if is_multi { "▪" } else { " " })).style(grade_style),
                 Cell::from(desc_indicator).style(desc_style),
+                Cell::from(pkg_indicator).style(pkg_style),
                 Cell::from(j.title.as_str()),
                 Cell::from(j.company_name.as_str()),
                 Cell::from(truncate(location, 16)),
@@ -136,6 +146,7 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         vec![
             Constraint::Length(5),  // grade + decision indicator
             Constraint::Length(2),  // description indicator
+            Constraint::Length(2),  // package indicator
             Constraint::Fill(1),   // title
             Constraint::Length(16), // company
             Constraint::Length(16), // location

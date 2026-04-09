@@ -120,6 +120,20 @@ The schema is defined as a single `CREATE TABLE IF NOT EXISTS` batch in `MIGRATI
 
 **MIGRATION_003** (session 3, continued): Adds `'archived'` to the `jobs.evaluation_status` CHECK constraint. Uses the same table-rebuild approach as MIGRATION_002. This supports job archival — archived jobs are hidden from TUI views and excluded from active queries but preserved in the database for historical tracking.
 
+**MIGRATION_004** (session 5): Adds `last_searched_at` column to `companies` for bespoke search tracking.
+
+**MIGRATION_005** (session 5): Adds `archived_at` column to `jobs` for tiered archival expiry tracking.
+
+**MIGRATION_006** (session 6): Creates `application_packages` table for pre-generated application answers:
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `job_id` | INTEGER | PRIMARY KEY, FK → jobs | One package per job |
+| `answers` | TEXT | NOT NULL | JSON-encoded tailored answers |
+| `created_at` | TEXT | NOT NULL | ISO date |
+
+Packages are auto-deleted when a job is marked "applied" via any TUI path (`o`, `p`, `a` keys).
+
 The database can always be recreated from scratch by deleting `state/cernio.db` and restarting — the migration rebuilds everything. The data is lost, but the schema is code.
 
 ### Tests
@@ -189,9 +203,9 @@ None at this stage.
 
 ## Planned / Missing / Likely Changes
 
-- Future migrations (`MIGRATION_004`, etc.) will be needed as the schema evolves
 - Higher-level query functions in `src/db/mod.rs` will grow as more pipeline operations are added
 - DB cleanup is implemented via `cernio clean` — removes F/C-graded jobs, stale listings >14d, archives C-grade companies
+- `cernio format` converts raw HTML descriptions to plaintext in-place (idempotent, runs on TUI startup)
 
 ---
 

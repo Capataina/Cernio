@@ -1,6 +1,6 @@
 # TUI System
 
-> Last updated: 2026-04-08. v4 implemented — dashboard, companies, jobs, pipeline views with detail panels, multi-select, search/filter, sort, export, responsive layout, mouse support, and kanban pipeline.
+> Last updated: 2026-04-09 (session 6). v4 with autofill integration — `o` auto-marks applied, `p` launches autofill from application_packages, yellow `●` package indicator in jobs view. `cernio format` runs silently on TUI startup.
 
 ---
 
@@ -51,6 +51,9 @@ src/tui/
 - Multi-select tracking
 - Toast notifications
 - Session summary display
+- Autofill launch (spawns `src/autofill/` with package data)
+- Auto-marking applied on URL open (`o` key)
+- Running `cernio format` silently on startup
 
 ### What the TUI does not own
 
@@ -110,7 +113,7 @@ Terminal width determines layout mode:
 |------|---------|--------|
 | **Dashboard** | Dynamic stats blocks, session summary (from `state/tui-summary.md`), scrollable top roles (all SS/S/A), grade distribution bars, pipeline health, ATS coverage | Dynamic block sizing, two-column grid |
 | **Companies** | Table: grade, name, status, job count, ATS. Detail: description, grade reasoning, relevance, full job list (all jobs), grade bars | 40% list / 60% detail, responsive |
-| **Jobs** | Table: grade, title, company, location, decision, description indicator (✓/·). Detail: full description with HTML cleanup, fit assessment, URL | 45% list / 55% detail, responsive |
+| **Jobs** | Table: grade, title, company, location, decision, description indicator (✓/·), package indicator (yellow `●` in "P" column). Detail: full description with HTML cleanup, fit assessment, URL | 45% list / 55% detail, responsive |
 | **Pipeline** | Kanban: 3 columns (Watching / Applied / Interview). Cards show grade + title + company. Movement with `w`/`a`/`i` keys. Mouse click and scroll | 3-column layout |
 
 ### Colour strategy
@@ -158,7 +161,8 @@ Semantic colour assignments:
 | `a` | Mark applied |
 | `x` | Mark rejected |
 | `i` | Mark interview |
-| `o` | Open URL in browser |
+| `o` | Open URL in browser **and auto-mark as applied** |
+| `p` | Launch autofill (reads application_package from DB, opens Chrome with pre-filled form) |
 | `y` | Copy URL to clipboard (pbcopy) |
 | `/` | Search/filter (vim-style, instant matching) |
 | `s` | Sort toggle (grade → company → date → location) |
@@ -274,6 +278,8 @@ User decisions: `INSERT INTO user_decisions (job_id, decision, decided_at)`. Tri
 - **Fresh connection per refresh:** Opens a new `Connection` on each 2-second refresh rather than holding one open. SQLite opens are fast and this avoids connection lifetime complexity in the App struct. Could be optimised later if profiling shows it matters.
 - **`x` for reject instead of `r`:** Used `x` because `r` would conflict with a future refresh key. Also maps intuitively to "cross out" / reject.
 - **Event drain per frame:** Events are drained in batches (up to 20 per frame) rather than one-at-a-time to prevent input buffering lag during rapid keystrokes or sustained scrolling.
+- **`o` auto-marks applied:** `open_selected_url()` changed from `&self` to `&mut self` in session 6. Opening a job URL now also records an "applied" decision. This reflects the real-world flow — if you opened the application page, you're applying.
+- **`p` for autofill:** Reads `application_packages` JSON from DB, spawns Chrome via `src/autofill/` with pre-filled data. Falls back to regular `open` for unsupported ATS providers.
 
 ---
 
