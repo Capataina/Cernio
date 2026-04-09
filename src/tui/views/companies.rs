@@ -1,7 +1,7 @@
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, Wrap};
+use ratatui::widgets::{Block, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, Wrap};
 use ratatui::Frame;
 use rusqlite::Connection;
 
@@ -146,6 +146,20 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .highlight_symbol("▸");
 
     frame.render_stateful_widget(table, area, &mut app.company_state);
+
+    // Scrollbar indicator.
+    if !app.companies.is_empty() {
+        let mut scrollbar_state = ScrollbarState::new(app.companies.len())
+            .position(app.company_state.selected().unwrap_or(0));
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
@@ -314,12 +328,28 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             t.border
         }));
 
+    let line_count = lines.len();
+
     let detail = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((app.detail_scroll, 0));
 
     frame.render_widget(detail, area);
+
+    // Detail scrollbar.
+    if line_count > 0 {
+        let mut scrollbar_state = ScrollbarState::new(line_count)
+            .position(app.detail_scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn detail_row<'a>(

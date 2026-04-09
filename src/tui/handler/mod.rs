@@ -15,6 +15,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Quick-peek popup — dismiss on any key except Space (which toggles it).
+    if app.show_quick_peek && key.code != KeyCode::Char(' ') && key.code != KeyCode::Esc {
+        app.show_quick_peek = false;
+        // Fall through to normal handling so the key still works.
+    }
+
     // Grade picker overlay — single-key selection.
     if app.show_grade_picker {
         overlays::handle_grade_picker(app, key);

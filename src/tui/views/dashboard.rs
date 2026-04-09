@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use chrono::{Datelike, Local, NaiveDate};
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 use rusqlite::Connection;
 
@@ -222,6 +222,44 @@ fn draw_summary_block(frame: &mut Frame, app: &App, area: Rect, has_summary: boo
                 ]));
             }
         }
+    }
+
+    // Session welcome diff — only show if any count > 0.
+    if app.new_jobs_since_last > 0
+        || app.new_companies_since_last > 0
+        || app.new_decisions_since_last > 0
+    {
+        let mut diff_spans = vec![Span::raw("  Since last session: ")];
+        let mut parts: Vec<Span> = Vec::new();
+        if app.new_jobs_since_last > 0 {
+            parts.push(Span::styled(
+                format!("+{}", app.new_jobs_since_last),
+                t.stat_value,
+            ));
+            parts.push(Span::raw(" jobs"));
+        }
+        if app.new_companies_since_last > 0 {
+            if !parts.is_empty() {
+                parts.push(Span::raw(" · "));
+            }
+            parts.push(Span::styled(
+                format!("+{}", app.new_companies_since_last),
+                t.stat_value,
+            ));
+            parts.push(Span::raw(" companies"));
+        }
+        if app.new_decisions_since_last > 0 {
+            if !parts.is_empty() {
+                parts.push(Span::raw(" · "));
+            }
+            parts.push(Span::styled(
+                format!("{}", app.new_decisions_since_last),
+                t.stat_value,
+            ));
+            parts.push(Span::raw(" decisions"));
+        }
+        diff_spans.extend(parts);
+        lines.push(Line::from(diff_spans));
     }
 
     let block = Block::bordered().border_style(Style::default().fg(t.border));
@@ -554,12 +592,7 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled("  Top producing companies:", t.header)));
         for (name, count) in &app.top_companies_by_hits {
-            // Truncate long names to fit.
-            let display_name = if name.len() > 16 {
-                format!("{}…", &name[..15])
-            } else {
-                name.clone()
-            };
+            let display_name = crate::tui::widgets::text_utils::truncate_chars(name, 16);
             lines.push(Line::from(vec![
                 Span::raw("    "),
                 Span::styled(format!("{display_name:<16} "), t.stat_value),
@@ -837,12 +870,28 @@ fn draw_top_roles(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(t.title)
         .border_style(Style::default().fg(t.border));
 
+    let line_count = lines.len();
+
     let para = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((scroll, 0));
 
     frame.render_widget(para, area);
+
+    // Scrollbar for top roles.
+    if line_count > 0 {
+        let mut scrollbar_state = ScrollbarState::new(line_count)
+            .position(app.dashboard_scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 /// Fetch bespoke company names that need manual job search.

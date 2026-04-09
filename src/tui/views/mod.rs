@@ -6,10 +6,10 @@ mod dashboard;
 mod jobs;
 mod pipeline;
 
-use ratatui::layout::{Constraint, Layout};
-use ratatui::style::Style;
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
 use super::app::{App, View};
@@ -73,6 +73,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         chrome::draw_status_bar(frame, app, status_area);
     }
 
+    // Quick-peek popup for jobs view.
+    if app.show_quick_peek && app.view == View::Jobs {
+        if let Some(job) = app.selected_job() {
+            draw_quick_peek(frame, app, job, frame_area);
+        }
+    }
+
     overlays::draw_toasts(frame, app);
 
     if app.show_grade_picker {
@@ -86,4 +93,73 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.show_help {
         overlays::draw_help_overlay(frame, app);
     }
+}
+
+fn draw_quick_peek(
+    frame: &mut Frame,
+    app: &App,
+    job: &super::app::state::JobRow,
+    frame_area: Rect,
+) {
+    let t = &app.theme;
+
+    // Centred popup: 50% width, 60% height.
+    let popup_w = frame_area.width * 50 / 100;
+    let popup_h = frame_area.height * 60 / 100;
+    let x = frame_area.x + (frame_area.width.saturating_sub(popup_w)) / 2;
+    let y = frame_area.y + (frame_area.height.saturating_sub(popup_h)) / 2;
+    let area = Rect::new(x, y, popup_w.min(frame_area.width), popup_h.min(frame_area.height));
+
+    let mut lines = Vec::new();
+
+    // Title (bold).
+    lines.push(Line::from(Span::styled(
+        format!("  {}", job.title),
+        Style::default().add_modifier(Modifier::BOLD),
+    )));
+
+    // Company (dim).
+    lines.push(Line::from(Span::styled(
+        format!("  {}", job.company_name),
+        t.dim,
+    )));
+
+    // Grade (coloured).
+    let grade_str = job.grade.as_deref().unwrap_or("—");
+    let grade_style = t.grade_style(job.grade.as_deref());
+    lines.push(Line::from(vec![
+        Span::styled("  Grade: ", t.stat_label),
+        Span::styled(grade_str, grade_style),
+    ]));
+
+    // Location if present.
+    if let Some(loc) = &job.location {
+        lines.push(Line::from(vec![
+            Span::styled("  Location: ", t.stat_label),
+            Span::raw(loc.as_str()),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+
+    // Fit assessment (wrapped).
+    if let Some(assessment) = &job.fit_assessment {
+        for text_line in assessment.lines() {
+            lines.push(Line::from(format!("  {text_line}")));
+        }
+    } else {
+        lines.push(Line::from(Span::styled("  No fit assessment yet.", t.dim)));
+    }
+
+    let block = Block::bordered()
+        .title(" Quick Peek ")
+        .title_style(t.title)
+        .border_style(Style::default().fg(t.border_focused));
+
+    let popup = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(popup, area);
 }

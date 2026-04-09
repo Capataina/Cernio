@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::tui::app::{App, View};
 
@@ -29,8 +29,21 @@ pub fn handle_company_list(app: &mut App, key: KeyEvent) {
 
 pub fn handle_job_list(app: &mut App, key: KeyEvent) {
     match key.code {
-        KeyCode::Char('j') | KeyCode::Down => app.next_in_list(),
-        KeyCode::Char('k') | KeyCode::Up => app.prev_in_list(),
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.show_quick_peek = false;
+            app.next_in_list();
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.show_quick_peek = false;
+            app.prev_in_list();
+        }
+        KeyCode::Char(' ') => {
+            app.show_quick_peek = !app.show_quick_peek;
+        }
+        KeyCode::Char('G') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.group_by_company = !app.group_by_company;
+            app.add_toast(if app.group_by_company { "Grouped by company" } else { "Ungrouped" }.to_string());
+        }
         KeyCode::Char('g') => {
             app.show_grade_picker = true;
         }
@@ -51,7 +64,9 @@ pub fn handle_job_list(app: &mut App, key: KeyEvent) {
         KeyCode::Char(']') => app.jump_next_grade_section(),
         KeyCode::Char('[') => app.jump_prev_grade_section(),
         KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
-            if app.job_filter_company.is_some() {
+            if app.show_quick_peek {
+                app.show_quick_peek = false;
+            } else if app.job_filter_company.is_some() {
                 app.clear_job_filter();
                 app.view = View::Companies;
                 app.detail_scroll = 0;
@@ -64,15 +79,19 @@ pub fn handle_job_list(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle_activity(app: &mut App, key: KeyEvent) {
+    let max_scroll = (app.activity_timeline.len() as u16).saturating_sub(10);
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
-            app.activity_scroll = app.activity_scroll.saturating_add(1);
+            app.activity_scroll = app.activity_scroll.saturating_add(1).min(max_scroll);
         }
         KeyCode::Char('k') | KeyCode::Up => {
             app.activity_scroll = app.activity_scroll.saturating_sub(1);
         }
         KeyCode::Home => {
             app.activity_scroll = 0;
+        }
+        KeyCode::End => {
+            app.activity_scroll = max_scroll;
         }
         _ => {}
     }

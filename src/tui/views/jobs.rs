@@ -1,7 +1,7 @@
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, Wrap};
+use ratatui::widgets::{Block, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::{App, Focus};
@@ -87,6 +87,11 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .map(|(idx, j)| {
             let is_multi = app.multi_select_jobs.contains(&idx);
 
+            // When grouped by company, check if this is the first job of a new company group.
+            let is_group_start = app.group_by_company && (idx == 0
+                || app.jobs.get(idx.wrapping_sub(1))
+                    .map_or(true, |prev| prev.company_name != j.company_name));
+
             // Animated spinner for pending/evaluating jobs, grade otherwise.
             let (grade_display, grade_style) = match j.evaluation_status.as_str() {
                 "pending" => {
@@ -152,6 +157,20 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                     })
             });
 
+            // When grouped: show company name as bold separator on first row, hide on subsequent.
+            let company_display = if app.group_by_company {
+                if is_group_start {
+                    Cell::from(Line::from(Span::styled(
+                        j.company_name.as_str(),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    )))
+                } else {
+                    Cell::from(Line::from(Span::styled("  ·", Style::default().fg(Color::DarkGray))))
+                }
+            } else {
+                Cell::from(j.company_name.as_str())
+            };
+
             let mut row = Row::new(vec![
                 Cell::from(format!("{}{grade_display:<4}", if is_multi { "▪" } else { " " })).style(grade_style),
                 Cell::from(desc_indicator).style(desc_style),
@@ -164,11 +183,15 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 } else {
                     vec![Span::raw(&j.title)]
                 })),
-                Cell::from(j.company_name.as_str()),
+                company_display,
                 Cell::from(truncate(location, 16)),
             ]);
             if is_multi {
                 row = row.style(Style::default().fg(Color::Cyan));
+            }
+            // Add top border for group headers when grouped.
+            if is_group_start && idx > 0 {
+                row = row.top_margin(1);
             }
             row
         })
@@ -215,6 +238,20 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .highlight_symbol("▸");
 
     frame.render_stateful_widget(table, area, &mut app.job_state);
+
+    // Scrollbar indicator.
+    if !app.jobs.is_empty() {
+        let mut scrollbar_state = ScrollbarState::new(app.jobs.len())
+            .position(app.job_state.selected().unwrap_or(0));
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
@@ -375,12 +412,28 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             t.border
         }));
 
+    let line_count = lines.len();
+
     let detail = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((app.detail_scroll, 0));
 
     frame.render_widget(detail, area);
+
+    // Detail scrollbar.
+    if line_count > 0 {
+        let mut scrollbar_state = ScrollbarState::new(line_count)
+            .position(app.detail_scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn detail_row<'a>(

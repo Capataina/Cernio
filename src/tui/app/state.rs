@@ -202,4 +202,15 @@ pub struct App {
     // ── Activity timeline ───────────────────────────────────────
     pub activity_timeline: Vec<ActivityEntry>,
     pub activity_scroll: u16,
+
+    // ── Quick-peek popup ────────────────────────────────────────
+    pub show_quick_peek: bool,
+
+    // ── Smart job grouping ──────────────────────────────────────
+    pub group_by_company: bool,
+
+    // ── Session welcome diff ────────────────────────────────────
+    pub new_jobs_since_last: i64,
+    pub new_companies_since_last: i64,
+    pub new_decisions_since_last: i64,
 }

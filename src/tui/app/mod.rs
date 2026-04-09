@@ -48,6 +48,8 @@ impl App {
         let last_search_at = queries::fetch_last_search_at(&conn);
         let last_graded_at = queries::fetch_last_graded_at(&conn);
         let top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);
+        let (new_jobs_since_last, new_companies_since_last, new_decisions_since_last) =
+            queries::fetch_new_since_session(&conn);
 
         Ok(Self {
             running: true,
@@ -97,6 +99,11 @@ impl App {
             pipeline_selections: [0; 3],
             activity_timeline,
             activity_scroll: 0,
+            show_quick_peek: false,
+            group_by_company: false,
+            new_jobs_since_last,
+            new_companies_since_last,
+            new_decisions_since_last,
         })
     }
 

@@ -488,6 +488,32 @@ pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
         .unwrap_or_default()
 }
 
+/// Fetch counts of new jobs, companies, and decisions since last session (~12 hours ago).
+pub fn fetch_new_since_session(conn: &Connection) -> (i64, i64, i64) {
+    let jobs: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM jobs WHERE discovered_at >= datetime('now', '-12 hours')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let companies: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM companies WHERE discovered_at >= datetime('now', '-12 hours')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let decisions: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM user_decisions WHERE decided_at >= datetime('now', '-12 hours')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    (jobs, companies, decisions)
+}
+
 fn fetch_top_matches(conn: &Connection) -> Vec<TopMatch> {
     conn.prepare(
         "SELECT j.title, c.name, j.grade, COALESCE(j.location, c.location)

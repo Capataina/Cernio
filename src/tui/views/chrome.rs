@@ -282,11 +282,7 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 .strip_prefix("https://")
                 .or(url.strip_prefix("http://"))
                 .unwrap_or(url);
-            let truncated = if display_url.len() > 40 {
-                format!("{}…", &display_url[..39])
-            } else {
-                display_url.to_string()
-            };
+            let truncated = crate::tui::widgets::text_utils::truncate_chars(display_url, 40);
             right_parts.push(Span::styled(format!(" {truncated} "), app.theme.dim));
         }
     }

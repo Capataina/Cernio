@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
-use ratatui::layout::Rect;
+use ratatui::layout::{Margin, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::App;
@@ -66,12 +66,28 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         )));
     }
 
+    let line_count = lines.len();
+
     let paragraph = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((app.activity_scroll, 0));
 
     frame.render_widget(paragraph, area);
+
+    // Scrollbar for activity timeline.
+    if line_count > 0 {
+        let mut scrollbar_state = ScrollbarState::new(line_count)
+            .position(app.activity_scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 /// Format "2026-04-09" into "Apr 9, 2026".

@@ -128,6 +128,8 @@ pub fn draw_help_overlay(frame: &mut Frame, app: &App) {
 
     // ── Grading section ──
     lines.push(section_header("Grading", section_style, rule_style));
+    help_line_push(&mut lines, t, "  Space         ", "Quick peek popup (Jobs view)");
+    help_line_push(&mut lines, t, "  Ctrl+G        ", "Group by company (Jobs view)");
     help_line_push(&mut lines, t, "  g             ", "Override grade (Jobs view)");
     help_line_push(&mut lines, t, "  W             ", "Bulk action by grade");
     help_line_push(&mut lines, t, "  e             ", "Export current view");

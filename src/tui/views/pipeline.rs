@@ -1,7 +1,7 @@
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::{App, PipelineCard, PipelineColumn};
@@ -129,11 +129,7 @@ fn draw_column(
         let text_part = format!("{} — {}", card.title, card.company);
         // Available width for text: inner_width - prefix(2) - grade(3) - space(1)
         let max_text = inner_width.saturating_sub(6);
-        let truncated = if text_part.len() > max_text {
-            format!("{}…", &text_part[..max_text.saturating_sub(1)])
-        } else {
-            text_part
-        };
+        let truncated = crate::tui::widgets::text_utils::truncate_chars(&text_part, max_text);
 
         lines.push(Line::from(vec![
             Span::styled(prefix, card_style),
@@ -158,4 +154,18 @@ fn draw_column(
         .scroll((scroll_offset, 0));
 
     frame.render_widget(para, area);
+
+    // Scrollbar for pipeline column.
+    if !cards.is_empty() {
+        let mut scrollbar_state = ScrollbarState::new(cards.len())
+            .position(selection);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin { vertical: 1, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
+    }
 }
