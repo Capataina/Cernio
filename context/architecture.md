@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-08 (session 3, final). TUI v4 implemented — 4 views (dashboard, companies, jobs, pipeline/kanban), mouse support, multi-select, search/filter, sort, grade override, export, responsive layout, widget refactor. Skill quality overhaul — all 8 skills have mandatory-read blocks, check-integrity has 3 reference files. 14 source files in `src/tui/` (views/ + widgets/). 6 ATS fetchers, 5 pipeline scripts, 8 skills. 684 jobs in DB (14 SS, 53 S), 79 companies (59 resolved).
+> Last updated: 2026-04-09 (session 4). Massive universe expansion — 273 active companies (167 resolved, 83 potential, 23 bespoke), grade distribution 25S/107A/94B/47C. 712 jobs in DB (12 SS, 55 S). Grading rubrics completely rewritten to question-first approach with mandatory description citation. Cleanup no longer auto-archives C companies (archive_company_grades = [], min_company_grade = "C"). Lever EU probing added. TUI v4 unchanged. 6 ATS fetchers, 5 pipeline scripts, 8 skills.
 
 ---
 
@@ -342,7 +342,7 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of session 3 (final).** Pipeline fully operational end-to-end. TUI v4 with 4 views, pipeline/kanban, multi-select, search, sort, export, mouse support, responsive layout. Skill quality overhaul — all 8 skills have mandatory-read blocks; CLAUDE.md updated with Skill Execution Protocol, Subagent Context Requirements, and Grade/Fit Assessment Quality Standard. Six ATS fetchers. Parallel search and grading proven at scale.
+**End of session 4 (2026-04-09).** Universe expanded from 79 to 273+ companies across multiple discovery and population rounds. Grading rubrics for both companies and jobs completely rewritten — question-first approach replacing dimension-weighted scoring, with mandatory description citation in fit assessments. Cleanup policy revised: C companies no longer auto-archived (kept active because job grading handles quality filtering), min_company_grade lowered to "C" to search all non-archived companies. Lever EU domain probing added. Per-request retry logic in HTTP client. TUI v4 unchanged.
 
 | Component | Status |
 |-----------|--------|
@@ -352,7 +352,7 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. Common trait + dispatch |
 | Pipeline: resolve (`src/pipeline/resolve.rs`) | Slug candidate generation, parallel multi-provider probing, SmartRecruiters false positive handling |
 | Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert |
-| Pipeline: clean (`src/pipeline/clean.rs`) | Job removal (F/C grades, stale), company archival (C-grade → archived) |
+| Pipeline: clean (`src/pipeline/clean.rs`) | Job removal (F/C grades, stale). Company archival disabled by default (archive_company_grades = []) — C companies kept active for job search coverage |
 | Pipeline: check (`src/pipeline/check.rs`) | ATS re-verification, stale detection, completeness, dead URLs, duplicates, profile-change, structured report |
 | profile-scrape skill | Designed, tested on NeuroDrive |
 | discover-companies skill | Designed with search-strategies reference, first run produced 73 companies |
@@ -362,14 +362,14 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | resolve-portals skill | Redesigned — AI fallback only for companies that fail script resolution |
 | grade-companies skill | New — extensive SKILL.md, grading rubric with worked examples, profile context reference |
 | grade-jobs skill | New — extensive SKILL.md, grading rubric, profile context, prioritisation guide |
-| Company universe | 79 companies in DB (59 resolved), pipeline proven at scale |
-| Jobs | 684 jobs in DB (14 SS, 53 S), full pipeline run complete with parallel search and grading |
+| Company universe | 273 active companies (167 resolved, 83 potential, 23 bespoke), grade distribution 25S/107A/94B/47C |
+| Jobs | 712 jobs in DB (12 SS, 55 S, 90 A, 130 B), full pipeline run complete with parallel search and grading |
 | TUI (`src/tui/`, 14 files) | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), mouse support, multi-select, search/filter, sort, grade override, export, responsive layout, widget refactor. See `context/systems/tui.md` |
 | Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
 
 **Next priorities:**
-1. Grade remaining ungraded companies (imported but not yet graded)
-2. Run job search on newly graded companies
-3. Grade pending jobs with improved quality standards
-4. Further discovery rounds to expand universe
-5. Portfolio gap analysis from grading patterns
+1. Resolve remaining 83 potential companies
+2. Search and grade jobs from newly resolved companies
+3. Interview prep skill design and implementation
+4. Portfolio gap analysis from grading patterns
+5. Further discovery rounds to expand universe beyond 273

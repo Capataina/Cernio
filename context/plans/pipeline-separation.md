@@ -2,7 +2,7 @@
 
 > Restructure the Cernio pipeline so every step has exactly one purpose. Scripts handle volume, AI handles judgment. No step does both.
 
-**Status:** Complete and proven — pipeline run end-to-end as of session 3 continued (2026-04-08). 79 companies resolved, 684 jobs fetched and filtered, 14 SS and 53 S graded. Workday fetcher added (6 ATS providers total). MIGRATION_003 adds job archival. `cernio import` added for bulk ingestion. `check-integrity` AI skill created. Runtime features (batch reporting, portfolio gap tracking during grading) deferred to future sessions.
+**Status:** Complete and proven. Pipeline scaled successfully from 79 to 273+ companies (session 4, 2026-04-09). 167 resolved, 712 jobs in DB (12 SS, 55 S). Grading rubrics rewritten to question-first approach with mandatory description citation. Cleanup policy revised — C companies no longer auto-archived. Lever EU probing added. Per-request retry logic. Runtime features (batch reporting, portfolio gap tracking) deferred.
 
 ---
 
@@ -29,7 +29,7 @@ At target scale (200 companies, 9,000 raw jobs, ~500 after filtering), the AI sh
 │     Failures → AI scrapes careers page as fallback                   │
 │                                                                      │
 │  3. grade-companies             (AI skill)                           │
-│     Grade ungraded companies (S/A/B/C) → archive C-tier             │
+│     Grade ungraded companies (S/A/B/C) — C kept active              │
 │                                                                      │
 │  4. search-jobs                 (Rust script)                        │
 │     Fetch all jobs from resolved S/A/B companies                    │

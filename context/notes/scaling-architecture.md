@@ -75,23 +75,24 @@ Everything else goes to the AI for judgment.
 
 ---
 
-## Expected flow at scale
+## Expected flow at scale (updated session 4)
 
 ```
-200 companies
-  resolve-ats script    → 140 resolved, 60 need AI fallback
-  resolve-portals AI    → 45 more resolved, 15 bespoke
-  grade-companies AI    → 120 S/A/B, 65 C (archived)
+273 active companies (actual as of 2026-04-09)
+  resolve-ats script    → 167 resolved, 83 still potential, 23 bespoke
+  grade-companies AI    → 25S / 107A / 94B / 47C
+  C companies kept active (not archived — job grading handles quality)
 
-120 S/A/B companies
-  search-jobs script    → 9,000 raw jobs fetched
-  location filter       → 1,500
-  exclusion filter      → 1,200
-  inclusion filter      → 600
-  dedup                 → 500 new pending jobs
+273 graded companies (all searched, min_company_grade = "C")
+  search-jobs script    → raw jobs fetched across all providers
+  location filter       → UK/London/Remote/Cambridge
+  exclusion filter      → remove Principal/Director/etc.
+  inclusion filter      → keep anything with Engineer/Dev/ML/etc.
+  dedup                 → skip already-seen URLs
+  → 712 jobs in DB (12 SS, 55 S, 90 A, 130 B)
 
-  grade-jobs AI         → 30 per session, ~17 sessions to clear
-  clean-db script       → remove F/C grades + stale
+  grade-jobs AI         → 30 per session, batched by company grade × title signal
+  clean-db script       → remove F/C grades + stale (does NOT archive companies)
 
 Steady state: ~50–100 active jobs, refreshed weekly
 ```

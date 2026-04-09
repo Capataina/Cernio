@@ -59,3 +59,16 @@ This was added after discovering that agents executing skills (especially discov
 CLAUDE.md now enforces this globally via three sections: Skill Execution Protocol, Subagent Context Requirements, and Grade and Fit Assessment Quality Standard.
 
 **Why:** The first discovery run's agents that didn't use web search produced obvious company lists. Grading runs without the full rubric produced shallow "good company, decent tech" reasoning. The mandatory-read protocol prevents both failure modes.
+
+---
+
+## Question-first grading rubric rewrite (session 4, 2026-04-09)
+
+Both grading rubrics (`skills/grade-companies/references/grading-rubric.md` and `skills/grade-jobs/references/grading-rubric.md`) were completely rewritten from a dimension-weighted scoring approach to a question-first approach:
+
+- **Old approach:** Score each dimension (career ceiling, tech stack, sponsorship, etc.) independently, then combine into a grade. This led to mechanical scoring where agents would assign 3/5 to every dimension and call it a B.
+- **New approach:** Start by answering core questions ("What does this company mean for the candidate's career?", "Would you recommend a friend apply here?"). The answers force genuine reasoning. Dimensions are then used as analytical support, not the primary scoring mechanism.
+
+Both rubrics now also enforce **mandatory description citation** in fit assessments — agents must quote specific phrases from the job description or company information to support their grade. This prevents vague "good tech stack, decent company" assessments that provide no value.
+
+**Why:** Session 3 grading produced assessments that were technically correct but shallow — they assigned reasonable grades but the reasoning was generic enough to apply to any company/job. The question-first approach forces specificity, and mandatory citation creates an evidence trail.

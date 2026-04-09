@@ -41,3 +41,19 @@ SurrealDB uses Pinpoint HQ (`surrealdb.pinpointhq.com`), a UK-based ATS not in o
 Vypercore was confirmed dead via Companies House (in liquidation, no website, overdue accounts). Without the validation step, it would have entered the database as a company with no ATS — wasting a row and potentially misleading future job searches.
 
 **Implication:** The validation step in populate-db (check website, check for activity, verify independence) is essential. Companies House is a useful verification source for UK companies.
+
+---
+
+## Lever has separate EU and US domains (session 4, 2026-04-09)
+
+Lever operates two API domains: `api.lever.co` (US) and `api.eu.lever.co` (EU). Some European companies (particularly UK and EU-based) use the EU endpoint exclusively — probing only the US endpoint will miss them entirely.
+
+**Implication:** The resolve script must probe both `api.lever.co/v0/postings/{slug}` and `api.eu.lever.co/v0/postings/{slug}` for every company. A company that returns 404 on the US endpoint may return a full job board on the EU endpoint. This was added to the resolve pipeline.
+
+---
+
+## Per-request retry improves reliability at scale (session 4, 2026-04-09)
+
+When resolving 200+ companies in parallel, transient HTTP failures (timeouts, rate limits, 502s) are inevitable. A global retry-on-failure approach is wasteful — it retries the entire batch for one failure. Per-request retry with exponential backoff handles transient errors gracefully without affecting other requests.
+
+**Implication:** The HTTP client now retries individual failed requests rather than failing the whole batch. This became essential at the 200+ company scale where at least a few requests would fail on every run.
