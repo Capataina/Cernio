@@ -10,6 +10,8 @@ use crate::ats::{ashby, greenhouse, lever, smartrecruiters, workable};
 
 /// Generate slug candidates from a company name.
 /// Tries common transformations that ATS providers use.
+/// Intentionally generates many candidates — false probes are cheap (one HTTP 404),
+/// while missing the right slug means the company never gets searched.
 fn slug_candidates(name: &str) -> Vec<String> {
     let lower = name.to_lowercase();
     let mut candidates = Vec::new();
@@ -21,11 +23,18 @@ fn slug_candidates(name: &str) -> Vec<String> {
     // Underscored.
     candidates.push(lower.replace(' ', "_"));
 
+    // Strip ALL punctuation and try (e.g. "D.E. Shaw" → "deshaw").
+    let no_punct: String = lower.chars().filter(|c| c.is_alphanumeric() || *c == ' ').collect();
+    candidates.push(no_punct.replace(' ', ""));
+    candidates.push(no_punct.replace(' ', "-"));
+
     // Strip common suffixes and try again.
     for suffix in &[
-        " ltd", " limited", " inc", " corp", " plc", " group",
-        " technologies", " technology", " tech", " labs", " ai",
-        " hq", " io",
+        " ltd", " limited", " inc", " incorporated", " corp", " corporation",
+        " plc", " group", " holdings", " capital", " partners",
+        " technologies", " technology", " tech", " labs", " laboratory",
+        " ai", " hq", " io", " uk", " global", " systems", " software",
+        " gmbh", " ag", " sa", " bv", " pty",
     ] {
         if let Some(stripped) = lower.strip_suffix(suffix) {
             candidates.push(stripped.replace(' ', ""));
@@ -33,37 +42,68 @@ fn slug_candidates(name: &str) -> Vec<String> {
         }
     }
 
-    // Also try WITH "technologies" appended (XTX → xtxmarketstechnologies).
+    // Also try WITH common suffixes appended (XTX → xtxmarketstechnologies).
     let no_spaces = lower.replace(' ', "");
     candidates.push(format!("{no_spaces}technologies"));
+    candidates.push(format!("{no_spaces}tech"));
+    candidates.push(format!("{no_spaces}hq"));
+    candidates.push(format!("{no_spaces}careers"));
+    candidates.push(format!("{no_spaces}jobs"));
 
     // Try just the first word (e.g. "Helsing GmbH" → "helsing").
     if let Some(first) = lower.split_whitespace().next() {
         candidates.push(first.to_string());
     }
 
-    // Strip parenthetical suffixes: "Man Group (AHL)" → "mangroup"
+    // Try first two words hyphenated (e.g. "Tower Research Capital" → "tower-research").
+    let words: Vec<&str> = lower.split_whitespace().collect();
+    if words.len() >= 2 {
+        candidates.push(format!("{}-{}", words[0], words[1]));
+        candidates.push(format!("{}{}", words[0], words[1]));
+    }
+
+    // Try initials/acronym (e.g. "XTX Markets" → "xtx", "DRW" → "drw").
+    if words.len() >= 2 {
+        let initials: String = words.iter().map(|w| w.chars().next().unwrap_or('_')).collect();
+        candidates.push(initials);
+    }
+
+    // Strip parenthetical suffixes: "Man Group (AHL)" → "mangroup", also try "ahl"
     if let Some(paren_pos) = lower.find('(') {
         let without_paren = lower[..paren_pos].trim();
         candidates.push(without_paren.replace(' ', ""));
         candidates.push(without_paren.replace(' ', "-"));
+        // Also try the part inside parens
+        if let Some(close) = lower.find(')') {
+            let inside = lower[paren_pos + 1..close].trim();
+            if !inside.is_empty() {
+                candidates.push(inside.to_string());
+            }
+        }
     }
 
-    // Strip slashes: "Refinitiv / LSEG" → "refinitiv"
+    // Strip slashes: "Refinitiv / LSEG" → "refinitiv", also try "lseg"
     if let Some(slash_pos) = lower.find('/') {
         let first_part = lower[..slash_pos].trim();
         candidates.push(first_part.replace(' ', ""));
         candidates.push(first_part.replace(' ', "-"));
+        let second_part = lower[slash_pos + 1..].trim();
+        if !second_part.is_empty() {
+            candidates.push(second_part.replace(' ', ""));
+            candidates.push(second_part.replace(' ', "-"));
+        }
     }
 
-    // Strip ".co" suffix: "Copper.co" → "copper"
-    if let Some(stripped) = lower.strip_suffix(".co") {
-        candidates.push(stripped.replace(' ', ""));
+    // Strip domain suffixes: "Copper.co" → "copper", "Modal.com" → "modal"
+    for suffix in &[".co", ".io", ".ai", ".com", ".dev"] {
+        if let Some(stripped) = lower.strip_suffix(suffix) {
+            candidates.push(stripped.replace(' ', ""));
+        }
     }
 
     // Deduplicate while preserving order.
     let mut seen = std::collections::HashSet::new();
-    candidates.retain(|c| seen.insert(c.clone()));
+    candidates.retain(|c| seen.insert(c.clone()) && !c.is_empty());
 
     candidates
 }
@@ -80,9 +120,9 @@ async fn probe_all_providers(
     let mut found_providers = std::collections::HashSet::new();
 
     for slug in &candidates {
-        // Probe fast providers in parallel first (Greenhouse, Lever, Ashby, Workable).
-        // SmartRecruiters is probed separately because it returns 200 for ANY slug,
-        // making it slow and noisy. Only probe it if we haven't found anything yet.
+        // Probe all fast providers in parallel for every slug candidate.
+        // Don't stop early — companies can use multiple ATS providers
+        // (e.g. Greenhouse for engineering, Workable for corporate).
         let (gh, lv, ab, wk) = tokio::join!(
             greenhouse::probe(client, slug),
             lever::probe(client, slug),
@@ -95,22 +135,16 @@ async fn probe_all_providers(
                 results.push(result);
             }
         }
-
-        // If we've found all 4 fast providers, stop early.
-        if found_providers.len() >= 4 {
-            break;
-        }
     }
 
-    // Only probe SmartRecruiters if we found nothing on faster providers.
-    // SmartRecruiters returns HTTP 200 for any slug (totalFound:0), so every
-    // candidate generates a response — very slow for no value when we already
-    // have a hit.
-    if results.is_empty() {
+    // Probe SmartRecruiters separately — it returns HTTP 200 for any slug
+    // (totalFound:0), so it's slower and noisier. Try all candidates but
+    // stop after the first real hit.
+    if !found_providers.contains("smartrecruiters") {
         for slug in &candidates {
             if let Some(result) = smartrecruiters::probe(client, slug).await {
                 results.push(result);
-                break; // One SR hit is enough.
+                break;
             }
         }
     }

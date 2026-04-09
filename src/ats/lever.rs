@@ -101,6 +101,7 @@ pub async fn fetch_all(
 }
 
 /// Fetch all open postings with optional EU support.
+/// Uses retry to handle transient timeouts that would silently return zero jobs.
 pub async fn fetch_all_with_extra(
     client: &reqwest::Client,
     slug: &str,
@@ -108,7 +109,8 @@ pub async fn fetch_all_with_extra(
 ) -> Result<Vec<LeverPosting>, reqwest::Error> {
     let url_base = base_url(ats_extra);
     let url = format!("{url_base}/{slug}");
-    let postings: Vec<LeverPosting> = client.get(&url).send().await?.json().await?;
+    let resp = get_with_retry(client, &url, 2).await?;
+    let postings: Vec<LeverPosting> = resp.json().await?;
     Ok(postings)
 }
 
@@ -182,18 +184,28 @@ pub async fn fetch_detail(
 }
 
 /// Strip HTML tags from a string.
+/// Handles '>' inside quoted attribute values (e.g. data-ccp-props with JSON).
 #[allow(dead_code)]
 pub fn strip_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut in_tag = false;
+    let mut quote_char: Option<char> = None;
     for ch in html.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => {
-                in_tag = false;
+        if in_tag {
+            match quote_char {
+                Some(q) if ch == q => quote_char = None,
+                Some(_) => {}
+                None if ch == '"' || ch == '\'' => quote_char = Some(ch),
+                None if ch == '>' => {
+                    in_tag = false;
+                }
+                None => {}
             }
-            _ if !in_tag => result.push(ch),
-            _ => {}
+        } else if ch == '<' {
+            in_tag = true;
+            quote_char = None;
+        } else {
+            result.push(ch);
         }
     }
     result

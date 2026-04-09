@@ -126,23 +126,43 @@ WHERE (j.description IS NULL OR j.description = '')
   AND j.status != 'archived';
 ```
 
-### 7. Portfolio gap staleness check
+### 7. Portfolio gap analysis — active maintenance
 
-Check whether `profile/portfolio-gaps.md` is being maintained as grading runs happen:
+This step does not just check whether portfolio-gaps.md is being maintained — it actively maintains it. Read 10 jobs from EACH grade tier (SS, S, A, B, C, F — fewer if the tier has fewer than 10 jobs), prioritising jobs at S-tier companies, then A, then B.
 
-- Read the "Patterns from Job Evaluations" section. If it's empty or has no entries despite graded jobs existing in the database, flag this as a critical gap — the career coaching loop is broken.
-- Count graded jobs in the database. If there are 50+ graded jobs and the "Patterns from Job Evaluations" section has zero entries, the grade-jobs skill has not been updating portfolio-gaps.md.
-- Check whether the "Known Gaps" section still reflects reality — profile changes may have closed gaps that are still listed as open.
-- Check whether the "Current Strengths" section captures strengths confirmed by market demand during grading.
-
-Report this prominently in the integrity report:
-
+```sql
+-- Sample 10 jobs per grade, prioritised by company grade
+SELECT j.id, j.title, j.grade, j.raw_description, j.fit_assessment,
+       c.name as company, c.grade as company_grade
+FROM jobs j
+JOIN companies c ON j.company_id = c.id
+WHERE j.grade = ?1 AND j.evaluation_status <> 'archived'
+ORDER BY
+    CASE c.grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 ELSE 4 END,
+    RANDOM()
+LIMIT 10;
 ```
-### Portfolio Gap Tracking
-- ⚠  "Patterns from Job Evaluations" section is empty despite 684 graded jobs
-  Recommendation: Run a portfolio gap analysis across graded SS/S/A jobs
-- ⚠  "Known Gaps" section may be stale — last updated before session 3
-```
+
+Run this for each grade tier: SS, S, A, B, C, F. Read the `raw_description` and `fit_assessment` for each sampled job. Across all ~60 sampled jobs, track:
+
+1. **Technologies that appear repeatedly but are absent from `profile/skills.md`**: Count occurrences, note which companies and role types ask for them. Example: "Kubernetes appeared in 12 of 60 sampled roles across SS to B tiers."
+
+2. **Domain knowledge the market expects**: Example: "4 trading roles asked for FIX protocol experience."
+
+3. **Experience patterns that recur**: Example: "8 roles mentioned production incident management."
+
+4. **Confirmed strengths**: Skills from the profile that the market clearly values. Example: "Rust appeared in 6 SS/S-tier roles — genuine differentiator."
+
+After analysis, **write the findings to `profile/portfolio-gaps.md`**:
+- Update the "Patterns from Job Evaluations" section with concrete findings (technology, count, roles, companies, impact)
+- Update "Known Gaps" if new gaps were identified or existing gaps have been closed
+- Update "Current Strengths" if the market confirms profile strengths
+
+**This is not optional.** If the integrity check runs and portfolio-gaps.md is not updated, the career coaching loop is broken. Even "no new patterns found" should be noted with the date checked.
+
+Also check staleness:
+- If `portfolio-gaps.md` has no entries in "Patterns from Job Evaluations" despite graded jobs existing, flag this prominently
+- Check whether "Known Gaps" entries have been closed by recent profile changes
 
 ### 8. Relevance refresh
 

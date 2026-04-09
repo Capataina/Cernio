@@ -142,7 +142,12 @@ pub async fn run_single(
 
     for target in &targets {
         println!("Searching {}...", target.company_name);
-        let jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+        let mut jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+        // Retry on empty result — transient timeouts cause silent 0-job responses.
+        if jobs.is_empty() {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            jobs = fetch_jobs(&client, &target.provider, &target.slug, target.ats_extra.as_deref()).await;
+        }
         println!("  Fetched {} jobs", jobs.len());
 
         let filtered: Vec<_> = jobs

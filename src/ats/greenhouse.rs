@@ -79,6 +79,7 @@ pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<AtsJo
 }
 
 /// Fetch all jobs with optional ats_extra for EU region support.
+/// Uses retry to handle transient timeouts that would silently return zero jobs.
 pub async fn fetch_all_with_extra(
     client: &reqwest::Client,
     slug: &str,
@@ -86,7 +87,10 @@ pub async fn fetch_all_with_extra(
 ) -> Result<Vec<AtsJob>, reqwest::Error> {
     let url_base = base_url(ats_extra);
     let url = format!("{url_base}/{slug}/jobs?content=true");
-    let resp = client.get(&url).send().await?.error_for_status()?;
+    let resp = get_with_retry(client, &url, 2).await?;
+    if !resp.status().is_success() {
+        return Ok(Vec::new());
+    }
     let board: BoardResponse = resp.json().await?;
 
     Ok(board.jobs.into_iter().map(|j| normalise(j)).collect())
@@ -140,12 +144,23 @@ fn normalise(job: GreenhouseJob) -> AtsJob {
 fn strip_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut in_tag = false;
+    let mut quote_char: Option<char> = None;
     for ch in html.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(ch),
-            _ => {}
+        if in_tag {
+            match quote_char {
+                Some(q) if ch == q => quote_char = None,
+                Some(_) => {}
+                None if ch == '"' || ch == '\'' => quote_char = Some(ch),
+                None if ch == '>' => {
+                    in_tag = false;
+                }
+                None => {}
+            }
+        } else if ch == '<' {
+            in_tag = true;
+            quote_char = None;
+        } else {
+            result.push(ch);
         }
     }
     result
