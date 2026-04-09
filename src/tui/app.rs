@@ -134,6 +134,7 @@ pub struct App {
     pub detail_scroll: u16,
     pub focused_mode: bool,
     pub show_archived: bool,
+    pub hide_applied: bool,
     pub frame_count: u64,
     pub toasts: Vec<Toast>,
 
@@ -197,7 +198,7 @@ impl App {
         crate::pipeline::format::run_silent(&conn);
 
         let companies = queries::fetch_companies(&conn, false);
-        let jobs = queries::fetch_jobs(&conn, None, false, false, SortMode::ByGrade);
+        let jobs = queries::fetch_jobs(&conn, None, false, false, false, SortMode::ByGrade);
         let stats = queries::fetch_stats(&conn);
         let total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
 
@@ -223,6 +224,7 @@ impl App {
             detail_scroll: 0,
             focused_mode: false,
             show_archived: false,
+            hide_applied: false,
             frame_count: 0,
             toasts: Vec::new(),
             companies,
@@ -268,6 +270,7 @@ impl App {
             self.job_filter_company,
             self.focused_mode,
             self.show_archived,
+            self.hide_applied,
             self.sort_mode,
         );
         self.stats = queries::fetch_stats(&conn);
@@ -561,7 +564,7 @@ impl App {
         self.detail_scroll = 0;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.show_archived, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.show_archived, self.hide_applied, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -576,7 +579,7 @@ impl App {
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.show_archived, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.show_archived, self.hide_applied, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -1071,7 +1074,7 @@ impl App {
     pub fn run_cleanup(&mut self) {
         if let Ok(conn) = Connection::open(&self.db_path) {
             // Tiered archival: SS=28d, S=21d, A=14d, B=7d, C/F=3d.
-            for (grade, days) in &[("SS", 28), ("S", 21), ("A", 14), ("B", 7), ("C", 3), ("F", 3)] {
+            for (grade, days) in &[("SS", 28), ("S", 21), ("A", 14), ("B", 7), ("C", 3), ("F", 0)] {
                 let _ = conn.execute(
                     "UPDATE jobs SET evaluation_status = 'archived', archived_at = datetime('now')
                      WHERE grade = ?1

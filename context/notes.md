@@ -17,3 +17,4 @@ Design decisions, preferences, and lessons from sessions. Each file captures a d
 | `notes/db-maintenance.md` | Tiered archival lifecycle, archive expiry, unarchive, `cernio format` (HTML→plaintext, idempotent, runs on TUI startup), application_packages cleanup |
 | `notes/autofill-status.md` | Autofill architecture: Chrome CDP via chromiumoxide, per-provider modules, application_packages DB table, prepare-applications skill. Status: scaffolded but broken (React form filling). Fix approach documented. |
 | `notes/interview-prep-design.md` | Future interview-prep skill: personalised curriculum from SS/S/A jobs + portfolio gaps, LeetCode-style TDD problems, systems practice with integration tests, company-specific prep |
+| `notes/bespoke-search-workflow.md` | Bespoke search results MUST be inserted into the jobs table — not just reported conversationally. Agents search career pages + aggregators, found jobs get INSERT OR IGNORE by URL. |

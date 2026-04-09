@@ -71,10 +71,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('f') => {
             if !matches!(app.view, View::Dashboard | View::Pipeline) {
                 app.focused_mode = !app.focused_mode;
+                app.hide_applied = app.focused_mode;
                 app.add_toast(if app.focused_mode {
-                    "Focused: hiding F/C".to_string()
+                    "Focused: hiding F/C + applied".to_string()
                 } else {
-                    "Showing all grades".to_string()
+                    "Showing all grades + applied".to_string()
                 });
                 app.refresh();
             }

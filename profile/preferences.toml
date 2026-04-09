@@ -216,15 +216,14 @@ include_keywords = [
 
 exclude_keywords = [
     # Seniority (too experienced for entry-level candidate)
-    "Senior", "Principal", "Staff", "Distinguished",
+    "Senior", "Sr.", "Sr ", "Principal", "Staff", "Distinguished",
     "Director", "VP", "Vice President",
     "Head of", "Chief", "CTO", "CIO",
+    "Lead",
     # Management
     "Manager", "Managing",
     # Too junior (apprenticeships/placements are different from internships)
     "Apprentice", "Placement",
-    # Architecture (typically requires 10+ years)
-    "Lead Architect",
     # Sales and business development (0 hits in B+ across 2,001 jobs)
     "Sales", "Account", "Executive", "BDR", "SDR",
     "Business Development", "Commercial", "GTM",

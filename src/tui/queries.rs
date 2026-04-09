@@ -56,6 +56,7 @@ pub fn fetch_jobs(
     company_filter: Option<i64>,
     focused: bool,
     show_archived: bool,
+    hide_applied: bool,
     sort_mode: SortMode,
 ) -> Vec<JobRow> {
     let focus_filter = if focused {
@@ -70,6 +71,12 @@ pub fn fetch_jobs(
         " AND j.evaluation_status != 'archived' AND c.status != 'archived'"
     };
 
+    let applied_filter = if hide_applied {
+        " AND j.id NOT IN (SELECT job_id FROM user_decisions WHERE decision = 'applied')"
+    } else {
+        ""
+    };
+
     let base = format!("
         SELECT j.id, j.company_id, c.name, j.title, j.url, j.location,
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
@@ -79,7 +86,7 @@ pub fn fetch_jobs(
                (SELECT 1 FROM application_packages ap WHERE ap.job_id = j.id) IS NOT NULL
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE 1=1{archive_filter}{focus_filter}");
+        WHERE 1=1{archive_filter}{focus_filter}{applied_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "
