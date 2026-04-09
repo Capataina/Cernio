@@ -198,10 +198,10 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
     // We split the inner area (area.width - 2 borders) into two halves.
     let inner_w = area.width.saturating_sub(2) as u16;
     let half_w = inner_w / 2;
-    // label = "  XX " = 5 chars, count = " 999" = 4 chars, separator = 2
-    let bar_width = half_w.saturating_sub(5 + 4 + 1);
+    // label = "  XX " = 5 chars, count = " 9999" = 5 chars, separator = 2
+    let bar_width = half_w.saturating_sub(5 + 5 + 1);
 
-    let spacer = " ".repeat(half_w.saturating_sub(11) as usize);
+    let spacer = " ".repeat(half_w.saturating_sub(12) as usize);
     let mut lines = vec![Line::from(vec![
         Span::raw("  "),
         Span::styled("Companies", t.header),
@@ -248,7 +248,7 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(format!("{grade:<2} "), style));
             spans.push(Span::styled(bar, style));
             spans.push(Span::raw(" ".repeat(pad)));
-            spans.push(Span::styled(format!("{count:>3}"), t.stat_value));
+            spans.push(Span::styled(format!("{count:>4}"), t.stat_value));
         } else {
             let pad = half_w.saturating_sub(2) as usize;
             spans.push(Span::raw(" ".repeat(pad)));
@@ -272,7 +272,7 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(format!("{grade:<2} "), style));
             spans.push(Span::styled(bar, style));
             spans.push(Span::raw(" ".repeat(pad)));
-            spans.push(Span::styled(format!("{count:>3}"), t.stat_value));
+            spans.push(Span::styled(format!("{count:>4}"), t.stat_value));
         }
 
         lines.push(Line::from(spans));
@@ -294,9 +294,9 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     let s = &app.stats;
 
     let inner_w = area.width.saturating_sub(2);
-    // "  provider     ████ 123 (45%)"
-    // 2 pad + 14 name + bar + 1 + 3 count + 6 pct = ~26 fixed
-    let bar_width = inner_w.saturating_sub(26);
+    // "  smartrecruiters ████ 123 (45%)"
+    // 2 pad + 18 name + bar + 1 + 3 count + 6 pct = ~30 fixed
+    let bar_width = inner_w.saturating_sub(30);
 
     let mut lines = Vec::new();
     let total_with_ats: i64 = s.ats_coverage.iter().map(|(_, c)| *c).sum();
@@ -325,7 +325,7 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
             let pad = bar_width.saturating_sub(bar_len as u16) as usize;
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(format!("{provider:<14}"), t.stat_value),
+                Span::styled(format!("{provider:<18}"), t.stat_value),
                 Span::styled(bar, t.grade_a),
                 Span::raw(" ".repeat(pad)),
                 Span::styled(format!("{count:>3}"), t.stat_value),
@@ -335,17 +335,21 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     if s.bespoke_count > 0 {
+        let pad = bar_width as usize;
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(format!("{:<14}", "bespoke"), t.status_bespoke),
+            Span::styled(format!("{:<18}", "bespoke"), t.status_bespoke),
+            Span::raw(" ".repeat(pad)),
             Span::styled(format!("{:>3}", s.bespoke_count), t.stat_value),
         ]));
     }
 
     if s.archived_count > 0 {
+        let pad = bar_width as usize;
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(format!("{:<14}", "archived"), t.dim),
+            Span::styled(format!("{:<18}", "archived"), t.dim),
+            Span::raw(" ".repeat(pad)),
             Span::styled(format!("{:>3}", s.archived_count), t.dim),
         ]));
     }
