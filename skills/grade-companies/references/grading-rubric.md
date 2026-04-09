@@ -79,9 +79,9 @@ A 2-year stint at a company with brilliant engineers and hard problems is worth 
 
 This is the motivation and alignment question. Not "does the tech stack match" (that's a dimension detail) but "would the candidate wake up interested in what they're building?"
 
-Read `projects.md` and `interests.md` — what does the candidate actually choose to build when nobody is making them? That reveals genuine interests, not just skills on paper.
+**Read the ENTIRE profile — not just projects.** `projects.md` shows what the candidate CAN build, but `interests.md` shows what the candidate WANTS to engage with. These are not always the same — the candidate might have deep interests in health, science, or domains they haven't built projects in yet. `preferences.toml` captures sector preferences. `cover-letter.md` reveals motivations and framing. All of these inform engagement assessment.
 
-A company whose core problems resemble what the candidate builds for fun is a company where they'll thrive. A company whose work is technically impressive but in a domain the candidate finds boring is a company where they'll coast.
+A company whose core problems resemble what the candidate builds for fun is a company where they'll thrive. But so is a company whose domain connects to the candidate's intellectual interests even if no matching project exists. A health AI company might be deeply engaging because of personal health interests, even though no health project is in the portfolio.
 
 This doesn't mean every company needs to be in a "passion" domain. "I find this interesting enough and the other factors are excellent" is a perfectly valid answer. But "I would actively dread this work" is a signal that matters.
 

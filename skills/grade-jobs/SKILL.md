@@ -93,6 +93,15 @@ You MUST have the full job description before assigning any grade other than 'sk
 
 Read the full description. Assess it across every dimension in the grading rubric, with particular attention to the critical dimensions (career ceiling and seniority match) that can force an F grade regardless of other strengths.
 
+**Mandatory: cite the description in the fit assessment.** The fit assessment MUST quote or paraphrase specific requirements from the job description. This proves you actually read it. For seniority assessment specifically, you must state what the description says about experience requirements — not your interpretation, but the actual text:
+
+- "Description states: '3-5 years of hands-on experience' — hard seniority mismatch, F"
+- "Description states: 'no specific years required, looking for strong problem solvers' — achievable"
+- "Description states: '2+ years preferred' — stretch but potentially achievable given portfolio depth"
+- "No experience requirements mentioned in description — likely accessible"
+
+**If you write "entry-accessible" without citing what the description actually says about seniority, the grade is unreliable.** The Thought Machine SS-grade failure happened because an agent wrote "entry-accessible" when the description literally said "3-5 years of hands-on experience." Citing the description prevents this class of error entirely.
+
 The evaluation should answer:
 - Is the seniority achievable given the candidate's experience level (from `experience.md`) and project depth (from `projects.md`)? Look past the title to the actual requirements.
 - Does this role lead somewhere valuable over a 10-15 year trajectory, relative to the candidate's long-term targets (from `preferences.toml`)?

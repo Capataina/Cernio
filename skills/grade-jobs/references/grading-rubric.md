@@ -88,14 +88,18 @@ Also check `portfolio-gaps.md` — does this role require something the profile 
 
 Not "is it systems engineering" in the abstract, but "would the candidate find this specific work interesting for 2 years?"
 
-Read `interests.md` and `projects.md` — what does the candidate build when nobody is making them? That reveals genuine interests:
+**Read the ENTIRE profile — not just projects.** `projects.md` shows what the candidate CAN build. `interests.md` shows what the candidate WANTS to build. These are not always the same. The candidate might have zero health projects but a deep interest in the intersection of AI and health — a health platform engineering role could be highly engaging despite no portfolio evidence. Similarly, `preferences.toml` captures sector preferences and `cover-letter.md` reveals how the candidate frames their motivations.
+
+What genuine engagement looks like (from the full profile):
 - Building from scratch rather than configuring existing tools
 - Performance-critical systems with measurable latency targets
 - Financial/trading domain problems
 - ML infrastructure and compiler engineering
 - Problems where correctness and efficiency both matter
+- Cross-disciplinary work connecting engineering to science, health, or finance
+- Any domain the candidate has expressed genuine interest in, even without a matching project
 
-A role writing Kubernetes YAML files is "infrastructure" but it's not the kind of infrastructure the candidate finds engaging. A role building a custom database engine is deeply engaging even if the company is unknown.
+A role writing Kubernetes YAML files is "infrastructure" but it's not the kind of infrastructure the candidate finds engaging. A role building a custom database engine is deeply engaging even if the company is unknown. A role building health monitoring infrastructure might be deeply engaging because of personal interests, even though no health project exists in the portfolio.
 
 "Interesting enough, with excellent other factors" is a valid answer. "I would actively dread this work" is a signal that matters even if everything else looks good.
 
