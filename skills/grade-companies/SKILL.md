@@ -84,13 +84,18 @@ For each ungraded company, build enough understanding to evaluate it across ever
 
 The goal is confident evaluation, not exhaustive research. When you have enough signal to place a company in a grade tier with clear reasoning, move on. When signal is weak and ambiguous, say so in the reasoning — a grade with acknowledged uncertainty is more honest than a confident grade based on thin evidence.
 
-### 4. Assign grades
+### 4. Enrich and grade
+
+The research you do for grading also produces the company's description and relevance assessment. These are written to the database alongside the grade — they are not separate steps.
 
 Apply the rubric from `references/grading-rubric.md`. Each company gets:
 
+- **`what_they_do`**: A substantive paragraph (3-5 sentences) explaining what this company specifically builds, their engineering focus, and their domain. This must be specific enough to distinguish them from every other company in the same sector. "Proprietary trading firm" is unacceptable — 100 firms match that description. "Proprietary derivatives market-maker building all technology in-house: a custom matching engine, real-time risk systems, and execution infrastructure for options and futures across global exchanges, with C++ and Python as primary languages" tells the reader what THIS company specifically does. **Exclude anything that goes stale**: no headcounts, no funding amounts, no recent news, no employee numbers. Only include what the company fundamentally IS and DOES.
+- **`location`**: Where they have engineering offices relevant to the candidate (e.g. "London", "London, Bristol", "Remote-UK").
+- **`sector_tags`**: Comma-separated sector tags (e.g. "trading-systems, derivatives, market-making").
 - **Grade**: S, A, B, or C
 - **Grade reasoning**: A concise paragraph explaining which dimensions drove the grade, what the company's strengths and weaknesses are, and any notable uncertainties. This reasoning is stored in the database and read by both the user and future agents — make it genuinely informative.
-- **Why relevant** (update if the existing value is thin or outdated): What makes this company relevant to the profile specifically.
+- **Why relevant**: What makes this company relevant to the candidate's profile specifically. Must reference specific flagship projects, technologies, or career targets by name. "Good alignment" is not acceptable. "Nyquestro's matching engine maps directly to their exchange infrastructure; Aurix's risk modelling connects to their derivatives pricing work" IS acceptable.
 
 The grade reasoning must include **specific, verifiable evidence** across these categories:
 
@@ -134,28 +139,39 @@ Format:
 ## Grading Results
 
 ### S-tier
-- **Cloudflare** — Exceptional infrastructure company. Core product (CDN, edge compute, Workers
-  runtime) directly overlaps with the candidate's systems engineering focus. Production Rust
-  usage aligns with primary language. Active OSS, substantive engineering blog. Confirmed
-  Skilled Worker sponsor. Clear IC track to Principal. Recent Q1 earnings show continued growth.
-  Why relevant: Edge infrastructure and performance-critical networking maps to Nyquestro's
-  matching engine architecture and NeuroDrive's real-time distributed simulation. Rust in
-  production stack.
+- **Cloudflare**
+  What they do: Operates one of the world's largest edge networks, building CDN, DDoS
+  mitigation, DNS, edge compute (Workers/Durable Objects), and developer platform
+  infrastructure. Engineering is heavily systems-oriented — they rewrote their core proxy
+  from NGINX to a custom Rust implementation. Active open-source contributor with a
+  substantive engineering blog covering systems internals.
+  Grade: S — Exceptional infrastructure company. Every core question has a strong answer.
+  Why relevant: Edge infrastructure and performance-critical networking maps directly to
+  Nyquestro's matching engine architecture. Rust in production stack — the candidate's
+  primary language. NeuroDrive's real-time distributed simulation transfers to their
+  distributed systems work.
 
 ### A-tier
-- **Form3** — Solid payments infrastructure. Core work (Faster Payments, BACS, CHAPS processing)
-  involves distributed systems, strict ordering, and fault tolerance — technically deep and
-  adjacent to exchange infrastructure. Go-heavy but systems-oriented. Series C, 200+ employees,
-  confirmed sponsor. Weaker on brand recognition outside fintech.
-  Why relevant: Payment message routing and transaction ordering are structurally similar to
-  order matching. The candidate's distributed systems experience from NeuroDrive transfers well.
+- **Form3**
+  What they do: Builds cloud-native payment infrastructure processing Faster Payments,
+  BACS, and CHAPS transactions for UK banks. Core engineering involves distributed
+  systems with strict message ordering, fault tolerance, and regulatory compliance.
+  Go-heavy backend with a focus on reliability and correctness.
+  Grade: A rather than S because brand recognition is weaker outside fintech, and
+  Go stack doesn't directly leverage the candidate's Rust proficiency.
+  Why relevant: Payment message routing and transaction ordering are structurally
+  similar to order matching in Nyquestro. Distributed systems experience from
+  NeuroDrive's multi-agent simulation transfers well.
 
-### C-tier (will be archived)
-- **SmallCo Ltd** — Marketing-focused consultancy. Engineering team of 3, no public repos,
-  no engineering blog. Core work is CMS customisation, not systems engineering. Not on the
-  sponsor register. No alignment with the candidate's infrastructure/systems focus.
-  Why relevant: Originally discovered via fintech list but core work is application-layer
-  marketing technology — no connection to the candidate's projects or technical interests.
+### C-tier
+- **SmallCo Ltd**
+  What they do: Marketing-focused consultancy building custom CMS integrations and
+  campaign management tools for mid-market retail brands. Engineering team of 3 with
+  no public repositories or engineering blog. Core work is application-layer WordPress
+  and Shopify customisation.
+  Grade: C — no alignment with the candidate's infrastructure/systems focus.
+  Why relevant: Originally discovered via fintech list but core work is marketing
+  technology — no connection to the candidate's projects or technical interests.
 ```
 
 ### 7. Write to database
@@ -164,14 +180,16 @@ After user confirmation, execute the updates. **Use EXACTLY this SQL format — 
 
 ```sql
 -- EXACT format for ALL grades (S, A, B, C) — do not modify column names:
-UPDATE companies SET grade = 'X', grade_reasoning = 'reasoning text here', why_relevant = 'updated relevance text', graded_at = datetime('now') WHERE id = N;
+UPDATE companies SET what_they_do = 'description paragraph', location = 'London', sector_tags = 'tag1, tag2', grade = 'X', grade_reasoning = 'reasoning text here', why_relevant = 'relevance text referencing specific profile elements', relevance_updated_at = datetime('now'), graded_at = datetime('now') WHERE id = N;
 ```
 
 **Critical SQL rules for agents:**
-- Column names are `grade`, `grade_reasoning`, `why_relevant`, `graded_at`. NOT `reasoning`, NOT `relevance`, NOT any other variation.
+- Column names are `what_they_do`, `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`, `relevance_updated_at`, `graded_at`. NOT `reasoning`, NOT `relevance`, NOT `description`, NOT any other variation.
+- `what_they_do` must be a substantive paragraph — not a one-liner. If you can't write 3+ sentences about what the company does, you haven't researched enough.
+- `why_relevant` must reference specific profile elements by name (projects, technologies, career targets).
 - Do NOT set `status = 'archived'` for any grade including C. C-tier companies stay active.
 - Escape single quotes in text by doubling them: `it''s` not `it's`
-- `graded_at` must be `datetime('now')`, not a hardcoded date string
+- `graded_at` and `relevance_updated_at` must be `datetime('now')`, not hardcoded date strings
 - Every statement must end with a semicolon
 - One UPDATE per line, no multi-line statements
 
@@ -192,11 +210,14 @@ Sometimes the user will ask to regrade specific companies — perhaps new inform
 Before presenting results to the user:
 
 - [ ] All files in `profile/` were read before grading began
+- [ ] Every company has a `what_they_do` paragraph of 3+ sentences that specifically describes what THIS company builds — not a generic sector label. If you wrote "trading firm" without further detail, it's not done.
+- [ ] `what_they_do` contains NO stale information (headcounts, funding amounts, recent news, employee numbers) — only what the company fundamentally IS and DOES
+- [ ] Every company has `location` and `sector_tags` filled in
 - [ ] Every graded company has a grade_reasoning that explains the evaluation across the high-weight dimensions (engineering reputation, technical alignment, growth trajectory) with specific evidence
 - [ ] Grade reasoning distinguishes this company from adjacent tiers — it is clear why an A is not an S, or why a B is not a C
-- [ ] C-tier companies are flagged for archival and the user understands what archival means
+- [ ] C-tier companies stay active — they are NOT archived
 - [ ] Companies with weak or ambiguous signal have uncertainty acknowledged in the reasoning rather than false confidence
-- [ ] The why_relevant field connects the company to the profile specifically — not generic praise, but what about this company matters for this candidate
+- [ ] The why_relevant field references specific flagship projects, technologies, or career targets from the profile by name — not generic praise
 - [ ] No company was graded without checking its current state — a company that was S-tier a year ago might have had layoffs, pivots, or acquisitions since
 - [ ] Sponsorship assessment is grounded in evidence (sponsor register check, company size, international hiring history) rather than assumption
 - [ ] Results are presented grouped by tier for easy review before any database writes happen

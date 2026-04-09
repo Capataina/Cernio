@@ -115,3 +115,15 @@ Re-assessed all 146 SS/S/A jobs that had descriptions (11 G-Research jobs with n
 - 4 genuinely accessible roles promoted (Parity Rust dev A→S, Squarepoint accessible quant roles A→S)
 
 **Token economics lesson:** Proper job grading (reading descriptions, answering 5 questions, citing evidence) costs roughly 0.08% of a 20x plan per job. Budget accordingly — ~700 jobs would need ~56% of a 20x plan session. The old approach of grading without reading was cheap but produced random results.
+
+---
+
+## Full database reset (session 5, 2026-04-09)
+
+All jobs (712), user decisions (120), and company metadata wiped. The 273 company names, websites, statuses, and 142 ATS portal records were preserved — this is the expensive resolution work from earlier sessions. 47 wrongly archived companies (from the TUI cleanup bug) were unarchived.
+
+**Why:** Company metadata (`what_they_do`, `why_relevant`, grades) suffered the same title-only problem as job grades. Descriptions were one-liners ("trading firm specialising in derivatives"), relevance fields were empty, and grades were assigned without proper research. Google at A-tier while Akuna Capital was S-tier. Apple at A. The metadata was too broken to patch — faster to rebuild from scratch with proper enrichment.
+
+**What changed in grade-companies skill:** Company grading now also writes enriched `what_they_do` (3-5 sentence paragraph, no stale info), `location`, `sector_tags`, and profile-grounded `why_relevant` alongside the grade. This was previously handled superficially during population. The grading agents are already researching each company — routing that knowledge into the description field is zero extra work.
+
+**Rebuild sequence:** Enrich+grade all 273 companies → search jobs with updated filters → grade jobs with new rubric.
