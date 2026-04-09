@@ -61,17 +61,28 @@ pub fn clean_description(raw: &str) -> String {
     text = processed;
 
     // Strip remaining HTML tags.
+    // Attribute-aware: tracks quoted strings so that '>' inside attribute
+    // values (e.g. data-ccp-props='{"key":true}') doesn't end the tag early.
     let mut result = String::with_capacity(text.len());
     let mut in_tag = false;
+    let mut quote_char: Option<char> = None;
     for ch in text.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => {
-                in_tag = false;
-                result.push(' ');
+        if in_tag {
+            match quote_char {
+                Some(q) if ch == q => quote_char = None,
+                Some(_) => {} // inside quoted attribute value, skip
+                None if ch == '"' || ch == '\'' => quote_char = Some(ch),
+                None if ch == '>' => {
+                    in_tag = false;
+                    result.push(' ');
+                }
+                None => {} // tag content, skip
             }
-            _ if !in_tag => result.push(ch),
-            _ => {}
+        } else if ch == '<' {
+            in_tag = true;
+            quote_char = None;
+        } else {
+            result.push(ch);
         }
     }
     text = result;

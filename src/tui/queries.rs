@@ -253,7 +253,8 @@ pub fn fetch_stats(conn: &Connection) -> DashboardStats {
             "SELECT COUNT(*) FROM companies
              WHERE status = 'bespoke'
              AND grade IN ('S', 'A')
-             AND id NOT IN (SELECT DISTINCT company_id FROM jobs)",
+             AND (last_searched_at IS NULL
+                  OR last_searched_at < datetime('now', '-7 days'))",
             [],
             |r| r.get(0),
         )

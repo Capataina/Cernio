@@ -607,6 +607,8 @@ fn draw_top_roles(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Fetch bespoke company names that need manual job search.
+/// Shows S/A bespoke companies that have never been searched or
+/// haven't been searched in 7+ days.
 fn fetch_bespoke_company_names(app: &App) -> Vec<String> {
     let Ok(conn) = Connection::open(&app.db_path) else {
         return Vec::new();
@@ -616,7 +618,8 @@ fn fetch_bespoke_company_names(app: &App) -> Vec<String> {
         SELECT name FROM companies
         WHERE status = 'bespoke'
         AND grade IN ('S', 'A')
-        AND id NOT IN (SELECT DISTINCT company_id FROM jobs)
+        AND (last_searched_at IS NULL
+             OR last_searched_at < datetime('now', '-7 days'))
         ORDER BY
             CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 END,
             name";

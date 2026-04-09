@@ -175,8 +175,14 @@ include_keywords = [
     "Security", "Cryptography", "Cyber",
     # Quant
     "Quantitative", "Quant", "Research",
+    # AI/ML specialisms
+    "Deep Learning", "Neural Network", "Computer Vision",
+    "NLP", "Reinforcement Learning",
+    # Low-level / specialist
+    "Firmware", "Trading", "Kernel", "Protocol",
     # Entry-level indicators
     "Graduate", "Grad", "Junior", "Entry",
+    "Intern", "Internship",
     # Senior (kept deliberately — see note above)
     "Senior",
     # Broad catch-all
@@ -198,8 +204,8 @@ exclude_keywords = [
     "Head of", "Chief", "CTO", "CIO",
     # Management
     "Manager", "Managing",
-    # Too junior (internships have separate pipelines)
-    "Intern", "Internship", "Apprentice", "Placement",
+    # Too junior (apprenticeships/placements are different from internships)
+    "Apprentice", "Placement",
     # Architecture (typically requires 10+ years)
     "Lead Architect",
 ]

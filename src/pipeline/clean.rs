@@ -8,6 +8,7 @@ pub struct CleanupReport {
     pub jobs_removed: u64,
     pub jobs_by_grade: Vec<(String, u64)>,
     pub stale_jobs: u64,
+    pub expired_archived: u64,
     pub companies_archived: u64,
     pub preserved_by_decision: u64,
     pub preserved_by_grade: u64,
@@ -37,7 +38,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
                  WHERE grade = ?1
                  AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)
-                 AND (grade NOT IN ('SS', 'S'))",
+                 AND grade NOT IN ('SS', 'S', 'A')",
                 params![grade],
                 |row| row.get(0),
             )
@@ -48,15 +49,27 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
         }
     }
 
-    // Count stale jobs.
+    // Count stale jobs (not SS/S/A).
     let stale: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM jobs
              WHERE discovered_at < datetime('now', ?1)
-             AND grade NOT IN ('SS', 'S')
+             AND grade NOT IN ('SS', 'S', 'A')
              AND evaluation_status != 'archived'
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             params![format!("-{} days", config.stale_days)],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Count archived jobs that would expire (>28 days in archive).
+    let expired_archived: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM jobs
+             WHERE evaluation_status = 'archived'
+             AND discovered_at < datetime('now', '-42 days')
+             AND id NOT IN (SELECT job_id FROM user_decisions)",
+            [],
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -87,6 +100,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
         jobs_removed,
         jobs_by_grade,
         stale_jobs: stale as u64,
+        expired_archived: expired_archived as u64,
         companies_archived,
         preserved_by_decision: preserved_by_decision as u64,
         preserved_by_grade: 0,
@@ -98,13 +112,13 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
     let mut jobs_removed = 0u64;
     let mut jobs_by_grade = Vec::new();
 
-    // Archive jobs by grade (preserving those with user decisions and SS/S).
+    // Archive jobs by grade (preserving those with user decisions and SS/S/A).
     for grade in &config.remove_job_grades {
         let count = conn
             .execute(
                 "UPDATE jobs SET evaluation_status = 'archived'
                  WHERE grade = ?1
-                 AND grade NOT IN ('SS', 'S')
+                 AND grade NOT IN ('SS', 'S', 'A')
                  AND evaluation_status != 'archived'
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 params![grade],
@@ -116,15 +130,28 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
         }
     }
 
-    // Archive stale jobs.
+    // Archive stale jobs (not SS/S/A).
     let stale = conn
         .execute(
             "UPDATE jobs SET evaluation_status = 'archived'
              WHERE discovered_at < datetime('now', ?1)
-             AND grade NOT IN ('SS', 'S')
+             AND grade NOT IN ('SS', 'S', 'A')
              AND evaluation_status != 'archived'
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             params![format!("-{} days", config.stale_days)],
+        )
+        .unwrap_or(0) as u64;
+
+    // Delete archived jobs older than 42 days total (14 days active + 28 days archived).
+    // This gives them a second chance — after deletion, they can be re-discovered
+    // and re-graded with a potentially updated profile.
+    let expired_archived = conn
+        .execute(
+            "DELETE FROM jobs
+             WHERE evaluation_status = 'archived'
+             AND discovered_at < datetime('now', '-42 days')
+             AND id NOT IN (SELECT job_id FROM user_decisions)",
+            [],
         )
         .unwrap_or(0) as u64;
 
@@ -139,6 +166,7 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
         jobs_removed,
         jobs_by_grade,
         stale_jobs: stale,
+        expired_archived,
         companies_archived,
         preserved_by_decision: 0,
         preserved_by_grade: 0,
@@ -194,6 +222,10 @@ fn print_report(report: &CleanupReport, dry_run: bool) {
     if report.stale_jobs > 0 {
         println!("    {verb} {} stale jobs (>14 days)", report.stale_jobs);
     }
+    if report.expired_archived > 0 {
+        let verb_del = if dry_run { "would delete" } else { "deleted" };
+        println!("    {verb_del} {} expired archived jobs (>42 days)", report.expired_archived);
+    }
     if report.preserved_by_decision > 0 {
         println!(
             "    preserved {} (have user decisions)",
@@ -213,6 +245,10 @@ fn print_report(report: &CleanupReport, dry_run: bool) {
         "\n  Total jobs {verb}: {}",
         report.jobs_removed + report.stale_jobs
     );
+    if report.expired_archived > 0 {
+        let verb_del = if dry_run { "would delete" } else { "deleted" };
+        println!("  Total archived {verb_del}: {}", report.expired_archived);
+    }
 
     if dry_run {
         println!("\n  (dry run — nothing was changed)");

@@ -95,6 +95,11 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
                     job,
                 );
             }
+            // Record when this company was last searched.
+            let _ = conn.execute(
+                "UPDATE companies SET last_searched_at = datetime('now') WHERE id = ?1",
+                params![result.target.company_id],
+            );
         }
     }
 

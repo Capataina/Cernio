@@ -39,6 +39,7 @@ impl Database {
         self.conn.execute_batch(MIGRATION_001)?;
         self.migrate_002_add_archived_status()?;
         self.migrate_003_add_job_archival()?;
+        self.migrate_004_add_last_searched_at()?;
         Ok(())
     }
 
@@ -212,6 +213,27 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
             PRAGMA foreign_keys = ON;
         ")?;
+
+        Ok(())
+    }
+
+    /// Migration 004: Add last_searched_at column to companies.
+    ///
+    /// Tracks when each company was last searched for jobs — either via
+    /// automated ATS search or manual bespoke search. Enables the TUI to
+    /// show which bespoke companies need searching.
+    fn migrate_004_add_last_searched_at(&self) -> Result<()> {
+        // Check if column already exists.
+        let has_column: bool = self
+            .conn
+            .prepare("SELECT last_searched_at FROM companies LIMIT 0")
+            .is_ok();
+
+        if !has_column {
+            self.conn.execute_batch(
+                "ALTER TABLE companies ADD COLUMN last_searched_at TEXT;",
+            )?;
+        }
 
         Ok(())
     }
