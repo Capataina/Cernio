@@ -250,7 +250,9 @@ fn draw_grade_distribution(frame: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::raw(" ".repeat(pad)));
             spans.push(Span::styled(format!("{count:>4}"), t.stat_value));
         } else {
-            let pad = half_w.saturating_sub(2) as usize;
+            // Empty company side: must match the width of a filled row.
+            // Filled row = grade label (3) + bar (bar_width) + count (4) = 7 + bar_width
+            let pad = (3 + bar_width as usize + 4) as usize;
             spans.push(Span::raw(" ".repeat(pad)));
         }
 

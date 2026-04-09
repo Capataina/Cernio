@@ -30,44 +30,40 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
     let mut jobs_removed = 0u64;
     let mut jobs_by_grade = Vec::new();
 
-    // Count jobs that would be removed by grade.
-    for grade in &config.remove_job_grades {
+    // Count jobs that would be archived by tiered rules.
+    // SS=28d, S=21d, A=14d, B=7d, C/F=3d.
+    let tier_rules: &[(&str, i64)] = &[
+        ("SS", 28), ("S", 21), ("A", 14), ("B", 7), ("C", 3), ("F", 3),
+    ];
+    let mut stale = 0i64;
+    for (grade, days) in tier_rules {
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM jobs
                  WHERE grade = ?1
                  AND evaluation_status != 'archived'
-                 AND id NOT IN (SELECT job_id FROM user_decisions)
-                 AND grade NOT IN ('SS', 'S', 'A')",
-                params![grade],
+                 AND discovered_at < datetime('now', ?2)
+                 AND id NOT IN (SELECT job_id FROM user_decisions)",
+                params![grade, format!("-{days} days")],
                 |row| row.get(0),
             )
             .unwrap_or(0);
         if count > 0 {
-            jobs_by_grade.push((grade.clone(), count as u64));
+            jobs_by_grade.push((grade.to_string(), count as u64));
             jobs_removed += count as u64;
         }
+        stale += count;
     }
 
-    // Count stale jobs (not SS/S/A).
-    let stale: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM jobs
-             WHERE discovered_at < datetime('now', ?1)
-             AND grade NOT IN ('SS', 'S', 'A')
-             AND evaluation_status != 'archived'
-             AND id NOT IN (SELECT job_id FROM user_decisions)",
-            params![format!("-{} days", config.stale_days)],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    // Count archived jobs that would expire (>28 days in archive).
+    // Count archived jobs that would expire (14+ days in archive).
     let expired_archived: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM jobs
              WHERE evaluation_status = 'archived'
-             AND discovered_at < datetime('now', '-42 days')
+             AND (
+                 (archived_at IS NOT NULL AND archived_at < datetime('now', '-14 days'))
+                 OR (archived_at IS NULL AND discovered_at < datetime('now', '-42 days'))
+             )
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             [],
             |row| row.get(0),
@@ -112,44 +108,48 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
     let mut jobs_removed = 0u64;
     let mut jobs_by_grade = Vec::new();
 
-    // Archive jobs by grade (preserving those with user decisions and SS/S/A).
-    for grade in &config.remove_job_grades {
+    // Tiered archival: each grade has a different active duration.
+    // SS=28d, S=21d, A=14d, B=7d, C/F=3d.
+    // Jobs with user decisions are always preserved.
+    let tier_rules: &[(&str, i64)] = &[
+        ("SS", 28),
+        ("S", 21),
+        ("A", 14),
+        ("B", 7),
+        ("C", 3),
+        ("F", 3),
+    ];
+
+    let mut stale = 0u64;
+    for (grade, days) in tier_rules {
         let count = conn
             .execute(
-                "UPDATE jobs SET evaluation_status = 'archived'
+                "UPDATE jobs SET evaluation_status = 'archived', archived_at = datetime('now')
                  WHERE grade = ?1
-                 AND grade NOT IN ('SS', 'S', 'A')
                  AND evaluation_status != 'archived'
+                 AND discovered_at < datetime('now', ?2)
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
-                params![grade],
+                params![grade, format!("-{days} days")],
             )
             .unwrap_or(0) as u64;
         if count > 0 {
-            jobs_by_grade.push((grade.clone(), count));
+            jobs_by_grade.push((grade.to_string(), count));
             jobs_removed += count;
         }
+        stale += count;
     }
 
-    // Archive stale jobs (not SS/S/A).
-    let stale = conn
-        .execute(
-            "UPDATE jobs SET evaluation_status = 'archived'
-             WHERE discovered_at < datetime('now', ?1)
-             AND grade NOT IN ('SS', 'S', 'A')
-             AND evaluation_status != 'archived'
-             AND id NOT IN (SELECT job_id FROM user_decisions)",
-            params![format!("-{} days", config.stale_days)],
-        )
-        .unwrap_or(0) as u64;
-
-    // Delete archived jobs older than 42 days total (14 days active + 28 days archived).
-    // This gives them a second chance — after deletion, they can be re-discovered
-    // and re-graded with a potentially updated profile.
+    // Delete archived jobs that have been in the archive for 14+ days.
+    // Uses archived_at timestamp, not discovered_at.
+    // Falls back to discovered_at + 42 days for jobs archived before migration 005.
     let expired_archived = conn
         .execute(
             "DELETE FROM jobs
              WHERE evaluation_status = 'archived'
-             AND discovered_at < datetime('now', '-42 days')
+             AND (
+                 (archived_at IS NOT NULL AND archived_at < datetime('now', '-14 days'))
+                 OR (archived_at IS NULL AND discovered_at < datetime('now', '-42 days'))
+             )
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             [],
         )

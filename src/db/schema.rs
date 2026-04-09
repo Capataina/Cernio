@@ -40,6 +40,7 @@ impl Database {
         self.migrate_002_add_archived_status()?;
         self.migrate_003_add_job_archival()?;
         self.migrate_004_add_last_searched_at()?;
+        self.migrate_005_add_archived_at()?;
         Ok(())
     }
 
@@ -145,9 +146,15 @@ impl Database {
                         fit_assessment      TEXT,
                         fit_score           REAL,
                         grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
-                        discovered_at       TEXT NOT NULL
+                        discovered_at       TEXT NOT NULL,
+                        archived_at         TEXT
                     );
-                    INSERT OR IGNORE INTO jobs_new SELECT * FROM jobs;
+                    INSERT OR IGNORE INTO jobs_new
+                        SELECT id, company_id, portal_id, title, url, location,
+                               remote_policy, posted_date, raw_description, parsed_tags,
+                               evaluation_status, fit_assessment, fit_score, grade,
+                               discovered_at, NULL
+                        FROM jobs;
                     DROP TABLE jobs;
                     ALTER TABLE jobs_new RENAME TO jobs;
                     CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
@@ -232,6 +239,25 @@ impl Database {
         if !has_column {
             self.conn.execute_batch(
                 "ALTER TABLE companies ADD COLUMN last_searched_at TEXT;",
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Migration 005: Add archived_at column to jobs.
+    ///
+    /// Tracks when a job was archived, enabling time-based archive expiry.
+    /// Archived jobs are fully deleted after 2 weeks in the archive.
+    fn migrate_005_add_archived_at(&self) -> Result<()> {
+        let has_column: bool = self
+            .conn
+            .prepare("SELECT archived_at FROM jobs LIMIT 0")
+            .is_ok();
+
+        if !has_column {
+            self.conn.execute_batch(
+                "ALTER TABLE jobs ADD COLUMN archived_at TEXT;",
             )?;
         }
 

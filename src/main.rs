@@ -202,23 +202,46 @@ fn cmd_pending(args: &[String]) {
 }
 
 /// Unarchive previously archived jobs/companies so they can be re-evaluated.
+/// Supports --grade flag to unarchive only jobs at a specific grade.
+/// Resets discovered_at to now so the tiered archival timer restarts.
 fn cmd_unarchive(args: &[String]) {
     let db = open_db();
     let conn = db.conn();
 
     let target = args.get(2).map(|s| s.as_str());
+    let grade_filter = get_flag_value(args, "--grade");
 
     match target {
         Some("--jobs") => {
-            let count = conn
-                .execute(
+            let count = if let Some(grade) = &grade_filter {
+                // Unarchive only jobs at a specific grade, preserving the grade and assessment.
+                // Reset discovered_at so the tiered archival timer restarts.
+                conn.execute(
+                    "UPDATE jobs SET evaluation_status = CASE grade
+                         WHEN 'SS' THEN 'strong_fit' WHEN 'S' THEN 'strong_fit'
+                         WHEN 'A' THEN 'weak_fit' WHEN 'B' THEN 'weak_fit'
+                         ELSE 'no_fit' END,
+                     discovered_at = datetime('now'), archived_at = NULL
+                     WHERE evaluation_status = 'archived' AND grade = ?1",
+                    rusqlite::params![grade.to_uppercase()],
+                )
+                .unwrap_or(0)
+            } else {
+                // Unarchive all jobs — reset to pending for full re-grading.
+                conn.execute(
                     "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
-                     fit_assessment = NULL, fit_score = NULL
+                     fit_assessment = NULL, fit_score = NULL,
+                     discovered_at = datetime('now'), archived_at = NULL
                      WHERE evaluation_status = 'archived'",
                     [],
                 )
-                .unwrap_or(0);
-            println!("Unarchived {count} jobs (reset to pending for re-grading).");
+                .unwrap_or(0)
+            };
+            if let Some(g) = &grade_filter {
+                println!("Unarchived {count} {}-graded jobs (timer reset).", g.to_uppercase());
+            } else {
+                println!("Unarchived {count} jobs (reset to pending for re-grading).");
+            }
         }
         Some("--companies") => {
             let count = conn
@@ -243,7 +266,8 @@ fn cmd_unarchive(args: &[String]) {
             let jobs = conn
                 .execute(
                     "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
-                     fit_assessment = NULL, fit_score = NULL
+                     fit_assessment = NULL, fit_score = NULL,
+                     discovered_at = datetime('now'), archived_at = NULL
                      WHERE evaluation_status = 'archived'",
                     [],
                 )
@@ -259,12 +283,13 @@ fn cmd_unarchive(args: &[String]) {
             println!("Unarchived {jobs} jobs and {companies} companies.");
         }
         _ => {
-            println!("Usage: cernio unarchive <--jobs|--companies|--all>");
+            println!("Usage: cernio unarchive <--jobs|--companies|--all> [--grade G]");
             println!();
             println!("Restores archived entries so they can be re-evaluated.");
-            println!("  --jobs        Unarchive all archived jobs (reset to pending)");
-            println!("  --companies   Unarchive all archived companies");
-            println!("  --all         Unarchive everything");
+            println!("  --jobs                 Unarchive all archived jobs (reset to pending)");
+            println!("  --jobs --grade A       Unarchive only A-graded jobs (preserves grade, resets timer)");
+            println!("  --companies            Unarchive all archived companies");
+            println!("  --all                  Unarchive everything");
         }
     }
 }

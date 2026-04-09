@@ -150,11 +150,11 @@ min_company_grade = "C"
 # the AI 30 seconds to grade as F. A false negative is a lost
 # opportunity that can never be recovered.
 #
-# "Senior" is deliberately here (not excluded). Many companies use
-# "Senior" for roles accessible to strong candidates without years
-# of experience. The AI will evaluate seniority fit properly during
-# grading — giving most a B or C, but not missing the ones where
-# "Senior" just means "not intern".
+# "Senior" was previously included but is now excluded. While some
+# companies use "Senior" for 2-year roles, historically 742 Senior
+# jobs graded F/C vs only 18 at B+ — a 41:1 noise ratio. The few
+# genuine opportunities at accessible "Senior" titles are lost, but
+# the token savings from not grading 742 noise jobs are substantial.
 include_keywords = [
     # Core engineering roles
     "Engineer", "Engineering", "Developer", "Dev", "SWE", "Software",
@@ -183,23 +183,40 @@ include_keywords = [
     # Entry-level indicators
     "Graduate", "Grad", "Junior", "Entry",
     "Intern", "Internship",
-    # Senior (kept deliberately — see note above)
-    "Senior",
     # Broad catch-all
     "Analyst",
 ]
 
 # Title containing any of these is excluded (AND NOT logic).
-# Case-insensitive matching. A job is REMOVED if its title contains
-# ANY of these keywords, regardless of inclusion keywords.
+# Case-insensitive matching using contains() — a job is REMOVED
+# if its title contains ANY of these as a SUBSTRING. This means
+# "account" matches "accountant", "account executive", etc.
 # Exclusion runs BEFORE inclusion.
 #
-# Be conservative with exclusions — only exclude titles that are
-# categorically impossible or irrelevant. If unsure, leave it out
-# and let the AI grade it.
+# ── EXCLUSION PHILOSOPHY ──
+# Every keyword here was validated against the full graded job database
+# (2,001 jobs across 434 companies). A keyword is ONLY added if it
+# appears in ZERO jobs graded B or above. This is a hard rule — we
+# accept a 100:1 F-to-good ratio before considering a keyword safe.
+#
+# The cost of a false negative (excluding a good job) is catastrophic
+# and irreversible. The cost of a false positive (grading a bad job)
+# is 30 seconds of AI time. We bias aggressively toward inclusion.
+#
+# Words like "market" (kills QRT SS-tier internship), "trader" (kills
+# Old Mission A-tier quant role), and "operations" (kills Jane Street
+# B-tier role) are deliberately NOT excluded despite high F counts
+# because they appear in at least one valuable job.
+#
+# Each keyword below has been verified against historical data:
+#   solutions: 117 F/C, 0 B+    |  sales: 71 F/C, 0 B+
+#   executive: 66 F/C, 0 B+     |  account: 54 F/C, 0 B+
+#   support: 38 F/C, 0 B+       |  marketing: 17 F/C, 0 B+
+#   (full validation data in context/notes/grading-rubric.md)
+
 exclude_keywords = [
-    # Clearly senior/leadership (beyond "Senior" which is kept)
-    "Principal", "Staff", "Distinguished",
+    # Seniority (too experienced for entry-level candidate)
+    "Senior", "Principal", "Staff", "Distinguished",
     "Director", "VP", "Vice President",
     "Head of", "Chief", "CTO", "CIO",
     # Management
@@ -208,6 +225,19 @@ exclude_keywords = [
     "Apprentice", "Placement",
     # Architecture (typically requires 10+ years)
     "Lead Architect",
+    # Sales and business development (0 hits in B+ across 2,001 jobs)
+    "Sales", "Account", "Executive", "BDR", "SDR",
+    "Business Development", "Commercial", "GTM",
+    # Customer-facing / support (0 hits in B+)
+    "Solutions", "Customer", "Support", "Consult",
+    # Non-engineering functions (0 hits in B+)
+    "Marketing", "Communications", "Content", "Social Media",
+    "Brand", "Strategist", "Evangelist",
+    "Legal", "Counsel", "Paralegal", "Compliance",
+    "Finance", "Tax", "Payroll", "Controller",
+    "Recruit", "Talent", "People", "Onboarding",
+    "Designer", "Writer", "Reporter", "Coordinator",
+    "Administrator", "Procurement", "Office",
 ]
 
 # ─────────────────────────────────────────────────────────────────
