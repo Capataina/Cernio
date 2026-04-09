@@ -34,7 +34,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let left_specs = vec![
         BlockSpec { content_lines: grade_content, min_height: 5, grow_priority: 0 },
         BlockSpec { content_lines: pipeline_content, min_height: 4, grow_priority: 0 },
-        BlockSpec { content_lines: 6, min_height: 5, grow_priority: 1 }, // session stats grows
+        BlockSpec { content_lines: 12, min_height: 8, grow_priority: 1 }, // session stats grows
     ];
     let left_constraints = distribute(&left_specs, cols[0].height);
     let left = Layout::vertical(left_constraints).split(cols[0]);
@@ -367,7 +367,7 @@ fn draw_pipeline_health(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-/// Fill the bottom-left area with session-level stats: decisions, coverage, staleness.
+/// Fill the bottom-left area with session-level stats.
 fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let s = &app.stats;
@@ -406,24 +406,12 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(" coverage"),
     ]));
 
-    // Jobs per company.
-    let total_active_companies = s.total_companies.saturating_sub(s.archived_count);
-    let avg_jobs = if total_active_companies > 0 {
-        s.total_jobs / total_active_companies
-    } else {
-        0
-    };
-    lines.push(Line::from(vec![
-        Span::raw("  "),
-        Span::styled(format!("{avg_jobs}"), t.stat_value),
-        Span::raw(" avg jobs/company"),
-    ]));
-
     // Grade distribution summary.
     lines.push(Line::from(""));
     let ss_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "SS").map(|(_, c)| *c).sum();
     let s_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "S").map(|(_, c)| *c).sum();
     let a_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "A").map(|(_, c)| *c).sum();
+    let b_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "B").map(|(_, c)| *c).sum();
     let f_count: i64 = s.jobs_by_grade.iter().filter(|(g, _)| g == "F").map(|(_, c)| *c).sum();
     let hit_rate = if s.total_jobs > 0 {
         (ss_count + s_count + a_count) * 100 / s.total_jobs
@@ -438,6 +426,46 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(" filtered (F)"),
     ]));
 
+    // Conversion funnel.
+    let total_graded = ss_count + s_count + a_count + b_count + f_count;
+    if total_graded > 0 && s.applied_count > 0 {
+        let apply_rate = s.applied_count * 100 / (ss_count + s_count + a_count).max(1);
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(format!("{apply_rate}%"), t.decision_applied),
+            Span::raw(" of SS+S+A applied to"),
+        ]));
+    }
+
+    // Per-tier application breakdown.
+    let applied_by_grade = fetch_applied_by_grade(app);
+    if !applied_by_grade.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("  Applied by grade:", t.header)));
+        for (grade, count) in &applied_by_grade {
+            let style = t.grade_style(Some(grade.as_str()));
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(format!("{grade:<3}"), style),
+                Span::styled(format!("{count}"), t.stat_value),
+            ]));
+        }
+    }
+
+    // Jobs per company.
+    let total_active_companies = s.total_companies.saturating_sub(s.archived_count);
+    let avg_jobs = if total_active_companies > 0 {
+        s.total_jobs / total_active_companies
+    } else {
+        0
+    };
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(format!("{avg_jobs}"), t.stat_value),
+        Span::raw(" avg jobs/company"),
+    ]));
+
     let block = Block::bordered()
         .title(" Session Stats ")
         .title_style(t.title)
@@ -447,6 +475,30 @@ fn draw_session_stats(frame: &mut Frame, app: &App, area: Rect) {
         Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
         area,
     );
+}
+
+/// Fetch count of applied jobs broken down by grade.
+fn fetch_applied_by_grade(app: &App) -> Vec<(String, i64)> {
+    let Ok(conn) = Connection::open(&app.db_path) else {
+        return Vec::new();
+    };
+
+    conn.prepare(
+        "SELECT j.grade, COUNT(*)
+         FROM user_decisions ud
+         JOIN jobs j ON j.id = ud.job_id
+         WHERE ud.decision = 'applied' AND j.grade IS NOT NULL
+         GROUP BY j.grade
+         ORDER BY CASE j.grade
+             WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+             WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6
+         END",
+    )
+    .and_then(|mut stmt| {
+        stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    })
+    .unwrap_or_default()
 }
 
 fn draw_action_items(frame: &mut Frame, app: &App, area: Rect) {

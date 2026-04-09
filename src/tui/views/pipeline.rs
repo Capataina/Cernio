@@ -7,12 +7,37 @@ use ratatui::Frame;
 use crate::tui::app::{App, PipelineCard, PipelineColumn};
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
-    let cols = Layout::horizontal([
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
-    ])
-    .split(area);
+    // Proportional columns: size by card count, with a minimum width for empty columns.
+    let w = app.pipeline_watching.len().max(1) as u32;
+    let a = app.pipeline_applied.len().max(1) as u32;
+    let i = app.pipeline_interview.len().max(1) as u32;
+    // Give empty columns a small fixed width, non-empty columns scale by content.
+    let min_col = 20_u16;
+    let constraints = if app.pipeline_watching.is_empty() && app.pipeline_interview.is_empty() {
+        // Only applied has content — give it most space.
+        vec![
+            Constraint::Length(min_col),
+            Constraint::Fill(1),
+            Constraint::Length(min_col),
+        ]
+    } else if app.pipeline_interview.is_empty() {
+        // Watching + Applied have content, Interview empty.
+        let total = w + a;
+        vec![
+            Constraint::Ratio(w, total),
+            Constraint::Ratio(a, total),
+            Constraint::Length(min_col),
+        ]
+    } else {
+        // All have content — distribute proportionally.
+        let total = w + a + i;
+        vec![
+            Constraint::Ratio(w, total),
+            Constraint::Ratio(a, total),
+            Constraint::Ratio(i, total),
+        ]
+    };
+    let cols = Layout::horizontal(constraints).split(area);
 
     draw_column(
         frame,
