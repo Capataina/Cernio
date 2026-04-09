@@ -12,6 +12,7 @@ Audits the health and consistency of the Cernio database by combining mechanical
 2. **`references/remediation-guide.md`** — how to fix every type of issue this skill can detect. Without this, you can identify problems but not solve them.
 3. **`references/quality-standards.md`** — what good vs bad grade reasoning and fit assessments look like. This is how you judge whether existing assessments meet the bar.
 4. **`references/profile-context.md`** — how to read and synthesise the profile for integrity assessment.
+5. **`references/cross-checking-guide.md`** — systematic procedures for cross-checking grade consistency across the entire company and job universe. This is not a spot-check — it defines the comprehensive relative grading pass that compares every graded entity against the full population.
 
 **Do not begin any checks until all mandatory reads are complete.**
 
@@ -83,7 +84,19 @@ Spot-check a sample of graded entries to verify reasoning quality. Pull 3-5 grad
 
 Flag any entries where the reasoning is thin, generic, or contradicted by the current profile state.
 
-### 5. Check for missing data
+### 5. Cross-check grades across the full universe
+
+This is the most important step and the one that catches errors no individual grading session can detect. Follow the full procedure in `references/cross-checking-guide.md`.
+
+**For companies:** Load all graded companies. Compare within each tier (do they all genuinely belong together?), across tier boundaries (is every A genuinely less valuable than every S?), and check for specific red flags (famous employer at C, unknown startup at S, tech stack as primary driver).
+
+**For jobs:** Verify company grade / job grade consistency (graduate role at S-tier company should rarely be below A). Compare all SS/S jobs against each other. Verify seniority requirements are cited in fit assessments. Spot-check description-assessment consistency by reading both the raw description and the fit assessment for a sample.
+
+**The cardinal rule:** Before changing ANY grade, you MUST have read the entity's complete database record (what_they_do/raw_description, grade_reasoning/fit_assessment, why_relevant) AND the full candidate profile. An integrity agent that changes a grade without reading the record has produced damage, not value. See the cross-checking guide for the full procedure.
+
+Present all findings as recommendations, not executed changes. The user decides what to act on.
+
+### 6. Check for missing data
 
 Identify gaps in the database that prevent effective operation:
 
@@ -113,7 +126,7 @@ WHERE (j.description IS NULL OR j.description = '')
   AND j.status != 'archived';
 ```
 
-### 6. Portfolio gap staleness check
+### 7. Portfolio gap staleness check
 
 Check whether `profile/portfolio-gaps.md` is being maintained as grading runs happen:
 
@@ -131,11 +144,11 @@ Report this prominently in the integrity report:
 - ⚠  "Known Gaps" section may be stale — last updated before session 3
 ```
 
-### 7. Relevance refresh
+### 8. Relevance refresh
 
 For companies where `why_relevant` is generic (e.g., "interesting tech company", "found on fintech list") or stale (references profile details that have changed), draft updated relevance statements that connect the company to the current profile specifically.
 
-### 7. Present findings
+### 9. Present findings
 
 Present a structured integrity report to the user, organised by severity:
 
