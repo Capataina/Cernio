@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-09 (session 4). Massive universe expansion — 273 active companies (167 resolved, 83 potential, 23 bespoke), grade distribution 25S/107A/94B/47C. 712 jobs in DB (12 SS, 55 S). Grading rubrics completely rewritten to question-first approach with mandatory description citation. Cleanup no longer auto-archives C companies (archive_company_grades = [], min_company_grade = "C"). Lever EU probing added. TUI v4 unchanged. 6 ATS fetchers, 5 pipeline scripts, 8 skills.
+> Last updated: 2026-04-09 (session 5). Full database reset and rebuild. 434 companies (27S/124A/182B/99C), 2,001 jobs (10 SS, 27 S, 71 A). Grading systems overhauled: project tiers (Flagship/Notable/Minor), calibration-anchored grading replacing batch-relative, mandatory description citation. Tiered job archival (SS=28d, S=21d, A=14d, B=7d, C/F=3d). 34 new exclusion keywords validated against historical data. Bespoke search tracking via last_searched_at. HTML tag stripper handles quoted attributes. 6 ATS fetchers, 5 pipeline scripts, 8 skills, 5 DB migrations.
 
 ---
 
@@ -342,34 +342,36 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of session 4 (2026-04-09).** Universe expanded from 79 to 273+ companies across multiple discovery and population rounds. Grading rubrics for both companies and jobs completely rewritten — question-first approach replacing dimension-weighted scoring, with mandatory description citation in fit assessments. Cleanup policy revised: C companies no longer auto-archived (kept active because job grading handles quality filtering), min_company_grade lowered to "C" to search all non-archived companies. Lever EU domain probing added. Per-request retry logic in HTTP client. TUI v4 unchanged.
+**End of session 5 (2026-04-09).** Full database reset and rebuild. Session 5 overhauled every grading system (project tiers, calibration-anchored grading, mandatory description citation, enriched company descriptions), wiped all jobs and company metadata, then rebuilt from scratch with 9 discovery agents, 6 company grading agents, and 16 job grading agents. Tiered job archival replaced flat staleness. 34 exclusion keywords added (data-validated, 0 false negatives). Bespoke search tracking and HTML parser improvements. Resolve and search scripts hardened with retry and wider slug patterns.
 
 | Component | Status |
 |-----------|--------|
-| Profile (12 files) | Fully populated, tested profile-scrape against NeuroDrive |
-| SQLite schema | 4 tables, 3 migrations (MIGRATION_001 base, MIGRATION_002 archived status, MIGRATION_003 job archival), 11 tests passing, WAL mode |
+| Profile (15 files) | Fully populated. Project tiers added (Flagship/Notable/Minor). Portfolio-gaps.md actively maintained by grading agents. |
+| SQLite schema | 4 tables, 5 migrations (001 base, 002 archived status, 003 job archival, 004 last_searched_at, 005 archived_at), 18 tests passing, WAL mode |
 | Config (`src/config.rs`) | TOML parser for `preferences.toml` — search filters, cleanup config, location patterns |
-| ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. Common trait + dispatch |
-| Pipeline: resolve (`src/pipeline/resolve.rs`) | Slug candidate generation, parallel multi-provider probing, SmartRecruiters false positive handling |
-| Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert |
-| Pipeline: clean (`src/pipeline/clean.rs`) | Job removal (F/C grades, stale). Company archival disabled by default (archive_company_grades = []) — C companies kept active for job search coverage |
+| ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. All fetchers use `get_with_retry`. Attribute-aware HTML stripping. |
+| Pipeline: resolve (`src/pipeline/resolve.rs`) | Expanded slug generator (punctuation stripping, domain suffixes, acronyms, first-two-words). No early termination — probes all providers for all slugs. SmartRecruiters probed for all companies. |
+| Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert. Retry on empty results. Sets `last_searched_at` per company. |
+| Pipeline: clean (`src/pipeline/clean.rs`) | Tiered archival: SS=28d, S=21d, A=14d, B=7d, C/F=3d. Archive expires after 14 days (tracked via `archived_at`). No company auto-archival. |
 | Pipeline: check (`src/pipeline/check.rs`) | ATS re-verification, stale detection, completeness, dead URLs, duplicates, profile-change, structured report |
+| Pipeline: import (`src/pipeline/import.rs`) | Bulk import from discovery files. Supports `--file` flag. Dedup via website URL unique constraint. |
 | profile-scrape skill | Designed, tested on NeuroDrive |
-| discover-companies skill | Designed with search-strategies reference, first run produced 73 companies |
+| discover-companies skill | 9-agent discovery run produced 228 raw companies (161 new after dedup). Agents write to individual files. |
 | populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
 | search-jobs skill | Legacy — job search moved to `cernio search` script |
-| check-integrity skill | New — AI-driven re-evaluation and grade quality auditing, 3 reference files (remediation-guide, quality-standards, profile-context) |
-| resolve-portals skill | Redesigned — AI fallback only for companies that fail script resolution |
-| grade-companies skill | New — extensive SKILL.md, grading rubric with worked examples, profile context reference |
-| grade-jobs skill | New — extensive SKILL.md, grading rubric, profile context, prioritisation guide |
-| Company universe | 273 active companies (167 resolved, 83 potential, 23 bespoke), grade distribution 25S/107A/94B/47C |
-| Jobs | 712 jobs in DB (12 SS, 55 S, 90 A, 130 B), full pipeline run complete with parallel search and grading |
-| TUI (`src/tui/`, 14 files) | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), mouse support, multi-select, search/filter, sort, grade override, export, responsive layout, widget refactor. See `context/systems/tui.md` |
+| check-integrity skill | AI-driven re-evaluation, cross-checking guide (4 reference files), active portfolio gap maintenance (10 jobs per grade tier) |
+| resolve-portals skill | AI fallback for companies that fail script resolution |
+| grade-companies skill | Enriches + grades: writes `what_they_do` (3-5 sentences), `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`. Calibration-anchored grading. |
+| grade-jobs skill | Question-first rubric, project tier awareness, calibration-anchored grading, mandatory description citation, prioritisation guide |
+| Company universe | 434 total (27 S, 124 A, 182 B, 99 C). 223 resolved, 23 bespoke, 167 potential. 18 duplicates archived. |
+| Jobs | 2,001 jobs (10 SS, 27 S, 71 A, 149 B, 226 C, 1,518 F). Every SS/S assessment is multi-paragraph with description citations. |
+| TUI (`src/tui/`, 14 files) | v4 — 4 views (dashboard, companies, jobs, pipeline). Dynamic grade bars, 18-char provider column, 4-digit job counts. Tiered cleanup via D key. Bespoke search tracking in dashboard. |
 | Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
+| Unarchive | `cernio unarchive --jobs [--grade G]` restores archived jobs with timer reset |
 
 **Next priorities:**
-1. Resolve remaining 83 potential companies
-2. Search and grade jobs from newly resolved companies
+1. Resolve 167 potential companies using resolve-portals AI skill
+2. Bespoke search S/A companies (Apple, Arm, Citadel, D.E. Shaw, Two Sigma, Google, etc.)
 3. Interview prep skill design and implementation
-4. Portfolio gap analysis from grading patterns
-5. Further discovery rounds to expand universe beyond 273
+4. Deduplicate remaining company pairs if any emerge
+5. Second integrity check after bespoke companies are searched

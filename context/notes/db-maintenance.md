@@ -8,33 +8,31 @@ Automated and user-triggered maintenance operations to keep the database lean an
 
 A single command (TUI button or CLI) that sweeps the database for stale, irrelevant, or dead entries.
 
-### What it removes / archives
+### Tiered archival lifecycle (session 5)
 
-**Jobs (deleted):**
+Jobs are archived based on their grade — higher-value jobs stay active longer:
 
-| Target | Condition | Rationale |
-|--------|-----------|-----------|
-| **F-graded jobs** | `grade = 'F'` | Categorically irrelevant — legal, finance, recruiting, etc. No reason to keep them cluttering the view |
-| **C-graded jobs** | `grade = 'C'` | Weak fit, not worth revisiting. If the profile changes significantly, a re-search would surface better-matched versions of these roles anyway |
-| **Stale jobs** | `discovered_at` older than 14 days AND no user decision | Jobs older than two weeks are almost certainly closed or filled. If the user marked one as "watching" or "applied", preserve it regardless of age |
-| **Stale evaluations** | Jobs whose `posted_date` is older than 14 days (when available) | Some ATS boards keep old listings live. Use `posted_date` when available, fall back to `discovered_at` |
+| Grade | Active duration | Then | Archive expiry |
+|-------|----------------|------|----------------|
+| SS | 28 days | → archived | Deleted after 14 days in archive |
+| S | 21 days | → archived | Deleted after 14 days in archive |
+| A | 14 days | → archived | Deleted after 14 days in archive |
+| B | 7 days | → archived | Deleted after 14 days in archive |
+| C/F | 3 days | → archived | Deleted after 14 days in archive |
+
+Archive expiry is tracked via the `archived_at` column (migration 005). When an archived job is deleted, it can be re-discovered and re-graded on the next search — giving it a "second chance" with a potentially updated profile.
+
+**Unarchive command:** `cernio unarchive --jobs --grade A` restores all A-graded archived jobs, preserving their grade and assessment but resetting `discovered_at` to now so the tiered timer restarts.
 
 **Companies:**
 
-Cleanup does NOT auto-archive companies by grade. C-tier companies stay active because job grading handles quality filtering — a C company might still have one genuinely good role. Companies are only archived manually when there's a hard reason (excluded sector, dissolved, no engineering team).
-
-| Target | Condition | Rationale |
-|--------|-----------|-----------|
-| **Manual archival only** | User decision | Only archive when there's a concrete reason, not based on grade alone |
-
-All thresholds (which grades to remove, stale age, which company grades to archive) are configurable in `profile/preferences.toml`.
+Cleanup does NOT auto-archive companies by grade. C-tier companies stay active because job grading handles quality filtering. Companies are only archived manually when there's a hard reason (excluded sector, dissolved, duplicates).
 
 ### What it preserves
 
 - Any job with a user decision (`watching`, `applied`, `rejected`) — these represent user intent
-- SS and S graded jobs regardless of age — high-value matches are worth keeping visible even if the listing has closed, as a record of what the company looks for
 - Archived companies — they stay in the DB for dedup, just hidden from TUI and searches
-- All S/A/B-graded companies — company cleanup only targets C-tier and below
+- All companies regardless of grade — company cleanup is manual only
 
 ### Surfacing
 
