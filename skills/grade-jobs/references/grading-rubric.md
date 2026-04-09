@@ -1,554 +1,289 @@
 # Job Grading Rubric
 
-> The complete evaluation framework for grading jobs. Every job is assessed across these dimensions, with the full reasoning chain visible. Applied consistently to every role across every company.
+The evaluation framework for grading individual jobs. Job grading is where the real decision happens — company grading determines what we search, but job grading determines what we apply to. Every grade should emerge from careful reasoning about this specific role for this specific candidate, not from mechanically scoring dimensions.
 
-**Important:** This rubric references the candidate's profile throughout. All profile facts must come from reading the files in `profile/` — never from hardcoded values in this document. When the rubric says "the candidate's portfolio" or "the visa timeline," it means: read `projects.md`, read `visa.md`, etc.
+**Important:** All profile facts must come from reading `profile/` files — never from hardcoded values. When this rubric says "the candidate's portfolio" or "the visa timeline," it means: read `projects.md`, read `visa.md`, etc.
+
+---
 
 ## Table of Contents
 
-1. [Grade Scale](#grade-scale)
-2. [Evaluation Dimensions](#evaluation-dimensions)
-3. [Dimension Interaction Effects](#dimension-interaction-effects)
-4. [Worked Examples](#worked-examples)
-5. [Boundary Cases](#boundary-cases)
-6. [Common Misjudgments](#common-misjudgments)
+1. [How to Grade a Job](#how-to-grade-a-job)
+2. [The Core Questions](#the-core-questions)
+3. [Analytical Dimensions](#analytical-dimensions)
+4. [Grade Scale](#grade-scale)
+5. [Cross-referencing and Relative Grading](#cross-referencing-and-relative-grading)
+6. [Career-Stage Context](#career-stage-context)
+7. [Common Grading Errors](#common-grading-errors)
+8. [Worked Examples](#worked-examples)
+9. [Evidence Standards for Fit Assessments](#evidence-standards-for-fit-assessments)
+
+---
+
+## How to Grade a Job
+
+Grading happens in four steps. Each step informs the next.
+
+**Step 1: Answer the core questions.** These force pragmatic thinking about what this role actually means for the candidate's career. Write 2-3 sentences per question. The answers ARE the evaluation — everything else supports them.
+
+**Step 2: Evaluate against the analytical dimensions.** The dimensions add precision and structure. They catch things the questions might miss — a role that feels right but has a hidden seniority wall, or one that feels wrong but actually has exceptional career ceiling.
+
+**Step 3: Cross-reference questions and dimensions.** Do they agree? When they conflict, reason through why. If the questions say "this would be amazing" but a critical dimension (seniority match) fails — the dimension wins; an unachievable role is F regardless. If the dimensions say "weak alignment" but the questions reveal this would be a transformative career move — the questions might be seeing something the dimensions missed.
+
+**Step 4: Relative comparison.** Compare this job against others at the same grade. Does it genuinely belong there? Would the candidate really be indifferent between all the jobs at this tier?
+
+The fit assessment written to the database should be the output of this process — the actual reasoning, not a summary.
+
+---
+
+## The Core Questions
+
+For every job, answer these five questions. These are the evaluation. The dimensions provide analytical support.
+
+### 1. Can the candidate actually get this job?
+
+This is the achievability question. It doesn't matter how perfect a role is if the candidate can't get hired.
+
+**Read the description, not the title.** "Senior" at many UK companies means 2-3 years out of university. "Staff" means genuinely senior. The title lies; the description tells the truth.
+
+Look for:
+- Explicit years of experience requirements — hard requirement or preference?
+- Scope of responsibility — "own a component" vs "own the architecture of the platform"
+- Expectations of managing others — "mentor junior engineers" presupposes experience
+- Production expectations — "incident management experience" presupposes operational maturity
+- "Or equivalent demonstrated ability" — this is an opening for strong portfolios
+
+Read `experience.md` for formal work history and `projects.md` for demonstrated capability. The portfolio can substitute for 1-2 years of professional experience if the projects demonstrate genuine depth — but it cannot substitute for 5 years of production systems ownership.
+
+**If the answer is clearly no — hard 5+ years requirement, staff/principal scope, leadership expectations — the grade is F. No other question matters.** This is the only question that can unilaterally determine the grade.
+
+### 2. Would this be a good first line on the candidate's CV?
+
+This combines company signal and role quality into one practical question. Think about how this looks to the next employer:
+
+- "Graduate Software Engineer, Infrastructure — Cloudflare" → opens every door
+- "Software Engineer — Bloomberg" → instantly credible
+- "Backend Engineer — Monzo" → strong UK signal
+- "Junior Developer — Unknown Agency Ltd" → raises questions
+- "Solutions Architect — [Any Company]" → "so... pre-sales?"
+
+The company name, the role title, and what the candidate would actually learn all contribute. A mediocre title at a great company can be better than a great title at a mediocre company, especially for a first job.
+
+### 3. Does the candidate's background give them an edge?
+
+This is where the profile matching actually matters — not as an abstract dimension score, but as a practical question: would the candidate's specific projects, skills, and experience make them a standout applicant for this role?
+
+Read `projects.md` carefully. For each major project, ask: does this demonstrate something this role requires? Be specific:
+- Nyquestro → lock-free concurrency, low-latency systems, financial domain knowledge
+- NeuroDrive → ML from scratch, RL, performance engineering under real-time constraints
+- Aurix → DeFi analytics, quantitative risk modelling, financial mathematics
+- Xyntra → compiler engineering, graph rewriting, GPU code generation
+- Cernio → async networking, database integration, TUI development, systems architecture
+
+A role where 2-3 projects map directly to the requirements is one where the candidate has a genuine edge over typical applicants. A role where none of the projects are relevant means the candidate is competing without their strongest evidence.
+
+Also check `portfolio-gaps.md` — does this role require something the profile explicitly lacks? A gap in a "nice to have" is different from a gap in a core requirement.
+
+### 4. Would the candidate enjoy the day-to-day work?
+
+Not "is it systems engineering" in the abstract, but "would the candidate find this specific work interesting for 2 years?"
+
+Read `interests.md` and `projects.md` — what does the candidate build when nobody is making them? That reveals genuine interests:
+- Building from scratch rather than configuring existing tools
+- Performance-critical systems with measurable latency targets
+- Financial/trading domain problems
+- ML infrastructure and compiler engineering
+- Problems where correctness and efficiency both matter
+
+A role writing Kubernetes YAML files is "infrastructure" but it's not the kind of infrastructure the candidate finds engaging. A role building a custom database engine is deeply engaging even if the company is unknown.
+
+"Interesting enough, with excellent other factors" is a valid answer. "I would actively dread this work" is a signal that matters even if everything else looks good.
+
+### 5. Does this solve the candidate's practical constraints?
+
+The unglamorous but critical question:
+- **Location:** Is it in London, Cambridge, or Remote-UK? (Read `preferences.toml`)
+- **Sponsorship:** Can and will this company sponsor when the Graduate visa expires? (Read `visa.md`)
+- **Excluded types:** Is this actually a consulting role, customer-facing role, or support role disguised by the title? (Read `preferences.toml` for hard exclusions)
+- **Excluded sectors:** Gambling, adtech, consumer-crypto? (These are hard exclusions — no amount of technical alignment overrides them)
+
+A role that fails on a hard exclusion is F regardless of everything else. A role with uncertain sponsorship is still valuable within the visa window but the grade should reflect the time limit.
+
+---
+
+## Analytical Dimensions
+
+These add precision to the question-based reasoning. They are not a replacement for thinking — they are a tool for catching blind spots.
+
+### Critical (can force F on their own)
+
+| Dimension | What to assess |
+|-----------|---------------|
+| **Seniority match** | Can the candidate realistically get hired? Based on `experience.md` and `projects.md`, not the title. |
+| **Career ceiling** | Does this domain lead to high-income, high-impact positions at 10-15 years? Read `preferences.toml` for targets. |
+
+### High weight
+
+| Dimension | What to assess |
+|-----------|---------------|
+| **Skill breadth** | Multiple technical layers or locked into one narrow thing? Breadth matters more early in career. |
+| **Company signal** | Does this company name open doors? Read `experience.md` — for a first job, this is disproportionately important. |
+| **Technical depth** | Genuinely hard problems or routine work? Performance-critical, distributed, algorithmic? |
+| **Sponsorship viability** | Can they sponsor? Read `visa.md` for timeline. Large companies with grad programmes almost always can. |
+
+### Medium weight (tiebreakers)
+
+| Dimension | What to assess |
+|-----------|---------------|
+| **Domain transferability** | Skills useful elsewhere, or company-specific? |
+| **Growth environment** | Strong engineers, mentorship, code review culture? |
+| **Tech stack relevance** | Technologies from `skills.md`? This is a TIEBREAKER. Languages are learned in months. |
 
 ---
 
 ## Grade Scale
 
-Six grades from SS (exceptional) to F (reject). The key to accurate grading is understanding what separates each grade from the one above it.
+| Grade | Meaning | How it should feel |
+|-------|---------|-------------------|
+| **SS** | Apply immediately, prioritise above all | "If I got this offer tomorrow, I'd accept without hesitation." Every question has a strong answer. All dimensions confirm. These are rare — ~2-3% of jobs. |
+| **S** | Strong candidate, apply with energy | "I'd be genuinely excited about this." Most questions strong, maybe one moderate. A clear career-positive move. ~10-15%. |
+| **A** | Worth applying to | "This is good — I'd apply if I have time." Good on several dimensions, 1-2 notable weaknesses. Still a net positive. ~25-30%. |
+| **B** | Backup / worth watching | "Maybe, depends what else is available." Acceptable but uninspiring on several fronts. Apply if the pipeline is thin. ~30-35%. |
+| **C** | Only if desperate | "Probably not." Achievable but limited career value. Narrow scope, weak signal, poor trajectory. ~10-15%. |
+| **F** | Do not apply | "No." Dealbreaker present. Unachievable seniority, excluded role type/sector, non-engineering role disguised by title. ~10-15%. |
 
-| Grade | Meaning | What separates it from the grade above |
-|-------|---------|----------------------------------------|
-| **SS** | Apply immediately, prioritise above all others | Nothing — this is the top. Every critical and high-weight dimension is strong. The role is achievable, the ceiling is high, the company opens doors, the work is technically deep, and sponsorship is viable. These are rare. Expect 1-3 per hundred jobs. |
-| **S** | Strong application candidate | One dimension is merely good rather than excellent. Perhaps the company is well-regarded but not tier-1, or the scope is slightly narrower than ideal, or the tech stack is adjacent rather than core. The role is still clearly worth pursuing and would be a strong career move. |
-| **A** | Worth applying to | Two dimensions are notably weaker. The role is good but has clear gaps — maybe a strong company but the role itself is narrow, or technically deep work at a company with limited brand recognition. Still a net positive career move, but not the kind of opportunity that demands dropping everything. |
-| **B** | Backup / worth watching | The role is acceptable but uninspiring on several fronts. Decent work, learning, or brand, but not enough of any to make it a priority. Apply if the pipeline is thin. These roles serve as practice applications and fallbacks. |
-| **C** | Only if nothing better exists | The role is technically achievable but offers limited career value. Narrow scope, weak company signal, poor growth environment, or domain with low transferability. A job, not a career move. The main risk is opportunity cost — time spent here is time not spent building toward the long-term target (read `preferences.toml`). |
-| **F** | Do not apply | A dealbreaker is present. The seniority is unachievable (read `experience.md` to determine), the domain is a career dead-end, the role is non-engineering, or a hard constraint from `preferences.toml` is violated. No amount of strength in other dimensions compensates. |
-
-### The SS threshold
-
-SS is not "very good." SS means: if the candidate were offered this role tomorrow, they would accept without hesitation and feel confident it was the right move for the next 2-3 years. The bar is deliberately high because SS roles get the most attention and the most detailed assessment. Inflating SS dilutes the signal the user relies on.
-
-**Grades should be conservative.** Expect roughly: SS ~2-3%, S ~10-15%, A ~25-30%, B ~30-35%, C ~10-15%, F ~10-15% of graded jobs. If more than 20% of jobs are S or above, the bar is too low.
-
-### The S-A boundary
-
-This is the most consequential grading decision. S means "apply with energy and a tailored application." A means "apply if time permits." The difference is whether the role has a realistic path to being the candidate's best option, or whether it's merely a good option in a lineup of good options.
-
-Ask: "If the candidate had three S-tier roles and this role, would they still apply to this one?" If yes, it's genuinely S. If they'd deprioritise it, it's A.
-
-### The F threshold
-
-F is not "bad." F is "do not waste time." The most common F reasons:
-- Hard seniority mismatch (description explicitly requires 5+ years of professional experience, senior/staff-level scope)
-- Non-engineering role disguised by title (Solutions Engineer that's really pre-sales, Developer Advocate that's really marketing)
-- Domain dealbreaker (check `preferences.toml` for excluded sectors)
-- Role type dealbreaker (check `preferences.toml` for excluded role types)
-- Security clearance requirement that cannot be met (check `personal.md` and `military.md` for nationality and clearance eligibility)
-
-### Career-stage calibration for jobs
-
-The same calibration that applies to companies applies to jobs, but with an additional factor: the job description gives you far more data to work with. Use it.
-
-**Dimension reweighting for this career stage:**
-
-| Dimension | Standard weight | Calibrated weight | Why |
-|-----------|----------------|-------------------|-----|
-| Seniority match | Critical | Critical | Unchanged — unachievable roles are still F |
-| Career ceiling | Critical | Critical | Unchanged — trajectory matters enormously at entry level |
-| Company signal | High | **Very high** | First-job CV signal. "Graduate SWE at Bloomberg" opens more doors than "Rust Engineer at Unknown Startup Ltd" |
-| Sponsorship viability | High | **Very high** | Read `visa.md` — mandatory from Aug 2027. A role that can't sponsor has a hard expiry date |
-| Technical depth | High | High | Unchanged |
-| Skill breadth | High | High | Unchanged — breadth matters more early in career |
-| Tech stack match | Medium | **Low** | A graduate switching languages takes weeks. Never the deciding factor between grades |
-
-### Relative grading for jobs — MANDATORY
-
-**Do not grade jobs in isolation.** After grading a batch, cross-reference:
-
-1. **Compare within each grade tier.** All the jobs at the same grade should be genuinely comparable in career value. If a "Graduate SWE at Bloomberg" and a "Junior Developer at a 5-person agency" are both B, re-examine.
-
-2. **Compare across adjacent tiers.** For every job at the boundary, ask: "Would the candidate genuinely prefer every A-tier job over this B-tier job?" If not, the grades are wrong.
-
-3. **The "which offer would you take" test.** For any two jobs at different grades, imagine the candidate has offers from both. If they'd take the lower-graded one, the grades need adjusting.
-
-4. **Cross-reference with company grades.** A graduate role at an S-tier company should rarely grade below the company itself. If the company is S but the graduate SWE role is C, something is wrong — re-examine. (It CAN happen — an S-tier company might post a non-engineering role disguised by title — but it should be explicitly justified.)
-
-5. **Sanity check after every batch.** Before writing to the database, scan for:
-   - Any graduate/entry-level role at a major employer graded C or F without a hard exclusion reason
-   - Any role mentioning Rust graded below B
-   - Any role at an S-tier company graded below B without clear justification
-   - These are the patterns that caused real grading failures. They're not automatic overrides — but each one demands explicit justification in the fit assessment.
-
-### Anti-inflation and anti-deflation rules
-
-These prevent the systematic grading errors observed in production:
-
-**1. Tech stack mismatch does NOT justify C or F.** A graduate backend role at Monzo using Go, or at Stripe using Ruby, is still a valuable career opportunity. The tech stack is a medium-weight tiebreaker, not a dealbreaker. Languages are learned in months; company signal, domain experience, and career trajectory compound over years. A role using a different language at a company with excellent engineering reputation and guaranteed sponsorship is worth MORE than a role using the candidate's primary language at an unknown company with no growth prospects.
-
-**2. Graduate programmes at large employers get a floor of B.** A structured graduate programme at any well-funded, reputable company with sponsorship capability should never be C or F (unless the role hits a hard exclusion like consulting or gambling). These programmes are explicitly designed for candidates at this career stage. They provide mentorship, structured onboarding, and a strong CV line. Even if the domain isn't perfectly aligned or the tech stack doesn't match, the career value of a graduate programme at a name-brand employer is substantial. Examples: Graduate SWE at Monzo = minimum A. Graduate SWE at Starling = minimum B. Graduate SWE at any bank with 500+ employees and a sponsor licence = minimum B.
-
-**3. Sponsorship-capable employers with grad hiring get a boost.** Read `visa.md` — the candidate needs Skilled Worker sponsorship from August 2027. Companies that demonstrably sponsor visas and hire graduates are solving two of the candidate's hardest constraints simultaneously. This is a significant positive signal that should push grades UP, not be treated as neutral.
-
-**4. CV signal matters disproportionately for a first job.** Read `experience.md` — with no formal work experience, the first employer's name IS the candidate's professional credential. A generic backend role at Bloomberg is worth more for career trajectory than a perfectly-aligned Rust role at a 5-person startup nobody has heard of. This doesn't mean every big-company role is S-tier, but company signal should be weighted heavily at this career stage.
-
-**5. Do not penalise for "consumer" product if the engineering is deep.** Monzo, Spotify, and Uber are consumer products, but their backend infrastructure involves distributed systems, real-time data pipelines, and performance-critical engineering. "Consumer product" is not the same as "consumer-facing role." A backend infrastructure engineer at Spotify is doing systems engineering regardless of what the end product is.
-
-**6. "Not aligned with target sectors" is NOT a reason for C or F.** The preferred sectors in `preferences.toml` are soft preferences, not hard exclusions. A strong role in a non-preferred sector (e.g., climate tech, healthcare) can still be A-tier if the engineering work is deep, the company is reputable, and the career ceiling is high. Only hard exclusions (gambling, adtech, consumer-crypto, consulting) justify downgrading on sector alone.
+**Grades should be conservative.** If more than 20% of jobs are S or above, the bar is too low.
 
 ---
 
-## Evaluation Dimensions
+## Cross-referencing and Relative Grading
 
-### Critical dimensions
+**Mandatory after every batch.** Do not write grades to the database without completing this.
 
-These are non-negotiable. A role that fails either critical dimension is an F regardless of how strong the other dimensions are.
+### Within a batch
 
-#### Career ceiling
+1. **Compare within each tier.** All jobs at the same grade should be genuinely comparable. If "Graduate SWE at Bloomberg" and "Junior Developer at a 5-person agency" are both B, re-examine.
 
-**What to assess:** Does this role's domain lead to high-income, high-impact positions at 10-15 years of experience? Read `preferences.toml` for the candidate's long-term targets, then assess whether this domain can deliver them.
+2. **Compare across adjacent tiers.** For boundary jobs: "Would the candidate genuinely prefer every A-tier job over this B-tier job?" If not, adjust.
 
-**Why it's critical:** The first job sets the trajectory. A role in a high-ceiling domain creates compounding returns — each year of experience makes the next role easier to get and better compensated. A role in a low-ceiling domain caps growth early. At entry level, the domain matters more than the specific role because you're choosing a trajectory, not just a job.
+3. **The "which offer would you take" test.** For any two jobs at different grades — if the candidate had offers from both, would they take the higher-graded one? If not, the grades are wrong.
 
-**Good signal:**
-- Systems engineering, infrastructure, platform engineering
-- Trading systems, exchange infrastructure, market data
-- AI/ML infrastructure, ML tooling, model serving
-- Distributed systems, databases, compilers, runtime engineering
-- Developer tools, open-source infrastructure
-- The role description mentions scale, performance, reliability, or correctness as primary concerns
+4. **Cross-reference with company grades.** A graduate role at an S-tier company should rarely grade lower than A unless there's a specific problem with the role itself (not the company). If the company is S but the graduate SWE role is C, something is likely wrong — re-examine. It CAN happen (the "role" might be pre-sales disguised by title), but it demands explicit justification.
 
-**Bad signal:**
-- IT support, helpdesk, desktop support
-- QA-only roles with no path to SDET or engineering
-- Purely operational roles (monitoring dashboards, ticket triage) with no engineering component
-- Narrow product work where the "engineering" is configuring a third-party tool
-- Roles where the primary output is documentation, process, or coordination rather than code
+### Sanity checks
 
-**Edge cases:**
-- "Data Engineer" can be high-ceiling (building data infrastructure at scale) or low-ceiling (writing SQL reports and maintaining Airflow DAGs). Read the description to determine which.
-- "DevOps" can be high-ceiling (building internal platforms, infrastructure automation at scale) or low-ceiling (manual deployment, ticket-driven ops).
-- "Full-stack" at a small company often means "you do everything including the CSS" which fragments focus. At a large company it can mean genuine breadth across meaningful systems.
+Before writing to the database, scan for:
+- Any graduate/entry-level role at a major employer graded C or F — does it have a hard exclusion reason, or was it misgraded?
+- Any role mentioning Rust as a primary language graded C or F — Rust roles are rare, are we sure?
+- Any role at an S-tier company graded C or F without hard seniority mismatch — why?
 
-#### Seniority match
-
-**What to assess:** Can this candidate realistically get hired for this role? Read `experience.md` for formal work history, `projects.md` for demonstrated capability, and `education.md` for credentials. Assess whether the description's actual expectations match the candidate's level.
-
-**Why it's critical:** A perfect role the candidate cannot get is worthless. Conversely, a role with a "Senior" title but expectations that match the candidate's actual level is genuinely valuable — many companies use title inflation. The assessment must be based on the description's requirements, not the title.
-
-**Achievable signals:**
-- "New grad", "graduate programme", "entry-level", "junior", "early career"
-- No years of experience stated, with scope that matches project-level experience
-- "0-2 years", "1+ years" (strong projects can substitute)
-- Intern-to-hire conversion programmes
-- "Strong academic background with relevant projects" or similar language valuing demonstrated ability over tenure
-
-**Stretch but possible:**
-- "2-3 years" with a strong portfolio narrative (projects demonstrate equivalent experience)
-- "Mid-level" where the actual listed responsibilities align with what the profile shows
-- Roles that list extensive requirements but also say "or equivalent demonstrated ability"
-
-**Not achievable:**
-- "5+ years of professional experience" as a hard requirement
-- Staff/principal-level scope: owning org-wide architecture, mentoring multiple teams, setting technical direction for a department
-- Expectations of production incident management, on-call leadership, or system ownership that presupposes years of operational experience
-- "Led teams of X engineers" as a requirement
-
-**The "Senior" trap:** Many companies, especially in the UK, use "Senior" for roles that are 2-3 years out of university. Read the description. If the actual expectations are "build features, participate in design reviews, own a component," that may be achievable despite the title. If the expectations are "drive architectural decisions across the org, mentor junior engineers, own system reliability," it is not.
+These are not automatic corrections. They are red flags that demand re-examination and explicit justification in the fit assessment.
 
 ---
 
-### High-weight dimensions
+## Career-Stage Context
 
-These strongly influence the grade but cannot force an F on their own. A role that's weak on one high-weight dimension might still be an A; weak on two and it drops to B.
+The same career-stage factors that affect company grading affect job grading, but with the added benefit of having the actual job description to work with.
 
-#### Skill breadth
-
-**What to assess:** Will this role expose the candidate to multiple technical layers (backend, infrastructure, data, some frontend) or lock them into one narrow slice? Breadth early in a career creates more options later.
-
-**Why it matters:** Read `experience.md` — at the candidate's current career stage, they may not yet know which specialisation will be the best long-term bet. A role that touches multiple infrastructure layers creates several possible specialisation paths. A role maintaining a single microservice creates one.
-
-**Good signal:** "Full-stack infrastructure," multiple team rotations, cross-functional work, exposure to different parts of the stack, graduate rotation programmes.
-
-**Bad signal:** "You will exclusively maintain this one microservice," single-tool focus, no mention of cross-team work, siloed within one narrow layer.
-
-#### Company signal
-
-**What to assess:** Does having this company on the CV open doors? Read `experience.md` — for a first/early job, brand recognition matters disproportionately.
-
-**Why it matters:** The first job is the hardest to get and the most important for trajectory. A strong company name gets the CV past initial screening at other strong companies. This premium decreases for subsequent jobs as the work itself becomes the signal, but for early career it is significant.
-
-**Strong signal:** Companies that engineers know and respect — tier-1 tech companies, well-funded scale-ups with strong engineering reputations, top quant firms, leading AI labs.
-
-**Moderate signal:** Large companies with solid but not exceptional engineering brands. Smaller companies with strong domain reputations.
-
-**Weak signal:** Unknown companies with no engineering reputation, body shops, agencies, outsourcing firms.
-
-#### Technical depth
-
-**What to assess:** Will the candidate work on genuinely hard problems? Performance-critical code, distributed systems, scale, algorithmic complexity? Read `projects.md` — the candidate's portfolio demonstrates what kind of technical depth they are capable of and interested in.
-
-**Why it matters:** Technical depth builds the kind of experience that compounds. Working on systems-level problems teaches skills that transfer across companies and domains. Working on application-layer CRUD teaches framework conventions.
-
-**Good signal:** Scale metrics, performance requirements, distributed systems, real-time processing, compiler/runtime work, ML training infrastructure, custom storage engines.
-
-**Bad signal:** CRUD applications, config management as the primary work, glue code, no mention of scale or technical challenge.
-
-#### Sponsorship viability
-
-**What to assess:** Can and will this company sponsor the required visa when the candidate's current right-to-work expires? Read `visa.md` for the exact timeline.
-
-**Why it matters:** The visa creates a hard deadline. After expiry, the candidate needs sponsored employment to remain in the UK. A brilliant role at a company that cannot sponsor is limited to the remaining visa window.
-
-**Strong signal:**
-- Large company with established sponsor licence
-- "We sponsor visas" in the job description
-- Established graduate programme
-- Known track record of sponsoring international hires
-
-**Moderate signal:**
-- Mid-size company that probably has a sponsor licence but doesn't mention it
-- Company in a sector that commonly sponsors
-
-**Weak signal:**
-- Small startup with no visible sponsor licence
-- "Must have existing right to work in the UK"
-
-**Important nuance:** Read `visa.md` — the candidate may currently have unrestricted right to work. If so, sponsorship is not needed now. A company that says "must have right to work" is not excluding the candidate today. When uncertain, do not penalise heavily, but note the risk.
+**Key calibration:**
+- **CV signal is disproportionately important.** "Graduate SWE at Bloomberg" is worth more as a first CV line than "Rust Infrastructure Engineer at Unknown Startup Ltd," even if the second role is more technically aligned. Read `experience.md` — there is no prior work history to fall back on.
+- **Tech stack is the least important factor.** A graduate role at Monzo using Go is a strong career move. The candidate will learn Go in weeks. The company signal, sponsorship, mentorship, and career trajectory compound over years. Never make tech stack the deciding factor.
+- **Sponsorship-capable employers with graduate programmes are solving two hard problems at once.** These roles should be graded with awareness that sponsorship + entry-level hiring is an exceptionally valuable combination.
+- **"Consumer product" is not "consumer-facing role."** A backend infrastructure engineer at Spotify is doing systems engineering. The exclusion is for roles that are customer-facing in nature (consulting, support, sales), not for engineering roles at companies with consumer products.
+- **Graduate rotation programmes are a strength, not a weakness.** "You'll rotate across three teams" is breadth — a high-weight positive signal. Do not downgrade because the specific team is uncertain.
 
 ---
 
-### Medium-weight dimensions
+## Common Grading Errors
 
-These are tiebreakers and quality signals. They rarely change a grade by more than one step.
+**Every one of these has caused real grading failures in production.**
 
-#### Domain transferability
+**Grading based on title, not description.** "Senior" at many UK companies is 2-3 years out of university. "AI Engineer" can be cutting-edge ML infrastructure or QA testing for AI products. Always read the full description. If you're grading on title alone, you're guessing.
 
-**What to assess:** Are the skills built in this role useful across multiple companies and sectors, or are they specific to this company's proprietary systems?
+**Over-weighting tech stack.** A graduate Go role at Monzo with guaranteed sponsorship is worth more than a Rust role at a 3-person startup with no funding. Languages are learned in months; company signal, career trajectory, and sponsorship compound over years. Tech stack should never be the deciding factor between adjacent grades.
 
-**Good signal:** Infrastructure, platform engineering, database systems, cloud-native tooling, open-source technologies, standard protocols.
+**Under-weighting company signal for a first job.** Read `experience.md` — there is no work history. The first employer's name IS the credential. A generic backend role at Bloomberg is worth more for career trajectory than a perfectly-aligned role at a company nobody has heard of.
 
-**Bad signal:** Proprietary internal DSL, hyper-specific product knowledge, vendor-locked tools with no external market.
+**Treating "consumer product" as "consumer-facing role."** Spotify's backend is systems engineering. Uber's pricing engine is distributed systems. Monzo's transaction processing is financial infrastructure. The product being consumer-facing does not make the engineering role consumer-facing.
 
-#### Growth environment
+**Assuming "no sponsorship mention" means "won't sponsor."** Large companies with international teams almost always sponsor. Only penalise sponsorship when there are active negative signals.
 
-**What to assess:** Will the candidate learn fast? Are there strong engineers to learn from? Is there a mentorship culture?
+**Penalising graduate programmes for breadth.** "You'll rotate across three teams" is a feature, not a bug. Do not downgrade for uncertain team placement in a structured programme.
 
-**Good signal:** Dedicated mentor, small team of strong engineers, open-source contributions, engineering blog, code review culture, engineering ladder with clear progression.
-
-**Bad signal:** No mentorship mentioned, very large teams where a new hire would be invisible, no engineering culture signals.
-
-#### Tech stack relevance
-
-**What to assess:** Are the technologies used broadly valuable in the market, and do they overlap with the candidate's existing strengths? Read `skills.md` for current proficiency.
-
-**Good signal:** Technologies with broad market demand that overlap with the candidate's primary skills (check `skills.md`).
-
-**Moderate signal:** Technologies with broad market demand but no direct overlap.
-
-**Bad signal:** Proprietary frameworks, legacy-only stacks with no modernisation path.
-
-**Profile-specific bonus:** If the candidate's primary language (from `skills.md`) is in the production stack, that's a strong positive signal.
-
----
-
-## Dimension Interaction Effects
-
-Dimensions do not operate independently. Some combinations amplify; others cancel.
-
-### Amplifying combinations
-
-- **High career ceiling + strong company signal:** The best possible foundation. A systems role at a tier-1 company sets up the entire career trajectory. This combination justifies S even if other dimensions are moderate.
-- **Technical depth + skill breadth:** Deep work across multiple layers is the ideal learning environment. This combination distinguishes SS from S.
-- **Strong company signal + good growth environment:** Learning from excellent people at a company whose name opens doors. Each reinforces the other's value.
-
-### Cancelling combinations
-
-- **High career ceiling but no seniority match:** The role is perfect — for someone with more experience. Grade F regardless of how attractive the domain is.
-- **Strong company signal but narrow scope:** Working at a great company but if the role is exclusively narrow operational work, the company brand is partially wasted.
-- **Great tech stack but low career ceiling:** Building interesting things in a great language at a company going nowhere. The language experience transfers, but the domain doesn't. This pulls toward B.
-
-### The sponsorship modifier
-
-Sponsorship viability acts as a multiplier on the overall grade, not a standalone dimension. Read `visa.md` for the timeline, then apply:
-- Clear sponsorship path: no modification.
-- Uncertain sponsorship: drops the grade by half a step.
-- Likely no sponsorship: drops the grade by a full step.
-- Explicit "no sponsorship ever": if the role otherwise requires staying beyond the visa expiry, drop by two steps or to F.
-
-For short-term contract roles or roles where the experience value within the visa window justifies the role regardless, sponsorship matters less.
+**Grade inflation from enthusiasm.** An exciting role that's unachievable (hard 5+ years requirement) is still F. Enthusiasm is a signal that the application will be strong — it doesn't change achievability.
 
 ---
 
 ## Worked Examples
 
-**Note:** These examples demonstrate the reasoning framework. When grading real jobs, substitute the candidate's actual profile data from `profile/` files. References to specific projects, skills, and credentials below are illustrative — always verify against current profile files.
+### Example: Graduate SWE, Infrastructure @ Cloudflare (→ SS)
 
-### Example 1: Graduate Software Engineer, Infrastructure @ Tier-1 Infrastructure Company
+**Q1 — Can they get it?** Yes. Explicitly graduate programme. No years required. Structured onboarding with mentorship.
 
-**Title parse:** "Graduate" = explicitly entry-level. "Infrastructure" = high-ceiling domain. Tier-1 company = top engineering brand.
+**Q2 — Good first CV line?** Exceptional. "Graduate Infrastructure Engineer — Cloudflare" opens every door in systems engineering.
 
-**Description signals:** Building and maintaining edge network infrastructure. Systems handling millions of requests per second. Multiple systems languages. Team rotation in the first year. Dedicated mentor. Graduate cohort with structured onboarding.
+**Q3 — Background gives an edge?** Strong. Nyquestro demonstrates lock-free, performance-critical systems thinking. NeuroDrive shows distributed system reasoning at scale. Cloudflare uses Rust in production — the candidate's primary language and strongest differentiator vs other graduates who typically bring web application experience.
 
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Excellent | Infrastructure at internet scale. This domain leads to principal-level infrastructure roles. |
-| Seniority match | Perfect | Explicitly a graduate programme. No years required. |
-| Skill breadth | Excellent | Rotation across multiple infrastructure domains in year one. |
-| Company signal | Excellent | Tier-1 engineering brand. |
-| Technical depth | Excellent | Millions of requests/sec, performance-critical code, multiple low-level languages. |
-| Sponsorship | Strong | Large company with established sponsor licence and graduate programme. |
-| Domain transferability | Excellent | Infrastructure and distributed systems skills transfer everywhere. |
-| Growth environment | Excellent | Dedicated mentor, cohort programme, strong engineering culture. |
-| Tech stack | Assess against `skills.md` | Check whether the listed languages overlap with the candidate's primary skills. |
+**Q4 — Engaging work?** Highly. Edge network infrastructure handling millions of requests/second. Performance-critical, systems-level, distributed. Direct alignment with what the candidate builds for fun.
 
-**Grade: SS.** Every dimension is strong. This is the archetype of what SS looks like.
+**Q5 — Practical constraints?** All solved. London office, confirmed Skilled Worker sponsor, established graduate programme addressing visa timeline.
 
----
+**Dimensions confirm:** All critical and high-weight dimensions strong. No weaknesses.
 
-### Example 2: Software Engineer, New Grad — Production Infrastructure @ Strong Brand
+**Grade: SS.** Every question has a strong answer. Dimensions confirm. The Rust + infrastructure + systems alignment with the strongest projects in the portfolio makes this a standout.
 
-**Description signals:** Owning reliability and performance of production systems. Kubernetes, cloud infrastructure, monitoring and alerting. On-call rotation. Mentorship from senior engineers.
+### Example: Graduate SWE @ Monzo (→ A)
 
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Strong | Production infrastructure is a high-ceiling domain, though more ops-flavoured than pure systems. |
-| Seniority match | Perfect | Explicitly new grad. |
-| Skill breadth | Good | Infrastructure + monitoring + reliability. |
-| Company signal | Excellent | Top-tier brand for systems work. |
-| Technical depth | Good | Production-scale systems, but more operational than pure infrastructure. |
-| Sponsorship | Strong | Large company, established grad programme. |
-| Tech stack | Assess against `skills.md` | Check overlap with candidate's primary languages. |
+**Q1 — Can they get it?** Yes. Graduate-level, achievable.
 
-**Grade: S.** Strong on nearly every front. The more ops-flavoured work keeps it from SS.
+**Q2 — Good first CV line?** Strong. "Software Engineer — Monzo" is a well-known UK tech brand.
 
----
+**Q3 — Background gives an edge?** Moderate. Go stack doesn't directly leverage Rust proficiency, but the distributed systems and financial transaction processing connect to Nyquestro and Aurix at the problem level. The candidate's from-scratch systems thinking transfers even if the language is different.
 
-### Example 3: Backend Software Engineer — Payments @ Tier-1 Fintech
+**Q4 — Engaging work?** Moderately. Backend infrastructure for consumer banking — technically deep (distributed systems, real-time financial processing) but not the candidate's core passion domain (trading systems, compilers, ML infrastructure). "Interesting enough, with excellent other factors."
 
-**Description signals:** Payment processing systems. High availability, low latency. 2-4 years of experience preferred. Distributed systems, API design, database modelling.
+**Q5 — Practical constraints?** All solved. London, guaranteed sponsor, established hiring.
 
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Excellent | Payments infrastructure at scale. |
-| Seniority match | Stretch | "2-4 years preferred" — not a hard requirement. Check `projects.md` for relevant domain work that could substitute for years of experience. |
-| Company signal | Excellent | Tier-1 engineering brand. |
-| Technical depth | Excellent | Low-latency, high-availability distributed systems at scale. |
-| Sponsorship | Strong | Large company with global workforce. |
-| Tech stack | Assess against `skills.md` | Check overlap. |
+**Grade: A.** Three strong answers (achievable, good CV line, constraints solved), one moderate (edge), one moderate (engagement). The brand signal + sponsorship + engineering depth make this solidly A despite the tech stack and domain being adjacent rather than core.
 
-**Grade: A.** Would be S except for the seniority stretch. Worth applying with a tailored narrative connecting relevant portfolio projects to the domain.
+### Example: Senior Staff Platform Engineer @ Unknown Corp (→ F)
 
----
+**Q1 — Can they get it?** No. Description requires "8+ years of production experience, led platform teams of 5+, principal-level architecture ownership." Hard seniority mismatch per `experience.md`.
 
-### Example 4: ML Engineer — Model Serving Infrastructure
+**Grade: F.** Question 1 fails decisively. No other questions matter.
 
-**Description signals:** Building and scaling model serving infrastructure. Low-latency inference, model optimisation. 1-3 years of experience. ML frameworks and model deployment.
+### Example: "Software Engineer" @ Well-funded Startup — Actually Solutions Engineering (→ F)
 
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Excellent | ML infrastructure is one of the highest-growth domains. |
-| Seniority match | Good | "1-3 years" is a stretch. Check `projects.md` for ML-adjacent work (inference pipelines, ML framework contributions). |
-| Technical depth | Excellent | Low-latency inference, model optimisation. Check `projects.md` for directly relevant experience. |
-| Tech stack | Assess against `skills.md` | Check for overlap with ML tooling experience. |
+**Q1 — Can they get it?** Probably, based on seniority.
 
-**Grade: S.** Direct domain overlap with relevant portfolio work (if present) is a differentiator.
+**Q2 — Good CV line?** Decent company name.
 
----
+**Q3 — Background gives an edge?** Not really — the description reveals 60% customer calls, integration support, custom API adapters.
 
-### Example 5: Quantitative Developer — Low-Latency Trading @ Top Quant Firm
+**Q4 — Engaging work?** No. This is customer-facing support engineering disguised by title.
 
-**Description signals:** Trading systems. Sub-microsecond latency requirements. Mathematics background. 0-2 years, graduate-level entry.
+**Q5 — Practical constraints?** Fails. Customer-facing roles are a hard exclusion in `preferences.toml`.
 
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Exceptional | Quant development at a top firm. Among the highest-compensated roles in technology. |
-| Seniority match | Good | Explicitly graduate-level entry. |
-| Technical depth | Exceptional | Sub-microsecond latency. Among the most demanding performance engineering in the world. |
-| Company signal | Excellent | Top-tier name in quantitative finance. |
-| Domain transferability | Moderate | Core skills transfer, domain knowledge is more specialised. Check `projects.md` for trading systems work. |
-
-**Grade: SS.** Graduate-level entry at a top quant firm. If the candidate's portfolio includes matching engine or trading systems work, the alignment is near-perfect.
-
----
-
-### Example 6: Site Reliability Engineer @ Well-Known Tech Company
-
-**Description signals:** Streaming infrastructure reliability. Kubernetes, cloud, Terraform, monitoring. On-call rotation. Incident management. 1-3 years preferred.
-
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Good | SRE at scale is solid but trends toward operational work. |
-| Seniority match | Stretch | "1-3 years preferred." SRE roles also expect operational maturity the candidate may lack (check `experience.md`). |
-| Technical depth | Moderate | Reliability engineering is important but the description emphasises operational tooling over building systems. |
-| Tech stack | Assess against `skills.md` | Heavy on managed cloud services. Check alignment. |
-
-**Grade: B.** The combination of seniority stretch, operational focus, and managed-cloud-heavy stack makes it a backup option.
-
----
-
-### Example 7: Compiler Engineer — LLVM @ Major Hardware Company
-
-**Description signals:** LLVM backends. Code generation, optimisation passes. PhD or equivalent research experience preferred.
-
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Excellent | Compiler engineering is one of the highest-ceiling specialisations. |
-| Seniority match | Stretch-to-difficult | "PhD or equivalent research experience preferred" is a high bar. Check `projects.md` for compiler-related work. |
-| Technical depth | Exceptional | LLVM internals, code generation, optimisation passes. |
-| Skill breadth | Narrow | Compiler engineering is deep but narrow. |
-
-**Grade: A.** Exceptional career ceiling and technical depth, but the seniority match is a real concern. Worth a focused application highlighting any compiler-adjacent work from the portfolio.
-
----
-
-### Example 8: Platform Engineer — Internal Developer Tools @ Consumer Fintech
-
-**Description signals:** Internal platforms for developer productivity. CI/CD, deployment tooling, service mesh, observability. Entry-level considered.
-
-**Dimension assessment:**
-| Dimension | Rating | Reasoning |
-|-----------|--------|-----------|
-| Career ceiling | Good | Platform engineering is a strong career path. Internal tooling is slightly lower ceiling than external infrastructure. |
-| Seniority match | Good | Explicitly accessible to entry-level. |
-| Technical depth | Moderate | Internal tooling is useful but often less technically demanding than product infrastructure. |
-| Company signal | Good | Well-known in UK tech. Not tier-1 globally. |
-| Tech stack | Assess against `skills.md` and `portfolio-gaps.md` | May address known portfolio gaps in CI/CD and containerisation. |
-
-**Grade: A.** Solid role with explicit entry-level accessibility. Interesting side benefit: may directly address known portfolio gaps.
-
----
-
-## Boundary Cases
-
-These are jobs that look like one grade but are actually another. They test whether the grading is based on surface signals or genuine analysis.
-
-### Boundary 1: Looks like A, actually S
-
-**Role:** "Software Engineer — Data Infrastructure" at a company you've barely heard of.
-
-**Why it looks like A:** Unknown company, generic title, no obvious prestige.
-
-**Why it's actually S:** The description reveals: building a distributed query engine in the candidate's primary language (check `skills.md`), sub-second query times over petabyte-scale data, the team is 8 engineers from top firms, well-funded, and they explicitly sponsor visas. Company signal is one dimension; it should not override six strong dimensions.
-
-**Lesson:** Do not let company name recognition dominate the grade. Read the description.
-
-### Boundary 2: Looks like S, actually B
-
-**Role:** "Graduate Software Engineer" at a tier-1 company.
-
-**Why it looks like S:** Tier-1 brand. Graduate. Software Engineer.
-
-**Why it's actually B:** The description reveals the team is internal IT systems — building ticketing tools and device management dashboards. The work is CRUD applications, the team is 50+ people, and there's no mention of scale or technical challenge. The brand is valuable but the actual work has a low career ceiling and minimal technical depth.
-
-**Lesson:** Company brand does not automatically make a role good. A low-ceiling role at a great company is still a low-ceiling role.
-
-### Boundary 3: Looks like C, actually S
-
-**Role:** "Junior Developer" at a 15-person company with a plain website and unclear product.
-
-**Why it looks like C:** Unknown company, generic title, small team.
-
-**Why it's actually S:** The company is building a custom database engine in the candidate's primary language (check `skills.md`). The team includes engineers from top firms. The tech is deep (custom storage engine, lock-free data structures, SIMD-optimised queries), and they sponsor visas. Small team means direct mentorship from senior engineers.
-
-**Lesson:** Small company + plain title can hide extraordinary opportunities. When the company is unknown, the description carries all the weight.
-
-### Boundary 4: Looks like B, actually F
-
-**Role:** "Software Engineer" at a well-funded startup. Decent salary, modern stack, 100-person company.
-
-**Why it looks like B:** Funded startup, modern stack, reasonable size.
-
-**Why it's actually F:** The description reveals the role is "Solutions Engineer" relabelled — 60% customer calls, integration support, custom API adapters. This is customer-facing support engineering disguised by the title — check `preferences.toml` for whether this is a hard exclusion.
-
-**Lesson:** Titles lie. The description's actual day-to-day activities determine the grade.
-
-### Boundary 5: Looks like F, actually A
-
-**Role:** "Senior Backend Engineer" at a strong fintech. The "Senior" title looks like an immediate seniority mismatch.
-
-**Why it looks like F:** "Senior" in the title.
-
-**Why it's actually A:** The description lists no years of experience requirement. The "Senior" title maps to a level system where actual expectations are mid-level at most companies. Check `projects.md` for relevant domain experience that supports the application. The company is a strong brand, sponsors visas, and the domain has excellent career ceiling.
-
-**Lesson:** "Senior" does not automatically mean unachievable. Always read the actual requirements. Many UK companies use "Senior" for their second engineering level.
-
-### Boundary 6: Looks like C, actually A — Graduate role at a "wrong stack" company
-
-**Role:** "Graduate Software Engineer" at Monzo. Go stack, cloud-native, consumer banking product.
-
-**Why it looks like C:** "Consumer banking product, Go not Rust, no trading/compiler/ML alignment, cloud-native is a portfolio gap."
-
-**Why it's actually A:** Monzo is a major UK employer with exceptional engineering reputation (engineering blog, open culture, Go microservices at scale). Graduate programme with structured onboarding and mentorship. Guaranteed Skilled Worker sponsor. The Go backend involves distributed systems, real-time financial processing, and infrastructure engineering — technically deep regardless of the end product being a banking app. CV signal from Monzo opens doors at every other company in the UK. For a candidate with no formal work experience, this is a career-defining first job. Tech stack mismatch (Go vs Rust) is a medium-weight concern that's dwarfed by the career-stage benefits.
-
-**Lesson:** Never penalise a graduate role at a major sponsor-capable employer just because the stack doesn't match. The candidate's career stage makes CV signal, sponsorship, and mentorship far more important than language alignment. This error cost us real opportunities in production — it is the single most important grading mistake to avoid.
-
-### Boundary 7: Looks like B, actually S — Graduate role at a non-obvious infrastructure company
-
-**Role:** "Graduate Engineer" at Form3. Payments infrastructure, Go, 200+ employees.
-
-**Why it looks like B:** "Not a household name, Go not Rust, payments is fintech but not trading systems."
-
-**Why it's actually S:** Form3 processes UK Faster Payments, BACS, CHAPS, and SEPA — this is literally the infrastructure that moves money between banks. The engineering challenges (distributed consensus, strict message ordering, zero-downtime deployments, regulatory compliance) are structurally identical to exchange infrastructure. Confirmed sponsor, active graduate hiring, 200+ employees with strong engineering culture. The payment message ordering problem is the same class of problem as order book management in Nyquestro. This is deep infrastructure at national scale, not a fintech wrapper.
-
-**Lesson:** "Payments" doesn't mean "payment app." Payment rails infrastructure is among the most technically demanding domains in software engineering.
-
----
-
-## Common Misjudgments
-
-These are patterns of grading error to actively avoid. **Every one of these has caused real grading errors in production.**
-
-**Over-weighting tech stack match.** The candidate's primary language in the listing is a positive signal, but a role using a different language in an excellent domain with great career ceiling is worth more than a primary-language role in a dead-end domain. Tech stacks are learned in months; domains take years to build expertise in. **A graduate Go role at Monzo is worth more than a Rust role at a 3-person startup with no funding.** Never make tech stack the deciding factor between B and C.
-
-**Under-weighting career ceiling for entry-level roles.** At 10-15 years of experience, the domain matters more than anything else. A QA automation role at a great company has a lower career ceiling than a systems engineering role at a well-funded startup. The domain trajectory is the most important factor at entry level because you're choosing a path, not just a job.
-
-**Under-weighting CV signal for a first job.** Read `experience.md` — with no formal work experience, the first employer's name IS the professional credential. "Monzo" or "Bloomberg" on a CV gets through screening filters that "Unknown Startup Ltd" does not. This premium is highest for the first job and decreases for subsequent roles. At the current career stage, company signal should be weighted almost as heavily as technical alignment.
-
-**Assuming "no sponsorship mention" means "won't sponsor."** Many companies sponsor but don't mention it in job descriptions. Large companies with international workforces almost always sponsor. Only penalise sponsorship when there are active negative signals at a small company with no visible sponsor licence.
-
-**Treating "consumer product" as "consumer-facing role."** The preference exclusion is for customer-facing ROLES (consulting, support, sales engineering), not for companies that make consumer products. A backend infrastructure engineer at Spotify is doing systems engineering. A platform engineer at Uber is building distributed systems. The end product being consumer-facing does not make the engineering role consumer-facing.
-
-**Grade inflation from enthusiasm.** A role that hits personal interest buttons (check `interests.md`) is exciting but must still be graded on the full rubric. Enthusiasm is a signal that the application will be strong — it doesn't change the grade. An unachievable dream role is still F.
-
-**Grade deflation from unfamiliarity.** A role in a domain you haven't encountered before deserves research, not dismissal. If you don't know the ceiling of a domain, look it up before grading. Don't default to B because the domain is unfamiliar.
-
-**Penalising graduate programmes for being "too broad."** Graduate rotation programmes deliberately expose new engineers to multiple areas. "You'll rotate across three teams in your first year" is breadth — a high-weight POSITIVE signal, not a weakness. Do not downgrade because the specific team placement is uncertain.
+**Grade: F.** Hard exclusion triggered (customer-facing role type). Title said "Software Engineer" but description reveals solutions engineering.
 
 ---
 
 ## Evidence Standards for Fit Assessments
 
-Every fit assessment must connect the job to the candidate's profile with specific, named evidence. The standard varies by grade but the principle is the same: explain WHY with concrete profile references, not just assert a conclusion.
+Every fit assessment must connect the job to the candidate's profile with specific evidence. The grade should be the conclusion of the reasoning, not a label attached to generic commentary.
 
 ### What "specific" means
 
 | Element | Generic (unacceptable) | Specific (required) |
 |---------|----------------------|---------------------|
-| Project alignment | "Has relevant projects" | "Your Nyquestro matching engine demonstrates lock-free systems design directly relevant to this exchange infrastructure role" |
-| Technology match | "Good stack overlap" | "Requires Rust and Python — your two strongest languages at proficient and comfortable levels respectively" |
-| Seniority assessment | "Seems achievable" | "Lists '0-2 years' with scope matching project-level experience. Your 4 substantial projects demonstrate equivalent capability to 1-2 years of professional work" |
-| Gap identification | "Some gaps exist" | "Heavy Kubernetes usage — currently listed as a gap in portfolio-gaps.md. Your Docker experience from NeuroDrive provides a partial foundation" |
-| Sponsorship | "They probably sponsor" | "Confirmed on UK sponsor register. Graduate programme established. Your Graduate visa expires Aug 2027, giving 15+ months before sponsorship is needed" |
-| Career ceiling | "Good career path" | "SRE at this scale leads to Staff SRE / Platform Architect roles. 10-year compensation trajectory in this domain reaches your £500K+ target per preferences.toml" |
+| Project alignment | "Has relevant projects" | "Nyquestro's lock-free matching engine demonstrates the concurrent systems design this role demands" |
+| Technology match | "Good stack overlap" | "Requires Rust and Python — proficient in both per skills.md" |
+| Seniority | "Seems achievable" | "Lists '0-2 years' — 4 substantial projects demonstrate equivalent capability" |
+| Gaps | "Some gaps exist" | "Heavy Kubernetes usage — listed as a gap in portfolio-gaps.md" |
+| Sponsorship | "They probably sponsor" | "Confirmed on UK sponsor register. Graduate visa expires Aug 2027 — 15+ months buffer" |
 
-### The golden rule for fit assessments
+### The five-question standard
 
-The user should be able to read a fit assessment and immediately understand:
-1. What the job actually involves (not just the title)
-2. Which of their specific projects and skills make them a good candidate
-3. What gaps exist and how significant they are
-4. Whether sponsorship is viable given their visa timeline
-5. Where this role leads in 5-10 years
+For SS/S grades, the fit assessment should clearly answer all five core questions with specific evidence. For A/B, at minimum questions 1, 2, and 5. For C/F, the primary reason (usually question 1 or 5) with specific justification.
 
-If the assessment doesn't answer all five questions for SS/S grades, it's not done.
+If the assessment doesn't answer the relevant questions with specific profile references, it's not done.

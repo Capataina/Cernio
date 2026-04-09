@@ -1,443 +1,245 @@
 # Company Grading Rubric
 
-A comprehensive rubric for evaluating whether a company is worth monitoring for jobs, and at what priority. The grade captures a multidimensional judgement about career value — not just "do they have relevant jobs" but "would working here advance the long-term trajectory."
+A rubric for evaluating whether a company is worth monitoring for jobs, and at what priority. Company grading is a thinking exercise, not a checklist — the grade should emerge from careful reasoning about what this company means for the candidate's career, not from mechanically scoring dimensions.
 
-**Important:** This rubric references the candidate's profile throughout. All profile facts must come from reading the files in `profile/` — never from hardcoded values in this document. When the rubric says "the candidate's visa situation" or "the portfolio," it means: read `visa.md`, read `projects.md`, etc.
+**Important:** This rubric references the candidate's profile throughout. All profile facts must come from reading the files in `profile/` — never from hardcoded values in this document.
 
 ---
 
 ## Table of Contents
 
-1. [Evaluation Dimensions](#evaluation-dimensions)
-2. [Grade Definitions](#grade-definitions)
-3. [Worked Examples](#worked-examples)
-4. [Boundary Cases](#boundary-cases)
-5. [Companies That Do Not Make the Cut](#companies-that-do-not-make-the-cut)
-6. [How Company Grade Interacts with Job Grade](#how-company-grade-interacts-with-job-grade)
+1. [How to Grade a Company](#how-to-grade-a-company)
+2. [The Core Questions](#the-core-questions)
+3. [Analytical Dimensions](#analytical-dimensions)
+4. [Grade Definitions](#grade-definitions)
+5. [Cross-referencing and Relative Grading](#cross-referencing-and-relative-grading)
+6. [Career-Stage Context](#career-stage-context)
+7. [Common Grading Errors](#common-grading-errors)
+8. [Worked Examples](#worked-examples)
+9. [Evidence Standards](#evidence-standards)
 
 ---
 
-## Evaluation Dimensions
+## How to Grade a Company
+
+Grading happens in four steps. Do not skip any.
+
+**Step 1: Answer the core questions.** These force you to think about what actually matters — not in the abstract, but for this specific candidate at this specific career stage. Write 2-3 sentences per question. This is where the real reasoning happens.
+
+**Step 2: Evaluate against the analytical dimensions.** The dimensions add precision and catch things the questions might miss. A company might feel right but have a hidden sponsorship problem, or feel wrong but actually have excellent technical depth you didn't consider.
+
+**Step 3: Cross-reference questions and dimensions.** Do they agree? If the questions say "I'd be proud to work here, they can hire me, I'd grow" but the dimensions say "C tier because tech stack mismatch" — the dimensions are wrong, not the questions. If the dimensions say "strong on everything" but the questions reveal "the work wouldn't actually be engaging" — that matters too. When they conflict, reason through why and decide which signal is more reliable.
+
+**Step 4: Relative comparison.** Compare this company against others at the same grade and adjacent grades. Does it genuinely belong where you've put it? Would the candidate really be indifferent between all the companies at this tier?
+
+The grade reasoning written to the database should reflect this process — not just a conclusion, but the thinking that led to it.
+
+---
+
+## The Core Questions
+
+For every company, answer these four questions. These are not optional warm-up exercises — they ARE the evaluation. The dimensions in the next section provide analytical support, but these questions are where the grade is determined.
+
+### 1. Would the candidate be proud to say they work here?
+
+This is the brand, reputation, and signal question. It captures something the dimension framework misses: the real-world social and professional value of having this company on your CV.
+
+Think about it concretely: if the candidate got a job here and told friends, family, former classmates, and future interviewers, would they be impressed? Would it open doors? Would it be a story worth telling?
+
+This is not about prestige snobbery — it's about the practical reality that early-career engineers are judged partly by where they work. Read `experience.md` — with no formal work history, the first employer name carries enormous weight.
+
+A company doesn't need to be a household name to score well here. "I work at a company building the UK's payment infrastructure" is impressive even if the company name isn't famous. But "I work at Apple" is impressive without any further explanation.
+
+### 2. Could they actually hire the candidate and keep them?
+
+This is the practicality question. It doesn't matter how good a company is if they can't or won't hire someone at this career stage.
+
+Consider:
+- Do they hire graduates or entry-level engineers? Or is it senior-only?
+- Can they sponsor a Skilled Worker visa when the Graduate visa expires? (Read `visa.md` for the timeline.)
+- Are they in the UK, or do they have UK-based roles?
+- Are they actually hiring, or is the careers page empty?
+
+A company that checks every other box but can't sponsor is a ticking clock — the candidate would need to leave within the visa window. That's not necessarily a dealbreaker (great experience within the window can justify the move), but it's a real cost that should be reflected.
+
+### 3. Would the candidate grow here?
+
+This is the career trajectory question. Not just "is the company growing" (that's the dimension) but "would the candidate specifically become a better, more employable, higher-value engineer by working here?"
+
+Consider:
+- Would they work alongside strong engineers who push them?
+- Would the problems be genuinely challenging or routine?
+- Is there a path from junior to senior to staff?
+- Would the experience compound — building skills and knowledge that make the next job even better?
+- Or would they stagnate, learning one narrow thing with no upward trajectory?
+
+A 2-year stint at a company with brilliant engineers and hard problems is worth more than 5 years at a company doing routine work, even if the routine company has a better name.
+
+### 4. Is the work something the candidate would find engaging?
+
+This is the motivation and alignment question. Not "does the tech stack match" (that's a dimension detail) but "would the candidate wake up interested in what they're building?"
+
+Read `projects.md` and `interests.md` — what does the candidate actually choose to build when nobody is making them? That reveals genuine interests, not just skills on paper.
+
+A company whose core problems resemble what the candidate builds for fun is a company where they'll thrive. A company whose work is technically impressive but in a domain the candidate finds boring is a company where they'll coast.
+
+This doesn't mean every company needs to be in a "passion" domain. "I find this interesting enough and the other factors are excellent" is a perfectly valid answer. But "I would actively dread this work" is a signal that matters.
+
+---
+
+## Analytical Dimensions
+
+These dimensions provide structure and precision. Use them to support and validate the reasoning from the core questions — not to override it.
 
 ### High weight
 
-These dimensions drive the grade. A company that scores well on all three high-weight dimensions is almost certainly S-tier. A company that fails on two is almost certainly C-tier.
-
-#### Engineering Reputation
-
-**What to assess:** Is this company known for strong engineering? Do they invest in engineering as a discipline, not just as a cost centre?
-
-**Why it matters:** Read `experience.md` to understand the candidate's work history. If formal experience is limited, the name on the first/next employer compensates for credential gaps in a way that an unknown company name cannot. This premium is highest for the first job and decreases with each subsequent role — but the current state of `experience.md` determines how much weight to place here.
-
-**Strong signals:**
-- Active engineering blog with substantive technical posts (not marketing dressed as engineering)
-- Open-source contributions or projects maintained by the company
-- Engineers who speak at conferences, publish papers, or are individually well-known
-- Positive Glassdoor/Blind reviews specifically about engineering culture (not just "good perks")
-- Tech radar or public stance on technology choices
-- Known for engineering-led product development rather than sales-led or consulting-led
-
-**Weak signals:**
-- "We use cutting-edge technology" on the careers page with no evidence
-- Blog exists but is entirely marketing, product announcements, or SEO content
-- No engineering presence on GitHub, no conference talks, no technical publications
-- Glassdoor reviews mention "outdated tech stack", "no code review culture", or "move fast and break things without the fixing part"
-- Engineering team is a support function for a sales/consulting business
-
-**Nuance:** A small company with 3 brilliant engineers and no blog can have excellent engineering culture. A large company with a beautiful eng blog can have terrible day-to-day engineering. Use the blog and OSS presence as starting evidence, but triangulate with employee reviews, LinkedIn profiles of engineers (what do they work on? how long do they stay?), and the company's actual product (is it technically impressive?).
-
-#### Technical Alignment
-
-**What to assess:** Does the company's core work involve problems that match the candidate's profile? Read `projects.md` and `skills.md` to understand the candidate's technical centre of gravity, then assess how well this company's engineering problems overlap.
-
-**Why it matters:** The portfolio is the candidate's primary evidence of capability. A company whose day-to-day engineering problems resemble what the candidate already builds is a company where the portfolio converts most effectively in interviews and where the daily work builds on existing strength. A company doing work entirely outside the candidate's domain wastes this alignment.
-
-**How to assess alignment:** Map the technologies, domains, and problem types from `projects.md` and `skills.md` against the company's engineering work:
-
-- **Strong alignment:** Core product involves the same problem types, languages, or domains the candidate's projects demonstrate (e.g., if the portfolio shows low-latency systems work, a trading infrastructure company is strongly aligned)
-- **Moderate alignment:** Problem types are adjacent — technically deep but in a different domain (e.g., payment processing, identity, fraud detection, security engineering)
-- **Weak alignment:** Primarily application-layer work, no performance constraints, consulting/agency work, marketing technology, mobile development, or work described entirely in business terms with no technical substance
-
-#### Growth Trajectory
-
-**What to assess:** Is this company growing, stable, or declining? Are they hiring, expanding, or contracting?
-
-**Why it matters:** Read `visa.md` for the candidate's visa timeline. A growing company is more likely to (a) actually hire at the candidate's level, (b) have budget for sponsorship when the time comes, (c) offer career progression as the company scales, and (d) still exist when the visa timeline demands it. A declining company may rescind offers, freeze hiring, or shut down the specific team after joining.
-
-**Growing signals:**
-- Recent funding round (Series A or later — pre-seed is too early for this purpose)
-- Active job listings across multiple engineering roles
-- Headcount growth visible on LinkedIn (company size trending up over 12-24 months)
-- Expanding into new markets, new products, or new offices
-- Revenue growth mentioned in press or investor communications
-- Recent product launches or major feature releases
-
-**Stable signals:**
-- Profitable and self-sustaining, not actively raising
-- Consistent headcount, hiring to replace attrition
-- Mature product with ongoing development
-- No recent negative press or strategic pivots
-
-**Declining signals:**
-- Recent layoffs (check layoffs.fyi, news coverage)
-- Careers page empty, removed, or showing only non-engineering roles
-- No new funding in 3+ years for a company that should need it
-- Key people leaving (CTO departure, engineering leadership churn)
-- Acquisition rumours or "strategic review" language
-- Product deprecated or superseded by competitors
+| Dimension | What to assess | Why it matters |
+|-----------|---------------|---------------|
+| **Engineering reputation** | Is this company known for strong engineering? Eng blog, OSS, conference talks, Glassdoor engineering reviews, known engineers. | Read `experience.md` — with limited formal experience, the first employer's name compensates for credential gaps. The higher the reputation, the more doors it opens. |
+| **Technical alignment** | Does the company's core work involve problems that match the portfolio? Map `projects.md` and `skills.md` against their engineering work. | The portfolio is the primary evidence of capability. A company whose problems resemble the candidate's projects is a company where the portfolio converts in interviews. |
+| **Growth trajectory** | Growing, stable, or declining? Funding, hiring activity, headcount trends, product launches. | Read `visa.md` — growth means they're more likely to hire at entry level, budget for sponsorship, and offer career progression. |
 
 ### Medium weight
 
-These dimensions influence the grade but rarely drive it alone. A company strong on high-weight dimensions does not get downgraded to C because of a medium-weight weakness. But between two companies that are equal on high-weight dimensions, medium-weight differences determine the tie.
-
-#### Sponsorship Likelihood
-
-**What to assess:** Can and will this company sponsor the required visa when the candidate's current right-to-work expires? Read `visa.md` for the exact visa type, expiry date, and what sponsorship is needed.
-
-**Why it matters:** This is not a soft preference — it is a hard constraint with a deadline. A company that cannot sponsor means leaving the UK or changing jobs within the visa window regardless of how good the role is. Companies that can and do sponsor are materially more valuable than those that theoretically could but have no track record.
-
-**How to assess:**
-- Check the [UK Sponsor Register](https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers) — this is the definitive source. If they are listed, they have a licence.
-- Company size matters: companies with 200+ employees almost always have the HR infrastructure for sponsorship. Companies with 10-30 employees may find the process burdensome.
-- International hiring history: do they employ people from outside the UK/EU? Do job listings mention visa sponsorship?
-- Sector patterns: finance, big tech, and defence/government contractors sponsor routinely. Small startups and agencies rarely do.
-
-**The time factor:** Read `visa.md` for the remaining visa window. During that window, sponsorship is not needed — the candidate has unrestricted right to work. This means a company that is unlikely to sponsor is not automatically C-tier — it could still be a strong first job within the visa window, building CV signal before moving to a sponsor-capable employer. But it is a real cost, and the grade should reflect that the exit is forced.
-
-#### Career Ceiling
-
-**What to assess:** How far can an engineer progress at this company? Is there a path from entry-level to senior, staff, and principal?
-
-**Why it matters:** Read `preferences.toml` for the candidate's long-term income and career targets. A company with a flat org structure where everyone is "Software Engineer" forever limits trajectory even if the day-to-day work is interesting.
-
-**High ceiling indicators:**
-- Multiple defined engineering levels (Junior → Mid → Senior → Staff → Principal or equivalent)
-- Evidence of internal promotion (engineers who joined junior and are now senior/staff)
-- Compensation bands that reach into the candidate's long-term target range
-- IC (individual contributor) track that is parallel to management, not subordinate to it
-
-**Low ceiling indicators:**
-- Flat org with no levels — "we don't believe in titles"
-- Engineering team too small to have meaningful levels (5-person team will not have a Staff role)
-- Compensation capped at market median with no top-of-band for exceptional performers
-- Only path to seniority is management — no IC leadership track
-
-#### Company Stability
-
-**What to assess:** Will this company exist and be hiring when the candidate needs it to?
-
-**Why it matters:** Read `visa.md` — joining a company that folds within the visa window means another job search while burning precious visa time. Stability is not about being boring — it is about the company surviving long enough to deliver the career value that justified joining.
-
-**Stable indicators:**
-- Profitable or has clear path to profitability with sufficient runway
-- Revenue-generating product in an established market
-- Well-funded (Series B+ with reputable investors) if pre-profit
-- Strong market position or defensible niche
-
-**Unstable indicators:**
-- Pre-revenue with less than 18 months runway
-- Dependent on a single client or contract
-- In a market that is consolidating (most competitors acquired or dead)
-- Founder/CEO churn, board conflicts, strategic pivots every 6 months
+| Dimension | What to assess | Why it matters |
+|-----------|---------------|---------------|
+| **Sponsorship capability** | Can and will they sponsor? Check the UK sponsor register, company size, international team, job listing mentions. | Read `visa.md` — mandatory from August 2027. Not a soft preference, a hard constraint with a deadline. |
+| **Career ceiling** | Path from entry to senior/staff/principal? IC track parallel to management? Compensation bands reaching long-term targets? | Read `preferences.toml` — first job sets the trajectory. A flat org caps growth regardless of how interesting the work is. |
+| **Company stability** | Will they exist when the candidate needs them to? Profitable, well-funded, strong market position? | Read `visa.md` — company folding during the visa window wastes precious time. |
 
 ### Low weight (tiebreakers)
 
-These dimensions break ties between companies that are similar on higher-weight dimensions.
+| Dimension | What to assess |
+|-----------|---------------|
+| **Tech stack match** | Does the company use technologies from `skills.md`? This is a TIEBREAKER, not a driver. Languages are learned in months. |
+| **CV signal** | Would the name impress future employers? Matters most for a first job. |
+| **Location** | Office in London/Cambridge? Hybrid policy? |
+| **Culture fit** | Engineering-led? Small teams? Autonomy? |
 
-| Dimension | What to assess | Notes |
-|-----------|---------------|-------|
-| **CV signal** | Would this company name impress future employers? | Matters most for a first job (read `experience.md` to determine). |
-| **Location** | Office location? Hybrid policy? Commute? | Read `preferences.toml` for location requirements. |
-| **Culture fit** | Engineering-led? Small teams? Autonomy? | Read `preferences.toml` and `interests.md` for culture preferences. |
-| **Compensation** | Do they pay at or above market? | Hard to assess from outside, but Levels.fyi, Glassdoor, and Blind give signals. |
+**Critical note on tech stack:** Tech stack match is deliberately low-weight. A company using Go, Java, C++, or Python is not penalised for not using Rust. What matters is whether the engineering *problems* align (distributed systems, low-latency, data infrastructure) — not whether they solve those problems in the same language. A graduate engineer switching languages takes weeks, not years.
 
 ---
 
 ## Grade Definitions
 
-Company grades are gentler than job grades — they assess whether a company is worth monitoring, not whether to apply right now. A B-tier company might produce an S-tier role.
+| Grade | What it means | How it should feel |
+|-------|--------------|-------------------|
+| **S** | Exceptional. Getting any relevant role here would be a career win. | "I would drop everything to apply here." The questions all have strong answers AND the dimensions confirm it. ~10% of the universe. |
+| **A** | Strong. Worth actively pursuing. | "I'd be genuinely excited about an offer here." Most questions have strong answers with maybe one area of uncertainty. ~25-30%. |
+| **B** | Decent. Worth tracking. | "I'd consider it — depends on the specific role." Some clear strengths but notable weaknesses. A good role here beats no role. ~35-40%. |
+| **C** | Marginal. Low probability of relevant roles. | "Probably not, but I wouldn't delete it." Tenuous connection to the profile, or hard negatives present. ~20-25%. |
 
-**Grades should be conservative.** S is reserved for companies where the alignment is genuinely exceptional across almost every dimension. Most good companies are A-tier. Most decent companies are B-tier. S should feel rare — if you're grading 50 companies and 15 come out as S, your bar is too low.
+**S requires genuine exceptionality.** "Good company, grows, sponsors" is A-tier. S means either near-perfect technical alignment (the candidate's projects map directly to the company's core work) OR an engineering reputation so strong that getting hired there is transformative regardless of the specific role.
 
-| Grade | Meaning | Profile | Rough frequency |
-|-------|---------|---------|-----------------|
-| **S** | Exceptional — career-defining | Scores well on ALL three high-weight dimensions AND at least two medium-weight. Strong engineering reputation, clear technical alignment with the candidate's specific projects, actively growing, likely to sponsor, high career ceiling. Getting any relevant role here would be a career win. These are companies where the candidate's portfolio would genuinely impress interviewers. | ~10% of the universe. If more than 15% are S, re-examine. |
-| **A** | Strong — actively monitor | Strong on two of three high-weight dimensions, acceptable on the third. Or strong on all three but with a notable medium-weight weakness. These are companies the candidate should actively pursue — they produce genuinely good roles. | ~25-30% |
-| **B** | Decent — worth tracking | Has genuine relevance and at least one clear strength, but with notable weaknesses. Maybe the tech stack doesn't match, maybe the company is small, maybe the domain is adjacent rather than core. Still worth having in the database because a good role here beats no role. | ~35-40% |
-| **C** | Marginal — archived | The connection to the candidate's profile is genuinely tenuous, OR the company has hard negatives (excluded sector, no engineering team, dissolved). Archived to prevent noise, preserved for dedup. | ~20-25% |
+**C is for genuine marginality.** A company should only be C if you can articulate a clear reason why monitoring it is likely a waste — an excluded sector, no engineering team, no relevance to the profile at all. "Their stack is different" is not sufficient for C. "They're a marketing agency with no backend engineers" is.
 
-### Career-stage calibration
+---
 
-The standard dimension weights assume an experienced engineer choosing between equivalent options. **This candidate is not in that position.** Read `experience.md` — there is no formal work experience. The profile's strength comes entirely from the project portfolio. This fundamentally changes what matters:
+## Cross-referencing and Relative Grading
 
-**Dimension reweighting for this career stage:**
+**This step is mandatory.** Do not write grades to the database without completing it.
 
-| Dimension | Standard weight | Calibrated weight | Why |
-|-----------|----------------|-------------------|-----|
-| Technical alignment | High | High | Unchanged — the portfolio is the primary evidence |
-| Engineering reputation | High | **Very high** | The first employer's name IS the professional credential. With no work history, company name on the CV does the job that prior employers would do for experienced candidates. |
-| Growth trajectory | High | High | Unchanged — growth means hiring, which means opportunity |
-| Sponsorship capability | Medium | **Very high** | Read `visa.md` — sponsorship becomes mandatory from August 2027. Companies that can sponsor solve the single hardest constraint. This is not a nice-to-have. |
-| Career ceiling | Medium | **High** | First job sets the trajectory. More important at entry level than mid-career. |
-| Tech stack match | Medium | **Low** | Languages are learned in months. A graduate engineer switching from Rust to Go takes weeks, not years. Tech stack should never be the deciding factor between grades. It's a tiebreaker, nothing more. |
-| CV signal | Low (tiebreaker) | **High** | First-job premium. "Bloomberg" on a CV gets through screening filters that "Unknown Startup Ltd" cannot. This premium decreases with each subsequent job but is very high right now. |
+### After grading a batch
 
-**What this means in practice:** A company with strong engineering reputation, guaranteed sponsorship, and high career ceiling should grade well even if the tech stack is completely different. Conversely, a tiny Rust startup with no brand recognition, uncertain sponsorship, and limited career ceiling should not grade higher than a well-known employer just because it uses Rust.
+1. **Compare within each tier.** Look at all companies you've put at the same grade. Do they genuinely belong together? Would it make sense to tell the candidate "these are all equally worth pursuing"? If a trillion-dollar tech company and a 10-person unfunded startup are both B, something is wrong.
 
-### Relative grading — MANDATORY
+2. **Compare across adjacent tiers.** For every company near a boundary, ask: "Is this genuinely less valuable than everything in the tier above?" If a B-tier company would clearly be a better career move than an A-tier company, adjust.
 
-**Do not grade companies in isolation.** After assigning initial grades to a batch, you MUST cross-reference and compare:
+3. **The "which offer would you take" test.** For any two companies at different grades, imagine the candidate has a graduate SWE offer from both. Would they take the higher-graded one? If the answer consistently contradicts the grades, the grades are wrong.
 
-1. **Compare within each grade tier.** Look at all the companies you've put in the same tier. Do they genuinely belong together? Would it make sense to tell the candidate "these are all equally worth pursuing"? If Amazon and a 10-person unfunded startup are both B, something is wrong — re-examine both.
+4. **Sanity check.** Scan for obvious anomalies: a well-known employer at C, a tiny startup with no sponsorship at S. These aren't automatic corrections — but each one demands re-examination and explicit justification.
 
-2. **Compare across adjacent tiers.** Look at the boundary between each pair of tiers (S/A, A/B, B/C). For every company at the lower tier, ask: "Is this genuinely less valuable than every company in the tier above?" If a B-tier company would clearly be a better career move than an A-tier company, the grades are wrong.
+### When grading in parallel across agents
 
-3. **The "would you take this over that" test.** For any two companies at different grades, ask: "If the candidate had a graduate SWE offer from both, which would they take?" If the answer consistently contradicts the grades, adjust.
+Each agent grades its batch independently, but the orchestrator MUST do a cross-batch comparison before writing to the database. Pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other.
 
-4. **Sanity check extreme cases.** After grading, scan for: any FAANG-tier company below A, any well-known UK employer below B, any excluded-sector company above C. These are the patterns that have caused real grading failures. They're not automatic overrides — but if you find one, you must re-examine and explicitly justify the grade in the reasoning.
+---
 
-**When grading in parallel across multiple agents:** Each agent grades its batch independently, but the orchestrator MUST do a cross-batch comparison before writing to the database. Pull the top 5 and bottom 5 from each agent's output and verify they make sense relative to each other.
+## Career-Stage Context
 
-### Anti-inflation rules
+Read `experience.md` — the candidate has no formal work experience. This fundamentally changes the evaluation:
 
-These prevent grade inflation where every decent company becomes S:
+- **CV signal matters more than at any other career stage.** The first employer's name IS the professional credential. This doesn't mean every big company is S-tier, but it means brand recognition is a genuinely important factor, not a tiebreaker.
+- **Sponsorship is not a nice-to-have.** Read `visa.md` — it becomes mandatory. Companies that solve this constraint are materially more valuable.
+- **Tech stack is the least important factor.** A graduate engineer learns a new language in weeks. What matters is the class of problems, the quality of mentorship, and the career trajectory — not whether they write Rust or Go.
+- **"Consumer product" is not "consumer-facing role."** Backend infrastructure at Spotify, Monzo, or Uber is systems engineering. The preference exclusion targets customer-facing roles (consulting, support, sales engineering), not companies whose product has end-users.
 
-1. **S requires genuine exceptionality, not just "good across the board."** To earn S, a company must have either (a) near-perfect technical alignment where the candidate's specific projects map directly to the company's core work (matching engines → trading firms, compilers → compiler companies, Rust systems → Rust infrastructure companies), OR (b) an engineering reputation so strong and career ceiling so high that getting hired there would be transformative regardless of the specific role (top quant firms, leading AI labs). "Good company, grows, sponsors" is A-tier, not S.
+---
 
-2. **Tech stack match is a bonus, not a requirement.** A company using Go, Java, C++, or Python is not penalised for not using Rust. Languages are learned in months. What matters is: does the engineering work involve the same class of problems the candidate's projects demonstrate? Distributed systems are distributed systems regardless of language.
+## Common Grading Errors
 
-3. **"Consumer product" does not mean "consumer-facing role."** Backend infrastructure at Spotify, Monzo, or Uber is systems engineering regardless of what the end user sees. The preference exclusion is for consumer-facing ROLES (consulting, support, sales engineering), not for companies whose product is used by consumers.
+Every one of these has occurred in production and caused real damage:
 
-### Anti-deflation rules
+**Grading a major employer as C because the tech stack doesn't match.** Monzo was graded C because it uses Go instead of Rust. This is wrong. A graduate SWE at Monzo with guaranteed sponsorship, strong CV signal, and deep backend infrastructure work is a strong career move regardless of language. Tech stack is a tiebreaker, not a primary driver.
 
-These prevent the systematic under-grading that has caused real failures in production:
+**Treating all companies in a tier as equivalent.** Amazon and a 5-person unfunded startup cannot both be B. If they are, the grades are not calibrated. Use relative comparison to catch this.
 
-1. **Tech stack mismatch alone cannot drop a grade by more than one step.** If a company would be A on every other dimension but uses Java instead of Rust, the tech stack can drop it to B at most — never to C. Languages are the most learnable dimension; penalising them heavily is irrational at any career stage.
+**Over-indexing on domain alignment.** The preferred sectors in `preferences.toml` are soft preferences, not hard exclusions. A strong role at a healthcare AI company or a climate tech infrastructure company can be A-tier. Only the explicitly excluded sectors (gambling, adtech, consumer-crypto) justify downgrading on sector alone.
 
-2. **Sponsorship-capable employers with graduate hiring get a boost.** These solve the candidate's two hardest constraints simultaneously. This is a significant positive signal that should push grades UP, not be treated as neutral.
+**Conflating "consumer product" with "consumer-facing role."** Spotify's backend is systems engineering. Uber's pricing engine is real-time infrastructure. The product being consumer-facing does not make the engineering role consumer-facing.
 
-3. **"Not aligned with target sectors" is a soft preference, not a hard exclusion.** Only the sectors explicitly listed as hard exclusions in `preferences.toml` (gambling, adtech, consumer-crypto) justify downgrading on sector alone. A strong engineering role in healthcare, climate tech, or any other non-excluded sector can still be A-tier.
-
-### The gap between B and C
-
-This is the most consequential boundary. B companies stay in the active search pool — their jobs get fetched, evaluated, and shown in the TUI. C companies are archived and invisible. Getting this boundary wrong in either direction has real costs:
-
-- **False B (should be C):** The job search wastes time fetching and evaluating roles from a company that was never going to produce a relevant hit. Low cost per company, but it accumulates.
-- **False C (should be B):** A company with a genuinely good role gets archived, and the role is never seen. This is a missed opportunity that cannot be recovered.
-
-**When in doubt between B and C, lean toward B.** The cost of monitoring one extra company is low. The cost of missing a good role is high. A company should only be C if you can articulate a clear reason why monitoring it would be a genuine waste — not just "their stack is different."
+**Ignoring the practical reality of sponsorship.** A brilliant 10-person startup that can't sponsor is a job with a hard expiry date. That doesn't make it C — the experience within the visa window might be valuable — but the grade should honestly reflect this constraint rather than ignoring it.
 
 ---
 
 ## Worked Examples
 
-These examples demonstrate the full reasoning chain through every dimension. They are illustrative — each real company should be evaluated fresh based on current evidence, not pattern-matched to these examples.
+These demonstrate the full reasoning process — questions first, dimensions second, grade as conclusion.
 
-**Note:** The examples below reference the candidate's profile generically. When grading real companies, use the actual profile data from `profile/` files.
+### Example: Cloudflare (→ S)
 
-### Example 1: Tier-1 Infrastructure Company (e.g. Cloudflare)
+**Q1 — Proud to work here?** Yes, unambiguously. Cloudflare is one of the most respected engineering companies in the world. "I work at Cloudflare" opens every door.
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Exceptional.** One of the best engineering blogs in the industry. Major OSS projects. Engineers are individually well-known. Systems languages in production at scale. |
-| Technical alignment | **Excellent.** Core product is network infrastructure — CDN, DNS, DDoS mitigation, edge compute. Performance-critical, systems-level, distributed. Assess alignment against the candidate's `projects.md`. |
-| Growth trajectory | **Strong.** Publicly traded, consistent revenue growth, expanding product portfolio, actively hiring across engineering. |
-| Sponsorship likelihood | **High.** Large company (3000+ employees), on the UK sponsor register, history of international hiring. |
-| Career ceiling | **High.** Clear IC progression to Staff and Principal. Compensation at senior levels is competitive. |
-| Stability | **High.** Profitable, public, diversified revenue. |
+**Q2 — Could they hire and keep?** Yes. Large company, London office, established graduate hiring, confirmed Skilled Worker sponsor. No barriers.
 
-**Grade: S** — Exemplary across every dimension. Any relevant role here is worth pursuing aggressively.
+**Q3 — Would the candidate grow?** Yes. World-class engineers, extremely challenging problems (edge computing at global scale), clear IC progression to Principal. The engineering depth is exceptional.
 
-### Example 2: Fintech Scaleup (e.g. Form3)
+**Q4 — Engaging work?** Yes. They rewrote their core proxy from NGINX to Rust — Rust in production at massive scale. CDN, edge compute, DNS, DDoS mitigation are performance-critical, systems-level, distributed problems. Direct alignment with Nyquestro and NeuroDrive's systems thinking.
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Good.** Known in the payments/fintech engineering community. Engineering blog exists but less prominent. |
-| Technical alignment | **Good.** Payment infrastructure — technically deep, involves distributed systems, real-time processing, correctness-critical. Assess stack overlap against `skills.md`. |
-| Growth trajectory | **Good.** Series C, expanding, actively hiring. |
-| Sponsorship likelihood | **High.** 200+ employees, on the sponsor register, international team. |
-| Career ceiling | **Moderate-good.** Multiple engineering levels, but ceiling may be lower than the candidate's long-term targets (check `preferences.toml`). |
-| Stability | **Good.** Well-funded, revenue-generating, strong backers. |
+**Dimensions confirm:** Engineering reputation exceptional, technical alignment excellent (Rust + infrastructure), growth strong (profitable, public, expanding), sponsorship guaranteed, career ceiling very high.
 
-**Grade: A** — Strong across most dimensions. Weaker brand recognition and potentially lower comp ceiling compared to S-tier keep it at A. A great role here would be a strong first job.
+**Grade: S.** Every question has a strong answer. Dimensions confirm. This is the archetype of S.
 
-### Example 3: Small Infrastructure Startup (e.g. Coadjute)
+### Example: Monzo (→ A)
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Unknown/weak signal.** Small company, minimal public engineering presence. |
-| Technical alignment | **Moderate.** Niche domain — involves some systems-level work but may be more application-layer. Assess against `projects.md`. |
-| Growth trajectory | **Moderate.** Funded but small team. Hiring at a scale where adding one entry-level engineer is a significant decision. |
-| Sponsorship likelihood | **Low-moderate.** Small company, unlikely to have established sponsorship infrastructure. |
-| Career ceiling | **Low.** Team too small for meaningful levels. |
-| Stability | **Moderate.** Funded but early-stage. |
+**Q1 — Proud to work here?** Yes. Monzo is a household name in UK tech. Strong engineering brand with a well-known engineering blog and open culture. "I work at Monzo" carries real weight.
 
-**Grade: B** — Genuine technical work but weaknesses on reputation, sponsorship, and career ceiling accumulate. Worth monitoring because a well-scoped infrastructure role here could be excellent, but not a priority target.
+**Q2 — Could they hire and keep?** Yes. Large UK bank, guaranteed Skilled Worker sponsor, established graduate/entry hiring. No barriers.
 
-### Example 4: Defence/Security Company with Clearance Complexity (e.g. Palantir)
+**Q3 — Would the candidate grow?** Yes. Strong engineering culture, technically deep backend (Go, distributed systems, real-time financial processing at scale). Good mentorship signals. Clear engineering levels.
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Strong.** Known for hiring exceptional engineers and paying well. Engineering-led product development. |
-| Technical alignment | **Excellent.** Large-scale data infrastructure, distributed systems, analytical platforms. Assess against `projects.md`. |
-| Growth trajectory | **Strong.** Public company, growing revenue, actively hiring. |
-| Sponsorship likelihood | **Complex.** Large company with HR infrastructure, on the sponsor register. However, many roles require security clearance — check `personal.md` and `military.md` for clearance eligibility based on nationality and residency. Need to filter for roles that do not require clearance. |
-| Career ceiling | **High.** Clear engineering levels, competitive compensation, strong IC track. |
-| Stability | **High.** Profitable, public, diversified. |
+**Q4 — Engaging work?** Moderately. The backend infrastructure involves distributed systems and financial transaction processing — connecting to Nyquestro's domain. But it's consumer banking product infrastructure rather than pure systems/trading/compilers — the core domains the candidate is most passionate about. "Interesting enough, with excellent other factors" rather than "this is exactly what I want to build."
 
-**Grade: S** — Despite the security clearance complication, the overall profile is exceptional. Clearance is a job-level filter (some roles require it, some do not), not a company-level disqualifier.
+**Dimensions confirm:** Engineering reputation strong, technical alignment moderate (Go not Rust, banking not trading, but distributed systems at scale), growth strong, sponsorship guaranteed, career ceiling good.
 
-### Example 5: Top Quant Firm (e.g. XTX Markets)
+**Grade: A.** Three strong question answers, one moderate. Strong across dimensions except tech stack (Go) and domain (banking vs trading). The brand signal, sponsorship, and engineering depth make this solidly A. Not S because the domain isn't a core passion — but absolutely worth pursuing.
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Exceptional.** Tech-first market maker — technology is the product. Known for paying top-of-market and hiring the strongest engineers. |
-| Technical alignment | **Excellent.** Low-latency trading infrastructure, matching engines, data pipelines, ML for strategy. Assess against `projects.md` — if the portfolio includes trading systems or matching engine work, this is a near-perfect match. |
-| Growth trajectory | **Strong.** Profitable, expanding, actively hiring. |
-| Sponsorship likelihood | **High.** International team, on the sponsor register. |
-| Career ceiling | **Very high.** Quant-tech compensation is among the highest in the industry. Check against long-term targets in `preferences.toml`. |
-| Stability | **High.** Massively profitable. |
+### Example: Small Rust Startup with No Brand (→ B)
 
-**Grade: S** — One of the strongest possible matches if the candidate's portfolio includes relevant domain work. The only risk is that entry-level hiring is fiercely competitive.
+**Q1 — Proud to work here?** Mixed. Nobody outside the Rust community would know the name. But "I'm building a database engine in Rust" is a compelling story to tell, even without the company name carrying weight.
 
-### Example 6: AI Lab (e.g. Anthropic or equivalent)
+**Q2 — Could they hire and keep?** Uncertain. 15 employees, sponsorship capability unknown, may not have HR infrastructure for visa processing. Within the Graduate visa window they could hire, but what happens after August 2027?
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Exceptional.** Research lab with world-class engineers. |
-| Technical alignment | **Good-excellent.** ML infrastructure, distributed training systems, inference serving — all systems-level problems. Check `projects.md` for ML-adjacent work (RL implementations, ONNX experience, ML framework contributions). |
-| Growth trajectory | **Strong.** Well-funded, rapidly expanding. |
-| Sponsorship likelihood | **High.** International hiring is routine. |
-| Career ceiling | **Very high.** AI infrastructure engineering compensation is among the highest. |
-| Stability | **Good.** Well-funded. Market risk is low. |
+**Q3 — Would the candidate grow?** Potentially excellent. Small team with strong engineers means direct mentorship and high-impact work. But no career ladder, no structured progression, and the company's survival is uncertain.
 
-**Grade: S** — AI infrastructure is a strong match for a systems engineering profile with ML depth. Entry bar is high but payoff is exceptional.
+**Q4 — Engaging work?** Highly. Building a database engine in Rust — direct alignment with Nyquestro's systems work, Cernio's data layer, and Xyntra's compiler interests. The work itself is exactly what the candidate would choose to do for fun.
 
-### Example 7: OSS-First Infrastructure Company (e.g. Grafana Labs)
+**Dimensions:** Technical alignment excellent (Rust + database), engineering reputation unknown, growth uncertain, sponsorship uncertain, career ceiling limited by size.
 
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Strong.** Major OSS company. Engineering culture is core to company identity. |
-| Technical alignment | **Good.** Observability infrastructure — distributed systems, time-series databases, query engines, high-throughput data ingestion. Assess against `projects.md` and `skills.md`. |
-| Growth trajectory | **Strong.** Well-funded, growing rapidly. |
-| Sponsorship likelihood | **High.** Large global team, on the sponsor register. |
-| Career ceiling | **Good-high.** Engineering-led company with clear levels. Comp may be slightly below top-tier firms. |
-| Stability | **Good.** Revenue-generating, well-funded. |
-
-**Grade: A** — Strong across the board, with genuine technical alignment. Slightly lower comp ceiling and less direct domain overlap compared to S-tier keep it at A. Excellent first-job environment.
-
-### Example 8: Trading Infrastructure Consultancy (e.g. Adaptive Financial Consulting)
-
-| Dimension | Assessment |
-|-----------|-----------|
-| Engineering reputation | **Good.** Known in the trading infrastructure community. Technically strong team. |
-| Technical alignment | **Excellent.** Low-latency messaging, exchange connectivity, trading system infrastructure. Assess against `projects.md` for relevant domain work. |
-| Growth trajectory | **Moderate.** Established company, steady growth. Consulting model means revenue is project-dependent. |
-| Sponsorship likelihood | **Moderate.** Medium-sized company, consulting firms sometimes prefer candidates without sponsorship needs. |
-| Career ceiling | **Moderate.** Consulting company structure may limit IC progression compared to product companies. |
-| Stability | **Good.** Established, profitable. |
-
-**Grade: A** — Excellent technical alignment, but consulting model introduces career ceiling and growth trajectory concerns.
-
----
-
-## Boundary Cases
-
-These examples demonstrate where the grade boundary lies and why a company falls on one side rather than the other.
-
-### "Looks like an A but is actually a B" — Consumer Fintech
-
-**Why it looks like A:** Well-known fintech brand, engineering blog, large engineering team, confirmed sponsor, growing. Good CV signal.
-
-**Why it is B:** Technical alignment is moderate — engineering challenges are primarily application-layer (mobile banking, microservices, product features) rather than systems-level infrastructure. The tech stack is relevant but the day-to-day problems are not the kind of work the candidate's portfolio demonstrates deepest strength in (check `projects.md`).
-
-**The principle:** Brand recognition does not compensate for misaligned technical depth. An A-tier company needs strong technical alignment, not just strong reputation.
-
-### "Looks like a B but is actually an A" — Small Company with Perfect Technical Fit
-
-Imagine a 50-person company building infrastructure in the candidate's primary language (check `skills.md`), well-funded, with engineers from top firms, an active engineering blog, and a clear IC ladder.
-
-**Why it looks like B:** Small, relatively unknown, limited CV signal.
-
-**Why it is A:** Technical alignment is near-perfect. Engineering reputation is strong for its size. Growth trajectory is good. The only weakness is CV signal, which is a low-weight tiebreaker, not a high-weight driver.
-
-**The principle:** Company size and brand are tiebreakers, not primary drivers. A small company doing exactly the right technical work with strong engineers can outrank a large company doing tangentially relevant work.
-
-### "Looks like an S but is actually an A" — Large Consultancy with Tech Division
-
-**Why it looks like S:** Huge brand, definite sponsor, massive scale, good CV signal, stable.
-
-**Why it is A (or even B):** Engineering culture in a consultancy is fundamentally different from a product company. Engineering is a cost centre, not a profit centre. Career progression is on a consulting ladder, not an engineering ladder. The work may be technically interesting on some engagements and mind-numbing on others.
-
-**The principle:** Size, stability, and sponsorship do not override culture and alignment.
-
-### "Looks like a C but is actually a B" — Pre-revenue Startup with Exceptional Technical Fit
-
-A tiny startup building in the candidate's primary language and domain (check `projects.md` and `skills.md`), pre-revenue, seed-funded, with no sponsorship history.
-
-**Why it looks like C:** Tiny, no revenue, sponsorship unlikely, no career ladder, survival uncertain.
-
-**Why it is B:** Technical alignment is exceptional. The sponsorship weakness is real but mitigated by the current visa window (check `visa.md` — if there is time remaining on the current visa, the candidate can work here without sponsorship during that period). If the company survives, early employee signal is valuable.
-
-**The principle:** A company with exceptional technical alignment gets the benefit of the doubt at the B/C boundary.
-
----
-
-## Companies That Do Not Make the Cut
-
-Some companies should never enter the database. These are not C-tier (marginal but preserved) — they are excluded entirely because tracking them has zero expected value.
-
-| Reason | Examples | What to do |
-|--------|----------|-----------|
-| **Dead** | Website down, company dissolved, domain parked | Remove from potential.md with note "dead / dissolved" |
-| **Acquired and absorbed** | No separate hiring, careers redirect to parent | Remove. If the parent company is interesting, track the parent instead |
-| **No engineering team** | Purely sales, marketing, or business operations | Remove. "We're a tech company" on the website does not mean they have engineers |
-| **Completely unrelated work** | Interior design firm, restaurant chain, law firm | Remove. Sometimes name collisions with tech companies cause false positives in discovery |
-| **Too small to hire at candidate's level** | 3-5 person company with no funding | Remove. They are not going to hire someone who needs mentorship and onboarding |
-| **Excluded sector** | Check `preferences.toml` for hard exclusions | Remove. These are hard exclusions, not judgement calls |
-
-The distinction between "C-tier and archived" and "excluded entirely" matters for the database. C-tier companies have a row with grade='C' and status='archived' — they prevent re-discovery. Excluded companies are not inserted at all.
-
----
-
-## How Company Grade Interacts with Job Grade
-
-Company grade sets a monitoring priority. Job grade determines whether to apply. They are independent assessments — a B company can have an S job, and an S company can have an F job.
-
-| Scenario | Company Grade | Job Grade | Why it makes sense |
-|----------|:------------:|:---------:|-------------------|
-| Top company, perfect role | S | SS | The dream case. Apply immediately with maximum effort. |
-| Top company, wrong role | S | F | Great company hiring for a role outside the candidate's profile. Company is great, role is irrelevant. |
-| Risky company, perfect role | B | S | Small startup with a founding engineer role perfectly matching the portfolio. Company is uncertain but the role is exceptional for growth. |
-| Good company, mediocre role | A | C | Strong company with a legacy maintenance role. Company is good but the role is a dead end. |
-| Unknown company, strong technical role | B | A | Small company with a systems engineer role matching the candidate's skills. Company lacks brand signal but the role itself is technically excellent. |
-
-**The key insight:** Company grade determines whether jobs are fetched and shown to the user. Job grade determines whether to apply. A high company grade with no good roles wastes some search time but causes no harm. A low company grade that filters out a great role before it is ever seen is an unrecoverable loss. This is why the B/C boundary matters so much — it is the cutoff between "jobs are visible" and "jobs are invisible."
+**Grade: B.** The work alignment is exceptional but the practical factors (brand, sponsorship, stability) create real risk. Worth monitoring — if a role appears that's genuinely compelling, the technical fit might justify accepting the practical trade-offs. But not A because the risks are too significant for a first job.
 
 ---
 
 ## Evidence Standards
 
-Grade reasoning must be grounded in evidence you can actually find and verify. Different types of evidence have different reliability and availability.
+Grade reasoning must be grounded in evidence you can actually find and verify.
 
-### What to look for (and where)
+| Signal | Where to find it | If you can't find it |
+|--------|-----------------|---------------------|
+| Engineering reputation | GitHub, eng blog, conference talks, Glassdoor | "No public engineering signals" — weak negative but not conclusive |
+| Technical alignment | Website, product docs, job descriptions, eng blog | If unclear, note uncertainty |
+| Growth trajectory | Crunchbase, press releases, LinkedIn headcount | "Growth data unavailable" — do NOT assume declining |
+| Sponsorship | UK sponsor register, job listings, company size | Check register. Large companies usually sponsor even if not explicitly listed |
+| Career ceiling | Levels.fyi, Glassdoor, LinkedIn engineer profiles | Infer from size and structure |
 
-| Signal | Where to find it | Reliability | If you can't find it |
-|--------|-----------------|-------------|---------------------|
-| Engineering reputation | GitHub repos, engineering blog, conference talks, Glassdoor engineering reviews | High | Note "no public engineering signals found" — this is a weak negative signal but not conclusive |
-| Technical alignment | Company website, product docs, job descriptions, engineering blog posts | High | If the company's actual work is unclear from public sources, note the uncertainty |
-| Growth trajectory | Crunchbase, press releases, LinkedIn headcount, careers page job count | Moderate | Many private/profitable companies have no public growth data. Do NOT assume declining — say "growth data unavailable" |
-| Sponsorship | UK sponsor register (gov.uk), job listing text, company size | High (register), Moderate (inference) | Check the register. If not listed, note it but consider company size — large companies often sponsor even without being listed for the specific entity name |
-| Career ceiling | Levels.fyi, Glassdoor reviews, LinkedIn profiles of engineers, job ladder in descriptions | Moderate | If progression data is unavailable, infer from company size and structure |
-| Hiring activity | Careers page, ATS job count, LinkedIn Jobs | Moderate | "No visible open roles" is not the same as "not hiring" — many companies hire through referrals |
-
-### The golden rule
-
-**Absence of evidence is not evidence of absence.** A company with no public funding data might be bootstrapped and profitable. A company with no engineering blog might have excellent engineering culture internally. A company with no visible open roles might hire exclusively through referrals.
-
-Grade based on what you CAN find:
-- Positive evidence raises the grade
-- Negative evidence (layoffs, dissolved on Companies House, "we don't sponsor" in listings) lowers the grade
-- Absence of evidence is neutral — note it honestly but do not treat it as a negative signal
-
-The exception: if you cannot find enough evidence to form ANY confident assessment, say so. A grade with acknowledged thin evidence ("B — limited public information; graded on technical alignment alone, which appears moderate based on product description") is more honest than a confident grade based on nothing.
+**Absence of evidence is not evidence of absence.** A company with no public funding data might be bootstrapped and profitable. Grade on what you CAN find. Positive evidence raises the grade. Negative evidence lowers it. Absence is neutral.
