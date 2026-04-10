@@ -28,7 +28,10 @@ fn slug_candidates(name: &str) -> Vec<String> {
     candidates.push(no_punct.replace(' ', ""));
     candidates.push(no_punct.replace(' ', "-"));
 
-    // Strip common suffixes and try again.
+    // Strip common suffixes and try again. We try BOTH the raw lowercase
+    // form and the punctuation-stripped form, because real names like
+    // "Acme, Inc." don't end with exactly " inc" (they end with " inc.")
+    // and the bare strip_suffix would silently miss them.
     for suffix in &[
         " ltd", " limited", " inc", " incorporated", " corp", " corporation",
         " plc", " group", " holdings", " capital", " partners",
@@ -37,6 +40,10 @@ fn slug_candidates(name: &str) -> Vec<String> {
         " gmbh", " ag", " sa", " bv", " pty",
     ] {
         if let Some(stripped) = lower.strip_suffix(suffix) {
+            candidates.push(stripped.replace(' ', ""));
+            candidates.push(stripped.replace(' ', "-"));
+        }
+        if let Some(stripped) = no_punct.strip_suffix(suffix) {
             candidates.push(stripped.replace(' ', ""));
             candidates.push(stripped.replace(' ', "-"));
         }
@@ -397,16 +404,31 @@ mod tests {
     }
 
     #[test]
-    fn slug_commas_and_periods_merged() {
-        // "Acme, Inc." → the no-punct filter merges the comma out, giving
-        // "acme inc" which splits into "acmeinc" and "acme-inc". The trailing
-        // period on "Inc." prevents the " inc" suffix stripper from firing,
-        // so we do NOT get a bare "acme" candidate. This is a known gap
-        // tracked by this test — if the suffix stripper learns to handle
-        // trailing punctuation, update the expectation to include "acme".
+    fn slug_commas_and_periods_handled() {
+        // "Acme, Inc." should produce all three forms: the no-punct join
+        // ("acmeinc", "acme-inc") AND the bare "acme" produced by running
+        // the suffix stripper against the punctuation-cleaned form.
         let c = slug_candidates("Acme, Inc.");
         assert!(c.contains(&"acmeinc".to_string()), "got: {c:?}");
         assert!(c.contains(&"acme-inc".to_string()), "got: {c:?}");
+        assert!(c.contains(&"acme".to_string()), "got: {c:?}");
+    }
+
+    #[test]
+    fn slug_handles_other_trailing_punctuation_companies() {
+        // Real cases that motivated the fix.
+        let cases = [
+            ("Wise, Inc.", "wise"),
+            ("Stripe, Inc.", "stripe"),
+            ("Anthropic PBC.", "anthropic"),
+        ];
+        for (name, expected) in &cases {
+            let c = slug_candidates(name);
+            assert!(
+                c.contains(&expected.to_string()),
+                "{name:?} missing bare candidate {expected:?}, got: {c:?}"
+            );
+        }
     }
 
     // ─────────────────────────────────────────────────────────────

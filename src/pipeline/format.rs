@@ -314,8 +314,9 @@ fn strip_tags(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut in_tag = false;
     let mut quote_char: Option<char> = None;
+    let mut chars = text.chars().peekable();
 
-    for ch in text.chars() {
+    while let Some(ch) = chars.next() {
         if in_tag {
             match quote_char {
                 Some(q) if ch == q => quote_char = None,
@@ -327,8 +328,22 @@ fn strip_tags(text: &str) -> String {
                 None => {}
             }
         } else if ch == '<' {
-            in_tag = true;
-            quote_char = None;
+            // Only enter tag mode if this looks like an actual HTML tag.
+            // A real tag opener is followed by a letter (`<p>`), a forward
+            // slash (`</p>`), or a `!` (`<!--` for comments). Anything else
+            // — `x < 5`, `C# < Java`, `<<<>>>` — is left alone so we don't
+            // silently eat content from prose with unescaped angle brackets.
+            match chars.peek() {
+                Some(&next)
+                    if next.is_ascii_alphabetic() || next == '/' || next == '!' =>
+                {
+                    in_tag = true;
+                    quote_char = None;
+                }
+                _ => {
+                    result.push(ch);
+                }
+            }
         } else {
             result.push(ch);
         }
@@ -668,14 +683,28 @@ mod tests {
     }
 
     #[test]
-    fn strip_tags_eats_from_unmatched_lt() {
-        // A lone '<' with no matching '>' puts the parser into tag mode and
-        // consumes the rest of the input. This is the current behaviour and
-        // we rely on it elsewhere — pre-decoding of &lt;/&gt; in
-        // `format_description` ensures well-formed HTML reaches this function.
-        // Bad ATS payloads with unescaped angle brackets in prose will lose
-        // content, which is a known trade-off documented by this test.
-        assert_eq!(strip_tags("a < b"), "a ");
+    fn strip_tags_preserves_lone_lt_in_prose() {
+        // A `<` followed by a non-tag character (space, digit, another `<`)
+        // is preserved as plain text. This protects prose like "C# < Java"
+        // and "if x < 5 return" from being silently eaten.
+        assert_eq!(strip_tags("a < b"), "a < b");
+        assert_eq!(strip_tags("if x < 5"), "if x < 5");
+        assert_eq!(strip_tags("C# < Java"), "C# < Java");
+    }
+
+    #[test]
+    fn strip_tags_still_strips_real_tags() {
+        // The fix above must not regress normal tag stripping.
+        assert_eq!(strip_tags("<p>hi</p>"), "hi");
+        assert_eq!(strip_tags("<div class=\"x\">y</div>"), "y");
+        assert_eq!(strip_tags("<!-- comment -->after"), "after");
+    }
+
+    #[test]
+    fn strip_tags_lone_lt_followed_by_lt() {
+        // The `<<<>>>` pathological input: no `<` is followed by an alpha
+        // char, so all six characters survive.
+        assert_eq!(strip_tags("<<<>>>"), "<<<>>>");
     }
 
     #[test]
