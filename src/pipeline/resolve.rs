@@ -328,3 +328,319 @@ fn insert_portal(conn: &Connection, company_id: i64, result: &SlugProbeResult, i
         ],
     );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// TESTS
+// ══════════════════════════════════════════════════════════════════
+//
+// `slug_candidates` is pure and the single highest-leverage function in
+// the resolve pipeline — a bug here silently loses companies. We test
+// every transformation rule in isolation, then exercise invariants
+// across a realistic roster of company names drawn from the actual
+// Cernio database.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn contains_all(candidates: &[String], expected: &[&str]) {
+        for e in expected {
+            assert!(
+                candidates.iter().any(|c| c == e),
+                "missing candidate {e:?} in {candidates:?}"
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Basic space handling
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_basic_lowercase_no_spaces() {
+        let c = slug_candidates("Acme");
+        assert!(c.contains(&"acme".to_string()));
+    }
+
+    #[test]
+    fn slug_space_variants() {
+        let c = slug_candidates("Two Sigma");
+        contains_all(&c, &["twosigma", "two-sigma", "two_sigma"]);
+    }
+
+    #[test]
+    fn slug_three_words_hyphenated() {
+        let c = slug_candidates("Tower Research Capital");
+        // Multiple variants expected.
+        assert!(c.contains(&"towerresearchcapital".to_string()));
+        assert!(c.contains(&"tower-research-capital".to_string()));
+        // First-two-words variants.
+        assert!(c.contains(&"tower-research".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Punctuation stripping
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_punctuation_stripped() {
+        let c = slug_candidates("D.E. Shaw");
+        assert!(c.contains(&"deshaw".to_string()));
+        assert!(c.contains(&"de-shaw".to_string()));
+    }
+
+    #[test]
+    fn slug_ampersand_removed() {
+        let c = slug_candidates("Ben & Jerry");
+        // '&' is non-alphanumeric and gets stripped.
+        assert!(c.contains(&"benjerry".to_string()));
+    }
+
+    #[test]
+    fn slug_commas_and_periods_merged() {
+        // "Acme, Inc." → the no-punct filter merges the comma out, giving
+        // "acme inc" which splits into "acmeinc" and "acme-inc". The trailing
+        // period on "Inc." prevents the " inc" suffix stripper from firing,
+        // so we do NOT get a bare "acme" candidate. This is a known gap
+        // tracked by this test — if the suffix stripper learns to handle
+        // trailing punctuation, update the expectation to include "acme".
+        let c = slug_candidates("Acme, Inc.");
+        assert!(c.contains(&"acmeinc".to_string()), "got: {c:?}");
+        assert!(c.contains(&"acme-inc".to_string()), "got: {c:?}");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Suffix stripping
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_strips_inc() {
+        let c = slug_candidates("Widget Inc");
+        assert!(c.contains(&"widget".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_ltd() {
+        let c = slug_candidates("Thing Ltd");
+        assert!(c.contains(&"thing".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_technologies() {
+        let c = slug_candidates("XTX Technologies");
+        assert!(c.contains(&"xtx".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_gmbh() {
+        let c = slug_candidates("Helsing GmbH");
+        assert!(c.contains(&"helsing".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_corp() {
+        let c = slug_candidates("Acme Corp");
+        assert!(c.contains(&"acme".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_plc() {
+        let c = slug_candidates("Something PLC");
+        assert!(c.contains(&"something".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Suffix appending
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_appends_technologies() {
+        let c = slug_candidates("XTX");
+        assert!(c.contains(&"xtxtechnologies".to_string()));
+        assert!(c.contains(&"xtxtech".to_string()));
+    }
+
+    #[test]
+    fn slug_appends_hq_careers_jobs() {
+        let c = slug_candidates("Acme");
+        assert!(c.contains(&"acmehq".to_string()));
+        assert!(c.contains(&"acmecareers".to_string()));
+        assert!(c.contains(&"acmejobs".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // First word / initials
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_first_word_for_multiword() {
+        let c = slug_candidates("Helsing Defence");
+        assert!(c.contains(&"helsing".to_string()));
+    }
+
+    #[test]
+    fn slug_initials_acronym() {
+        let c = slug_candidates("XTX Markets");
+        // Initials: "xm"
+        assert!(c.contains(&"xm".to_string()));
+        // Full acronym for three words:
+        let c = slug_candidates("Tower Research Capital");
+        assert!(c.contains(&"trc".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Parentheticals
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_parenthetical_both_halves() {
+        let c = slug_candidates("Man Group (AHL)");
+        // Before paren
+        assert!(c.contains(&"mangroup".to_string()));
+        // Inside paren
+        assert!(c.contains(&"ahl".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Slashes
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_slash_first_and_second() {
+        let c = slug_candidates("Refinitiv / LSEG");
+        assert!(c.contains(&"refinitiv".to_string()));
+        assert!(c.contains(&"lseg".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Domain suffixes
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_strips_dot_co() {
+        let c = slug_candidates("Copper.co");
+        assert!(c.contains(&"copper".to_string()));
+    }
+
+    #[test]
+    fn slug_strips_dot_io_ai_com_dev() {
+        assert!(slug_candidates("Modal.com").contains(&"modal".to_string()));
+        assert!(slug_candidates("Anthropic.ai").contains(&"anthropic".to_string()));
+        assert!(slug_candidates("Heroku.dev").contains(&"heroku".to_string()));
+        assert!(slug_candidates("Tarball.io").contains(&"tarball".to_string()));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Deduplication and hygiene
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_no_duplicates() {
+        let c = slug_candidates("Acme");
+        let mut seen = std::collections::HashSet::new();
+        for s in &c {
+            assert!(seen.insert(s.clone()), "duplicate candidate: {s}");
+        }
+    }
+
+    #[test]
+    fn slug_no_empty_candidates() {
+        let c = slug_candidates("Acme");
+        for s in &c {
+            assert!(!s.is_empty(), "empty candidate in {c:?}");
+        }
+    }
+
+    #[test]
+    fn slug_all_lowercase() {
+        let c = slug_candidates("UPPERCASE Company Ltd");
+        for s in &c {
+            assert_eq!(*s, s.to_lowercase(), "non-lowercase candidate: {s}");
+        }
+    }
+
+    #[test]
+    fn slug_preserves_insertion_order_for_priority() {
+        // First candidate should be the no-space lowercase form, which is
+        // the most common successful slug across ATS providers.
+        let c = slug_candidates("Two Sigma");
+        assert_eq!(c[0], "twosigma");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Edge cases
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_single_word() {
+        let c = slug_candidates("Stripe");
+        assert!(c.contains(&"stripe".to_string()));
+        // Shouldn't produce empty candidates or panic.
+        assert!(!c.is_empty());
+    }
+
+    #[test]
+    fn slug_empty_input() {
+        let c = slug_candidates("");
+        // Empty input filtered out by the `!c.is_empty()` dedup pass.
+        // Appended suffixes survive though (e.g. "technologies").
+        for s in &c {
+            assert!(!s.is_empty());
+        }
+    }
+
+    #[test]
+    fn slug_single_character() {
+        let c = slug_candidates("X");
+        assert!(c.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn slug_unicode_accented() {
+        // We lowercase and filter to alphanumeric. Non-ASCII letters are
+        // alphanumeric so they're preserved in at least the no-punct variants.
+        let c = slug_candidates("Béziers");
+        // Must not panic and must produce SOMETHING.
+        assert!(!c.is_empty());
+    }
+
+    #[test]
+    fn slug_very_long_name() {
+        let name = "A".repeat(200);
+        let c = slug_candidates(&name);
+        assert!(!c.is_empty());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Realistic roster — verify we generate sensible candidates for
+    // a representative sample of actually-resolved Cernio companies.
+    // If any of these regress, real job searches will silently lose
+    // companies.
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn slug_realistic_roster() {
+        let expectations: &[(&str, &str)] = &[
+            ("XTX Markets", "xtxmarkets"),
+            ("Two Sigma", "twosigma"),
+            ("Jane Street", "janestreet"),
+            ("Citadel", "citadel"),
+            ("Palantir", "palantir"),
+            ("Stripe", "stripe"),
+            ("Anthropic", "anthropic"),
+            ("DeepMind", "deepmind"),
+            ("Bloomberg", "bloomberg"),
+            ("DRW", "drw"),
+            ("HRT", "hrt"),
+            ("Jump Trading", "jumptrading"),
+            ("Hudson River Trading", "hudsonrivertrading"),
+        ];
+        for (name, expected) in expectations {
+            let c = slug_candidates(name);
+            assert!(
+                c.contains(&expected.to_string()),
+                "{name:?} missing candidate {expected:?}, got: {c:?}"
+            );
+        }
+    }
+}
