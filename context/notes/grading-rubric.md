@@ -148,6 +148,61 @@ The 51 leaked jobs were archived after grading. The exclusion keywords are now a
 
 ---
 
+## Lifestyle and environment fit as part of the grading rubric (session 8, 2026-04-10)
+
+Added `profile/lifestyle-preferences.md` alongside distributed additions to `personal.md` (worldview, height, presentation), `visa.md` (mobility mindset and hard exclusions), `languages.md` (language-learning flexibility), `interests.md` (café work, evening walks, gym aspiration, frontier-tech-as-user), `preferences.toml` (positive/negative signals), and `portfolio-gaps.md` (Geographic Patterns section). When grading, read all of these alongside the existing profile files — the lifestyle signals are distributed on purpose so that no single file carries the whole picture, and so that an agent that misses one file still picks up most of the context from the others.
+
+### The coherence insight
+
+The lifestyle preferences are **correlated, not independent**. They all derive from a single underlying profile: *cosmopolitan modernist at the frontier* — someone who wants to live where humanity is visibly building the future, with the personal operating infrastructure (cafés, gyms, safe streets, integrated greenery) that supports high performance, in a culturally progressive environment that doesn't impose friction on how he lives day to day.
+
+**Consequence for grading:** do not score the lifestyle axes independently and sum them up. Look for **overall pattern match**. A city matching the overall profile well across several axes is a good fit even if one axis is weak. A city matching the profile on only one or two axes is a weak fit even if one of those axes scores very highly. This is a reasoning exercise, not an arithmetic one.
+
+**The underlying pattern in practice:**
+
+- "Modern" means *proximity to frontier technology*, not architectural taste. A beautiful historic city fails because the future doesn't arrive there first. A modern-looking city with weak tech adoption also fails partially.
+- Café culture, walks, and integrated greenery are *personal operating infrastructure*, not lifestyle luxuries — see `interests.md`. Cafés soothe ADHD focus, walks are decompression, green spaces are where Caner takes his laptop between work sessions. Unsafe streets invalidate all of these simultaneously, which is why safety is load-bearing across the whole pattern rather than being one axis among equals.
+- Nightlife and active social scenes are recreational access, not identity. Cities get credit for offering an active, vibrant after-hours scene, but they are not penalised for not forcing Caner into it. He's an engineer who wants the option on weekends, not a party-first lifestyle.
+- Secular, progressive, and integration-minded are one bundle — see the worldview field in `personal.md` and the integration mindset in `visa.md`.
+- Rigidity is physical, not ideological. Where Caner is inflexible (Amsterdam height, Jordaan low-rise scale, Croydon crime, Gulf religious backdrop), the friction is with the environment itself, not the idea of being there. Everywhere else he's flexible.
+
+### How to weave lifestyle fit into grading
+
+Lifestyle fit is a **low-to-medium weight factor** that sits alongside the primary dimensions of career ceiling, sponsorship viability, skill match, and company signal. Career still dominates — a top career opportunity in a lifestyle-imperfect city should grade above a mid opportunity in a lifestyle-perfect one.
+
+The grader's job is to **reason through the fit**, not to mechanically adjust grades. In practice this means:
+
+- **Read the profile files and form an overall impression of lifestyle fit** alongside the technical impression. "Is this role in a place where Caner would actually thrive?" is the question — the answer is not a number.
+- **Let that impression inform the grade** in the same way that "strong company signal" or "weak sponsorship track record" inform the grade: as one of several factors woven into the reasoning, not as a separate arithmetic adjustment.
+- **Pattern-match across the profile, not axis-by-axis.** Use the calibration anchors table in `lifestyle-preferences.md` as a reference point for how the whole package of axes interacts. A city that looks similar to "London Kings Cross" on the pattern is probably a good lifestyle fit; a city that looks similar to "London Croydon" is probably a poor one.
+- **Weave the observation into the assessment, don't bolt it on.** Good example: "Office is at Google Kings Cross — the mixed-scale regenerated district Caner explicitly calls the gold standard, with the rooftop atrium and integrated café culture. This is a strong environmental match that compounds the already-strong career fit." Bad example: "Lifestyle is A+, so adding half a tier."
+- **Flag mismatches explicitly.** If a mechanically strong role is in a city that fails several anti-preferences at once, the fit assessment should surface this so Caner can make an informed decision rather than being blindsided. The grader's job is to make the trade-off visible, not to hide it.
+
+### Known pitfalls to avoid
+
+1. **Do not re-recommend Amsterdam** or Jordaan-equivalent low-rise historic cities even when the mechanical firm fit is perfect. Optiver, IMC, and Flow Traders are top-tier matches on paper, but Amsterdam is explicitly excluded on aesthetic and physical-scale grounds. This was the case study that motivated the coherence insight — I made the mistake of recommending it once and should not repeat it.
+2. **Do not inflate grades for visa-blocked aesthetic-match cities.** Seattle, Toronto, and SF are aesthetic gold-standard fits, but the H-1B lottery (US) and Express Entry structural bias (Canada) make them low-probability outcomes. Grade on realistic expected value, not aspirational fit. Cross-reference `visa.md` before letting lifestyle fit pull the grade up.
+3. **Do not downgrade a top career opportunity on tertiary lifestyle axes alone.** A strong career fit in Singapore should not drop because the evening social scene is less lively than NYC.
+4. **Canary Wharf roles need specific nuance.** The distinction between "gold standard modern" (Nine Elms, Kings Cross) and "pure skyscraper canyon" (Canary Wharf) is real and was made explicitly by Caner. Do not conflate them — visually modern does not automatically mean lifestyle-fit.
+5. **Berlin's social scene should not be downgraded.** The user's stated answer dismissed German nightlife generally, but Berlin specifically has a significantly larger and more active after-hours scene than the rest of Germany — substantially more so than his stated answer implied.
+6. **Safety is load-bearing, not a tertiary axis.** If an office is in an actively unsafe area (current Croydon is the live calibration point — the user cannot walk there at night), this invalidates the entire personal-infrastructure stack simultaneously (evening walks, late-night café work, post-dinner decompression, gym at 10pm). Treat unsafe office areas as a meaningful negative factor in the assessment, not a small footnote.
+
+### Where the lifestyle signals live across the profile
+
+The distribution is deliberate — no single file carries all of it, so an agent that misses one file still picks up most of the context from the others:
+
+- `profile/lifestyle-preferences.md` — urban aesthetic, nightlife, safety, climate, calibration anchors (the content with no other natural home)
+- `profile/personal.md` — height, presentation, worldview (identity-level facts that happen to be grading-relevant)
+- `profile/interests.md` — café work, evening walks, gym, thunderstorms, frontier-tech-as-user (daily habits)
+- `profile/visa.md` — mobility mindset, integration mindset, hard exclusions from nationality
+- `profile/languages.md` — language-learning flexibility and the B2-German push as a closure opportunity
+- `profile/preferences.toml` — machine-readable positive/negative signals for the search pipeline
+- `profile/portfolio-gaps.md` — Geographic Patterns tier table and closure opportunities
+
+When grading, read at minimum: `preferences.toml` (hard filters), `lifestyle-preferences.md` (overall picture and calibration anchors), `personal.md` + `visa.md` (constraints), and cross-reference `interests.md` where daily-habit friction is relevant.
+
+---
+
 ## Session 7 grading run (2026-04-09)
 
 Full grading of 206 pending jobs (255 from automated search + 13 bespoke - duplicates and previously graded). Results:

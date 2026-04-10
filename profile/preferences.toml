@@ -94,6 +94,16 @@ positive_signals = [
     "modern-codebase",
     "rust-in-production",
     "technically-deep-team",
+    # Lifestyle and environment signals — see lifestyle-preferences.md
+    # for the full reasoning behind each of these. They modulate grades
+    # within tiers, they are not hard filters.
+    "modern-office-environment",       # Kings Cross, Canary Wharf, Paddington Basin-class
+    "mixed-scale-urban-district",      # Nine Elms gold standard: tall + small + green
+    "frontier-technology-exposure",    # Company works on cutting-edge, not legacy maintenance
+    "safe-nighttime-walkability",      # Neighbourhood Caner would feel safe walking home in at midnight
+    "cafe-dense-office-area",          # Multiple large laptop-friendly cafes within 5 min of the office
+    "serious-gym-infrastructure",      # City has premium gym options (Third Space-class)
+    "secular-public-culture",          # Low religious presence in daily public life
 ]
 
 # Signals that make a role less attractive (but not dealbreakers)
@@ -107,6 +117,13 @@ negative_signals = [
     "heavy-client-interfacing",
     "legacy-only-codebase",
     "crunch-culture",
+    # Lifestyle and environment negative signals
+    "isolated-suburban-office",        # Business park detached from urban life
+    "pure-skyscraper-canyon",          # Canary Wharf-style: no mixed scale, no integrated green
+    "unsafe-neighbourhood-after-dark", # Office in a high-crime area
+    "historic-only-low-rise-city",     # Pretty in photos, wrong for this profile to live in
+    "religion-heavy-public-culture",   # Gulf states, parts of US south
+    "technologically-lagging-city",    # Places where frontier tech arrives years late
 ]
 
 # ─────────────────────────────────────────────────────────────────

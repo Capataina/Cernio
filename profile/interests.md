@@ -1,9 +1,13 @@
 # Interests and Hobbies
 
-- **Strength training and hypertrophy** — full-body rotation across three distinct sessions, currently running a slow recomposition cut. Genuinely interested in the underlying physiology, recovery science, and programming theory.
-- **Boxing and Muay Thai** — training for practical self-defence, conditioning, and cardio rather than competition.
+- **Strength training and hypertrophy** — full-body rotation across three distinct sessions, currently running a slow recomposition cut. Genuinely interested in the underlying physiology, recovery science, and programming theory. Long-term aspiration is a **Third Space** membership in London once income allows — views it as one of the "modern establishments" worth investing in for both equipment quality and environment.
+- **Boxing and Muay Thai** — training for practical self-defence, conditioning, and cardio rather than competition. Does not require a serious martial arts scene in a city to be happy there.
+- **Working from cafés, coworking spaces, hotel lobbies, and libraries** — a core daily habit rather than an occasional thing. Large, air-conditioned, wifi-equipped cafés with plenty of seating are the preferred environment (Café Nero, Starbucks, Black Sheep Coffee). The background noise and ability to people-watch soothe ADHD/autism and aid focus rather than distract. This is the primary reason he bought a MacBook — portability and battery life to support café-based work sessions.
+- **Evening and between-session walks** — used as decompression and a form of "mindful cardio" rather than exercise proper. Particularly enjoys regenerated urban greenery (Nine Elms, Kings Cross, York's riverside walks) for these.
+- **Thunderstorms and harsh weather** — actively enjoys thunderstorms and misses them in London compared to Istanbul. Likes cold, snow, and dramatic weather generally. Not a factor in career decisions, but a real aesthetic preference.
 - **Game modding** — 18+ released mods across RimWorld, Minecraft, Terraria, and Escape from Tarkov, totalling over 150,000 combined downloads. The original outlet for the same drive that now produces systems projects: understanding and extending complex software at a low level.
 - **Cooking** — tactile, hands-on counterbalance to abstract software work.
 - **Traditional art** — drawing and painting as a creative practice.
 - **Reading** — currently working through Camus, Kafka, and Dostoevsky. Broader interest in philosophy, scientific writing, and explanations that go a layer deeper than the surface.
 - **Cross-disciplinary science** — mathematics, physics, biology, chemistry, particularly when concepts connect across domains.
+- **Experiencing frontier technology as a user** — actively wants to live somewhere that gets Waymo-style AVs, robotaxis, cutting-edge medical AI, and other frontier tech early. This is separable from wanting to *build* frontier tech and should be treated as a lifestyle preference that shapes which cities make him feel "not left behind."

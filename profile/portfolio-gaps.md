@@ -26,6 +26,61 @@
 - **Highlight existing tests in profile entries**: If tests exist (NeuroDrive passes `cargo test`), make them visible in the technical highlights. Don't undersell what already exists.
 - **Land a merged open source contribution**: The tinygrad PR was closed for line-count reasons. A merged contribution to any well-known project would be a significant signal. Bevy, ratatui, or reqwest are all projects already in the stack.
 
+## Geographic Patterns
+
+> This section tracks which cities and countries fit the profile best, combining **market fit** (what Caner can do well) with **visa accessibility** (what he can actually get hired into) with **lifestyle fit** (where he'd actually be happy — see `lifestyle-preferences.md`). Updated as geographic research and targeted grading surfaces new information.
+
+### Tier SS — top targets beyond London
+
+| City | Market fit | Visa | Lifestyle | Notes |
+|---|---|---|---|---|
+| **London (current)** | SS | Graduate visa until 08/2027, then Skilled Worker | A (Kings Cross / Nine Elms / Paddington; weak for Croydon-tier areas) | Primary track. Stripe intern, Graphcore, HRT/Jane Street grad programmes, Google KGX1 (aesthetic gold standard). |
+| **Dublin** | S | Critical Skills Employment Permit is genuinely friendly to fresh CS grads; €32k threshold; Stamp 4 after 2 years | B+ (good urban energy, weaker than London on scale, fine on café culture, fine on safety) | Stripe HQ, Susquehanna Dublin office, Fenergo. The most mechanically achievable non-UK move for this profile. |
+
+### Tier S — strong fit but with caveats
+
+| City | Market fit | Visa | Lifestyle | Notes |
+|---|---|---|---|---|
+| **Berlin** | A | EU Blue Card, ~€45k threshold, 21-33 months to PR, A2/B1 German is an asset | Good (Berlin's social scene is notably larger than the rest of Germany — worth re-evaluating if the city had been filed as uniformly restrained) | Trade Republic, N26, Solana Labs, Wayve. Worth re-visiting as a candidate destination. |
+| **Paris** | A | Talent Passport "Skilled Employee", €43k threshold, 4-year permit | C+ (aesthetic is historic-not-futuristic; Parisian café culture is hostile to laptop work) | **Hugging Face Paris is a near-perfect technical match** — the only Paris role where the career upside outweighs the lifestyle mismatch. Mistral AI, Datadog Paris as secondary targets. |
+| **Munich / Frankfurt** | B+ | Blue Card same as Berlin | C (historic-conservative; good gyms, weak nightlife, religion more visible than Berlin) | Apple Munich, Cerebras Munich, Citadel Frankfurt. Graduate-accessible at some firms but lifestyle friction is real. |
+
+### Tier A — feasible but harder
+
+| City | Market fit | Visa | Lifestyle | Notes |
+|---|---|---|---|---|
+| **Toronto** | A | Express Entry CRS scoring is structurally biased against fresh non-Canadian CS grads with no Canadian education, no family ties, no LMIA-backed offer. Realistic CRS without ties: 410-450; typical cutoffs: 470-500. PNP routes exist but require provincial connections. **Harder than initially described.** | A+ (aesthetic gold standard on high-rise density; Shopify/1Password culture fit) | Would be SS if the visa worked. Treat as a stretch goal. |
+| **Sydney / Melbourne** | B+ | Skilled Independent 189 (points-based), or employer-sponsored 482. Easier than US, harder than EU Blue Card. | A- (good aesthetic on Sydney CBD, good nightlife scene, serious gyms, safe) | Atlassian, Canva, IMC Sydney, Optiver Sydney. Timezone distance from European collaborators is the main friction. |
+| **Singapore** | S | Employment Pass is senior-skewed; fresh grad path is narrow. | A (modern, safe, serious gyms, strong tech adoption) but C (religious environment is moderate; nightlife is legally restricted; secular mostly) | **Optiver / IMC / Jane Street / Tower / HRT / Jump all have Singapore offices.** The realistic path is to land at Optiver Amsterdam (no — he's rejected Amsterdam) or IMC London and transfer in after 1-2 years. Direct fresh-grad applications are possible but selective. |
+| **Dubai / Abu Dhabi** | B | Golden Visa for tech workers, relatively straightforward | B+ on aesthetic (modern, futuristic, gold-standard high-rises) but D on religious environment (Gulf religious backdrop is a hard friction for an agnostic atheist) | Growing crypto/fintech scene. Tax advantages significant. Worth grading individual roles but not a strategic priority given cultural fit friction. |
+
+### Tier B — structurally hard visa or lifestyle mismatch
+
+| City | Why flagged |
+|---|---|
+| **SF / Seattle / NYC** | Aesthetically perfect (Seattle in particular), firms are a perfect match, but **H-1B lottery sub-30%** for non-US-grads is the dominant constraint. Apply anyway as stretch — especially to firms with internal immigration teams (Anthropic, Citadel, HRT, Jane Street, Stripe, Databricks) — but do not build the plan around it. |
+| **Zürich** | Swiss non-EU quota is ~8,500 permits/year for the entire country, employer must prove no EU candidate exists. Realistic only 2-3 years into career with seniority leverage. |
+| **Amsterdam** | **Explicitly rejected by Caner** on aesthetic (historic low-rise), body-scale (Dutch height average), and lifestyle mismatch. Do not recommend despite Optiver/IMC/Flow Traders being top-tier technical matches. Lesson: overrode the aesthetic fit when I first recommended it — don't repeat. |
+| **Tokyo / Hong Kong** | Visa is workable (HSP for Japan; various for HK) but the gap between international-firm English and daily-life Japanese/Cantonese is significant. Tokyo-based HFT offices (Optiver, Jane Street, HRT, IMC, Tower) hire non-Japanese speakers but the broader lifestyle is language-dependent. Worth considering as a post-experience transfer destination, not as a first move. |
+
+### Known blockers
+
+- **US security clearance** roles — Turkish nationality excludes. Affects defence, intelligence-adjacent, some trading infra.
+- **UK SC/DV clearance** roles — same exclusion. Affects Helsing, parts of Palantir UK, parts of BAE, Faculty AI's Defence wing.
+- **Canadian Express Entry without ties** — see Toronto row above. The points deficit without Canadian education/work/family is structural, not fixable with better applications.
+- **Switzerland non-EU quota** — see Zürich row above. Not practically addressable for an entry-level candidate.
+
+### Geographic closure opportunities
+
+These are concrete steps that would unlock whole geographies rather than individual jobs:
+
+1. **Push German from A2/B1 to B2** over the next 12-18 months. Unlocks a meaningful slice of Berlin, Munich, Frankfurt, Vienna, and Zürich roles that currently require German — without abandoning the English-first strategy. Low cost, high optionality.
+2. **Target a UK-based role at a firm with a strong international transfer programme** (Optiver London, IMC London, Citadel London, Jane Street London, Stripe London). This transforms Singapore/Tokyo/New York from "direct-apply lottery" into "internal transfer after 1-2 years," which is dramatically more realistic.
+3. **Build a C++ or OCaml presence in the portfolio** (already tracked in the skill-gaps section above). This has the side-effect of making the profile competitive at Jane Street (OCaml) and the German industrial software scene (C++ heavy) — unlocking cities as a secondary benefit.
+4. **Actively avoid building a portfolio that requires security clearance to use** — e.g. don't take an open-source contribution or side project in a domain that requires clearance-equivalent vetting for professional work (classified ML, defence embedded, certain crypto). The current portfolio is clean on this.
+
+---
+
 ## Patterns from Job Evaluations
 
 ### Batch: QRT (74 jobs), Rerun (3), Schonfeld (2), SingleStore (7), Squarepoint (39) — 2026-04-09
