@@ -14,3 +14,9 @@ toml = "0.8"
 ratatui = { version = "0.29", features = ["crossterm"] }
 chromiumoxide = "0.9"
 futures = "0.3"
+
+[dev-dependencies]
+proptest = "1.5"
+tempfile = "3.10"
+assert_cmd = "2.0"
+predicates = "3.1"

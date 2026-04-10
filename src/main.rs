@@ -1,11 +1,4 @@
-mod ats;
-mod autofill;
-mod config;
-mod db;
-mod http;
-mod pipeline;
-mod tui;
-
+use cernio::{ats, config, db, pipeline, tui};
 use db::Database;
 use std::path::Path;
 
@@ -352,9 +345,10 @@ async fn cmd_lever_detail(args: &[String]) {
 // ── TUI ──────────────────────────────────────────────────────────
 
 fn cmd_tui() {
-    let db_path = Path::new("state/cernio.db");
+    let db_path_string = db_path_from_env();
+    let db_path = Path::new(&db_path_string);
     if !db_path.exists() {
-        eprintln!("Database not found at state/cernio.db");
+        eprintln!("Database not found at {}", db_path.display());
         eprintln!("Run a session to populate the database first.");
         std::process::exit(1);
     }
@@ -367,10 +361,22 @@ fn cmd_tui() {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/// Resolve the database path, honouring the `CERNIO_DB_PATH` env var.
+///
+/// Defaults to `state/cernio.db` for normal operation. Tests override this
+/// env var to point at a temporary per-test database so they never touch the
+/// real one.
+fn db_path_from_env() -> String {
+    std::env::var("CERNIO_DB_PATH").unwrap_or_else(|_| "state/cernio.db".to_string())
+}
+
 fn open_db() -> Database {
-    let db_path = Path::new("state/cernio.db");
+    let db_path_string = db_path_from_env();
+    let db_path = Path::new(&db_path_string);
     if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent).expect("failed to create state/ directory");
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).expect("failed to create state/ directory");
+        }
     }
     Database::open(db_path).expect("failed to open database")
 }

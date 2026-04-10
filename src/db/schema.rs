@@ -25,7 +25,11 @@ impl Database {
     }
 
     /// Open an in-memory database for testing.
-    #[cfg(test)]
+    ///
+    /// Exposed to integration tests so they can build fresh, isolated databases
+    /// without touching the real filesystem. Runs migrations immediately.
+    #[doc(hidden)]
+    #[allow(dead_code)]
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
