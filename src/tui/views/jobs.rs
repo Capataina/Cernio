@@ -506,4 +506,90 @@ mod tests {
         let _ = text_utils::relative_date("not-a-date");
         assert_eq!(text_utils::relative_date("not-a-date"), "not-a-date");
     }
+
+    #[test]
+    fn test_format_relative_date_today() {
+        let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
+        assert_eq!(text_utils::relative_date(&today), "today");
+    }
+
+    #[test]
+    fn test_format_relative_date_yesterday() {
+        let y = (chrono::Local::now().date_naive() - chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(text_utils::relative_date(&y), "1 day ago");
+    }
+
+    #[test]
+    fn test_format_relative_date_under_week() {
+        let three_days = (chrono::Local::now().date_naive() - chrono::Duration::days(3))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(text_utils::relative_date(&three_days), "3 days ago");
+    }
+
+    #[test]
+    fn test_format_relative_date_one_week() {
+        let week = (chrono::Local::now().date_naive() - chrono::Duration::days(7))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(text_utils::relative_date(&week), "1 week ago");
+    }
+
+    #[test]
+    fn test_format_relative_date_two_weeks() {
+        let two_weeks = (chrono::Local::now().date_naive() - chrono::Duration::days(14))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(text_utils::relative_date(&two_weeks), "2 weeks ago");
+    }
+
+    #[test]
+    fn test_format_relative_date_truncates_iso_timestamp() {
+        // ISO timestamp with time portion should still parse on the date.
+        let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
+        let with_time = format!("{today}T15:30:00Z");
+        assert_eq!(text_utils::relative_date(&with_time), "today");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // truncate_chars
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_truncate_chars_short_string_unchanged() {
+        assert_eq!(text_utils::truncate_chars("hi", 10), "hi");
+        assert_eq!(text_utils::truncate_chars("", 10), "");
+    }
+
+    #[test]
+    fn test_truncate_chars_exact_length() {
+        assert_eq!(text_utils::truncate_chars("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_chars_truncates_with_ellipsis() {
+        let result = text_utils::truncate_chars("hello world", 7);
+        assert!(result.ends_with('…'));
+        // The ellipsis counts as one character; max=7 → 6 chars + ellipsis.
+        assert_eq!(result.chars().count(), 7);
+    }
+
+    #[test]
+    fn test_truncate_chars_handles_unicode_safely() {
+        // Each character is multi-byte but truncation is by char count.
+        let input = "日本語のテストです"; // 9 chars
+        let result = text_utils::truncate_chars(input, 5);
+        assert_eq!(result.chars().count(), 5);
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_truncate_chars_emoji() {
+        // Emoji are single chars (from char count perspective).
+        let input = "🌸🌷🌹🌺🌻🌼";
+        let result = text_utils::truncate_chars(input, 4);
+        assert_eq!(result.chars().count(), 4);
+    }
 }
