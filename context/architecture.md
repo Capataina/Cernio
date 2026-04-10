@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-09 (session 6). 408 companies (287 resolved, 121 bespoke, 0 potential), 937 jobs. All 167 potential companies resolved — 0 remaining. Exclusion keyword purge deleted 1,064 jobs. New `cernio format` pipeline command (HTML→plaintext). Autofill system scaffolded (Chrome CDP via chromiumoxide — launches but React form filling broken). `application_packages` DB table + `prepare-applications` skill. TUI: `o` auto-marks applied, `p` launches autofill, `●` package indicator. 7 ATS fetchers, 6 pipeline scripts, 9 skills, 6 DB migrations.
+> Last updated: 2026-04-09 (session 7). 408 companies, 1184 jobs (484 graded non-archived, 0 pending). Profile scrape rewrote projects.md (honest tiers: Nyquestro→Notable, Aurix→Notable), resume.md, cover-letter.md. Job search: 255 new + 13 bespoke (Citadel, Bloomberg, Google, Apple, Arm). Full grading run: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Added Sr./Lead exclusion keywords (51 jobs archived). TUI v5: major modularisation (app.rs→6 files, handler.rs→4 files, views/mod.rs→3 files), 5 views (new Activity Timeline tab), dashboard overhaul (heatmap, search pulse, visa countdown, top companies leaderboard), quick-peek popup, breadcrumb nav, smart grouping, contextual status bar. 26 TUI source files, 7 ATS fetchers, 6 pipeline scripts, 9 skills, 6 DB migrations.
 
 ---
 
@@ -60,7 +60,7 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 | HTTP | Reqwest | In use — ATS API calls across 6 providers (incl. Workday) |
 | Serialisation | Serde | In use — JSON (ATS responses), TOML (config) |
 | Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed config structs |
-| TUI | Ratatui 0.29 + Crossterm backend | v4 implemented — 4 views (dashboard, companies, jobs, pipeline), multi-select, search/filter, sort, export, mouse support, responsive layout, widget refactor |
+| TUI | Ratatui 0.29 + Crossterm backend | v5 implemented — 5 views (dashboard, companies, jobs, pipeline, activity), modular architecture (26 source files), heatmap, search pulse, visa countdown, quick-peek, breadcrumbs, smart grouping, contextual status bar, session timer |
 | Browser automation | `chromiumoxide` (Chrome CDP) + `futures` | Scaffolded — Chrome launches, navigates; form filling broken on React forms |
 | AI layer | Claude Code skills (conversational invocation) | 9 skills with mandatory-read blocks enforced on all skills. check-integrity has 3 reference files (remediation-guide, quality-standards, profile-context) |
 
@@ -98,18 +98,31 @@ cernio/
 │   │   ├── check.rs            # cernio check — integrity report
 │   │   ├── import.rs           # cernio import — bulk import from external sources
 │   │   └── format.rs           # cernio format — HTML/entity-encoded descriptions → clean plaintext
-│   └── tui/
+│   └── tui/                    # 26 source files, v5
 │       ├── mod.rs              # Terminal setup/teardown, event loop
-│       ├── app.rs              # App state, View/Focus enums, data models, navigation, multi-select, search, sort
-│       ├── handler.rs          # Key event dispatch — global + view/focus-specific + mouse handling
-│       ├── theme.rs            # Semantic ANSI colour palette
-│       ├── queries.rs          # DB read queries (companies, jobs, stats, top matches, pipeline)
+│       ├── app/                # App state (modularised from single app.rs)
+│       │   ├── mod.rs          # App struct, new(), refresh(), entry point
+│       │   ├── state.rs        # View/Focus/SortMode enums, App fields, ActivityEntry
+│       │   ├── navigation.rs   # View switching, selection, drill-down, scroll
+│       │   ├── actions.rs      # User actions (decisions, export, URL open, grade override)
+│       │   ├── pipeline.rs     # Pipeline-specific state management
+│       │   └── cleanup.rs      # Database cleanup confirmation and execution
+│       ├── handler/            # Event handling (modularised from single handler.rs)
+│       │   ├── mod.rs          # Top-level event dispatch
+│       │   ├── navigation.rs   # Key-based navigation (j/k/g/G/Tab/1-5)
+│       │   ├── overlays.rs     # Help, grade picker, search bar input
+│       │   └── mouse.rs        # Click, scroll, multi-select mouse events
+│       ├── theme.rs            # Semantic ANSI colour palette + freshness/activity/badge styles
+│       ├── queries.rs          # DB read queries (companies, jobs, stats, pipeline, activity, heatmap)
 │       ├── views/
-│       │   ├── mod.rs          # Draw dispatcher, tabs, status bar, help overlay, search bar, grade picker, toast
-│       │   ├── dashboard.rs    # Stats overview — dynamic sizing, session summary, scrollable top roles
+│       │   ├── mod.rs          # Draw dispatcher, view routing
+│       │   ├── chrome.rs       # Tab bar, status bar, breadcrumbs, session timer
+│       │   ├── overlays.rs     # Help overlay, search bar, grade picker, toast, quick-peek popup
+│       │   ├── dashboard.rs    # Stats, heatmap, search pulse, visa countdown, top companies, session diff
 │       │   ├── companies.rs    # Company table + detail with full job list, grade bars, sort
-│       │   ├── jobs.rs         # Job table + detail with full descriptions, description indicator
-│       │   └── pipeline.rs     # Kanban/pipeline view — 3 columns (Watching/Applied/Interview), card rendering
+│       │   ├── jobs.rs         # Job table + detail, description indicator, new badges, smart grouping
+│       │   ├── pipeline.rs     # Kanban view — 3 columns, one-line cards, scrollbar, spinners
+│       │   └── activity.rs     # Activity Timeline tab (5th view)
 │       └── widgets/
 │           ├── mod.rs
 │           ├── grade_bar.rs    # Proportional grade bar (reused in dashboard + company detail)
@@ -355,11 +368,13 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 
 ## Structural Notes / Current Reality
 
-**End of session 6 (2026-04-09).** Exclusion keyword purge deleted 1,064 jobs (DB: 2,001→937). All 167 potential companies resolved via 8 parallel agents (64 resolved to ATS, 98 bespoke, 5 dead/duplicate removed). New `cernio format` command converts HTML descriptions to plaintext (922 formatted, runs on TUI startup). Autofill system scaffolded: `src/autofill/` with Chrome CDP via chromiumoxide — launches correctly but React form filling broken (needs nativeInputValueSetter or CDP Input.insertText). `application_packages` DB table (migration 006) stores pre-generated answers as JSON. `prepare-applications` skill generates tailored answers. TUI: `o` auto-marks applied, `p` launches autofill, yellow `●` package indicator. Dead companies removed (Eisler, Nivaura, OpenSSF, Qatalog, Oxbotica duplicate).
+**End of session 7 (2026-04-09).** Profile scrape found major discrepancies — Nyquestro only has type system implemented, Aurix only Tab 1. projects.md rewritten with honest entries, resume.md and cover-letter.md rebuilt. Nyquestro downgraded from Flagship to Notable, Aurix from Flagship to Notable. Job search: 255 new jobs from `cernio search` + 13 bespoke from S/A-tier companies (Apple, Citadel, Bloomberg, Google, Arm, Mastercard, Amazon). Full grading run: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Added "Sr.", "Sr ", "Lead" to exclusion keywords — 51 leaked senior jobs archived. 39 bespoke companies marked as searched. DB: 408 companies, 1184 jobs (484 graded non-archived), 0 pending.
+
+**TUI v5 overhaul (session 7):** Major modularisation — `app.rs` (1,112 lines) split into `app/` directory (6 files), `handler.rs` (490 lines) into `handler/` (4 files), `views/mod.rs` (438 lines) into 3 files (mod.rs, chrome.rs, overlays.rs). New 5th view: Activity Timeline. Dashboard enhancements: GitHub-style activity heatmap, search pulse with freshness colouring, application progress bar, visa countdown with urgency colours, top companies leaderboard, session welcome diff. View enhancements: one-line kanban cards, viewport scrolling with scrollbars, animated spinners (◐◑◒◓), fit assessment structured rendering (Q1-Q5), quick-peek popup (Space), breadcrumb navigation, "New" badges (magenta ●), smart job grouping (Ctrl+G). Chrome: contextual status bar, coloured tab badges, session timer, URL preview, decision history indicator, enhanced help overlay (6 sections). Filter fixes: focus mode (f) hides F/C + applied, D key archives F jobs immediately.
 
 | Component | Status |
 |-----------|--------|
-| Profile (15 files) | Fully populated. Project tiers added (Flagship/Notable/Minor). Portfolio-gaps.md actively maintained by grading agents. |
+| Profile (15 files) | Fully populated. Session 7: profile-scrape found major discrepancies, projects.md rewritten with honest entries (Nyquestro Notable, Aurix Notable), resume.md rebuilt (verified with tectonic), cover-letter.md rebuilt. Project tiers (Flagship/Notable/Minor). Portfolio-gaps.md actively maintained. |
 | SQLite schema | 5 tables, 6 migrations (001 base, 002 archived status, 003 job archival, 004 last_searched_at, 005 archived_at, 006 application_packages), 18 tests passing, WAL mode |
 | Config (`src/config.rs`) | TOML parser for `preferences.toml` — search filters, cleanup config, location patterns |
 | ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. All fetchers use `get_with_retry`. Attribute-aware HTML stripping. |
@@ -380,14 +395,14 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | grade-companies skill | Enriches + grades: writes `what_they_do` (3-5 sentences), `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`. Calibration-anchored grading. |
 | grade-jobs skill | Question-first rubric, project tier awareness, calibration-anchored grading, mandatory description citation, prioritisation guide |
 | Company universe | 408 total (287 resolved, 121 bespoke, 0 potential). ATS: 114 Greenhouse, 70 Ashby, 31 Workable, 26 Lever, 20 Workday, 8 SmartRecruiters, 1 Eightfold. Every company has a known path to job discovery. |
-| Jobs | 937 jobs (after exclusion purge of 1,064). Every SS/S assessment is multi-paragraph with description citations. |
-| TUI (`src/tui/`, 14 files) | v4 — 4 views (dashboard, companies, jobs, pipeline). Dynamic grade bars, 18-char provider column, 4-digit job counts. Tiered cleanup via D key. Bespoke search tracking in dashboard. `o` auto-marks applied. `p` launches autofill. Yellow `●` package indicator. |
+| Jobs | 1184 jobs (484 graded non-archived, 0 pending). Full grading: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Every SS/S assessment is multi-paragraph with description citations. |
+| TUI (`src/tui/`, 26 files) | v5 — 5 views (dashboard, companies, jobs, pipeline, activity). Modularised: app/ (6 files), handler/ (4 files), views/ (8 files), widgets/ (5 files) + mod.rs, queries.rs, theme.rs. Dashboard: heatmap, search pulse, visa countdown, top companies, session diff. Views: one-line kanban cards, scrollbars, spinners, quick-peek (Space), breadcrumbs, new badges, smart grouping (Ctrl+G). Chrome: contextual status bar, session timer, coloured tab badges, URL preview, decision history, enhanced help (6 sections). Focus mode hides F/C + applied. D archives F immediately. |
 | Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
 | Unarchive | `cernio unarchive --jobs [--grade G]` restores archived jobs with timer reset |
 
 **Next priorities:**
 1. Fix autofill React form filling (nativeInputValueSetter or CDP Input.insertText)
-2. Bespoke search S/A companies (Apple, Arm, Citadel, D.E. Shaw, Two Sigma, Google, etc.)
-3. Interview prep skill design and implementation
-4. Second integrity check after bespoke companies are searched
-5. Add Lever and Ashby autofill modules once Greenhouse works
+2. Interview prep skill design and implementation
+3. Integrity check after session 7 grading
+4. Add Lever and Ashby autofill modules once Greenhouse works
+5. Next job search cycle (periodic re-search of resolved companies)

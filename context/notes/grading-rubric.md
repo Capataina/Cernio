@@ -135,3 +135,32 @@ All jobs (712), user decisions (120), and company metadata wiped. The 273 compan
 Deleted 1,064 jobs matching exclusion keywords from the database (both active and archived). The DB went from ~2,001 to 937 jobs. This was a bulk retroactive application of the 34 exclusion keywords added in session 5 — the keywords had only been applied to new search results, not to the existing corpus.
 
 Also in session 6: all 167 potential companies were resolved via 8 parallel agents. 64 resolved to supported ATS, 98 marked bespoke with careers URLs, 5 dead/duplicate archived then deleted (Eisler Capital shut down, Nivaura acquired, OpenSSF podcast not employer, Qatalog acquired by ClickUp, Oxbotica duplicate of Oxa). Final company count: 408 (287 resolved, 121 bespoke, 0 potential).
+
+---
+
+## New exclusion keywords: Sr./Lead (session 7, 2026-04-09)
+
+Added "Sr.", "Sr ", and "Lead" to the exclusion keyword list. These were missing from the original 34 keywords, causing 51 senior/lead-level jobs to leak through the search filter and appear as pending jobs.
+
+**Evidence for exclusion:** After grading all 206 pending jobs, zero senior/lead roles received B+ or higher grades. Every single one was graded B or below because the seniority requirements (typically 3-8 years experience) are incompatible with the profile's 1 year of professional experience. These roles waste grading tokens and clutter the pipeline.
+
+The 51 leaked jobs were archived after grading. The exclusion keywords are now applied during `cernio search` so future search runs will filter them out before insertion.
+
+---
+
+## Session 7 grading run (2026-04-09)
+
+Full grading of 206 pending jobs (255 from automated search + 13 bespoke - duplicates and previously graded). Results:
+
+| Grade | Count | % |
+|-------|-------|---|
+| SS | 13 | 2.7% |
+| S | 27 | 5.6% |
+| A | 70 | 14.4% |
+| B | 142 | 29.2% |
+| C | 20 | 4.1% |
+| F | 212 | 43.7% |
+
+Notable SS additions: Citadel Graduate Programme, Bloomberg 2026 SWE, Google Graduate 2026. The bespoke search for 39 S/A-tier companies yielded 13 jobs — these tend to be higher quality because the companies were pre-screened.
+
+DB state post-session: 408 companies, 1184 jobs (484 graded non-archived), 0 pending.

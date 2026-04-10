@@ -1,6 +1,6 @@
 # TUI System
 
-> Last updated: 2026-04-09 (session 6). v4 with autofill integration — `o` auto-marks applied, `p` launches autofill from application_packages, yellow `●` package indicator in jobs view. `cernio format` runs silently on TUI startup.
+> Last updated: 2026-04-09 (session 7). v5 with modular architecture (26 source files), 5 views, dashboard overhaul (heatmap, search pulse, visa countdown), quick-peek popup, breadcrumbs, smart grouping, contextual status bar, activity timeline tab.
 
 ---
 
@@ -17,33 +17,56 @@ Reads from SQLite (auto-refreshing every 2 seconds) and writes user decisions ba
 ### Module structure
 
 ```
-src/tui/
-├── mod.rs              # Terminal setup/teardown, event loop
-├── app.rs              # App state, View/Focus/SortMode enums, multi-select, search state
-├── handler.rs          # Key + mouse event dispatch, bulk actions
-├── theme.rs            # Semantic ANSI colour palette
-├── queries.rs          # DB queries (companies, jobs, stats, pipeline data)
+src/tui/                          # 26 source files
+├── mod.rs                        # Terminal setup/teardown, event loop
+├── app/                          # App state (modularised from monolithic app.rs)
+│   ├── mod.rs                    # App struct, new(), refresh(), entry point
+│   ├── state.rs                  # View/Focus/SortMode enums, App fields, ActivityEntry
+│   ├── navigation.rs             # View switching, selection, drill-down, scroll
+│   ├── actions.rs                # User actions (decisions, export, URL open, grade override)
+│   ├── pipeline.rs               # Pipeline-specific state management
+│   └── cleanup.rs                # Database cleanup confirmation and execution
+├── handler/                      # Event handling (modularised from monolithic handler.rs)
+│   ├── mod.rs                    # Top-level event dispatch
+│   ├── navigation.rs             # Key-based navigation (j/k/g/G/Tab/1-5)
+│   ├── overlays.rs               # Help, grade picker, search bar input
+│   └── mouse.rs                  # Click, scroll, multi-select mouse events
+├── theme.rs                      # Semantic ANSI colour palette + freshness/activity/badge styles
+├── queries.rs                    # DB read queries (companies, jobs, stats, pipeline, activity, heatmap)
 ├── views/
-│   ├── mod.rs          # Draw dispatcher, tabs, status bar, help, search bar, grade picker, toast
-│   ├── dashboard.rs    # Dynamic stats, session summary, scrollable top roles
-│   ├── companies.rs    # Company table + detail with full job list and sort
-│   ├── jobs.rs         # Job table + detail with full descriptions
-│   └── pipeline.rs     # Kanban view — 3 columns, card rendering
+│   ├── mod.rs                    # Draw dispatcher, view routing
+│   ├── chrome.rs                 # Tab bar, status bar, breadcrumbs, session timer, URL preview
+│   ├── overlays.rs               # Help overlay, search bar, grade picker, toast, quick-peek popup
+│   ├── dashboard.rs              # Stats, heatmap, search pulse, visa countdown, top companies, session diff
+│   ├── companies.rs              # Company table + detail with full job list, grade bars, sort
+│   ├── jobs.rs                   # Job table + detail, description indicator, new badges, smart grouping
+│   ├── pipeline.rs               # Kanban view — 3 columns, one-line cards, scrollbar, spinners
+│   └── activity.rs               # Activity Timeline (5th view)
 └── widgets/
     ├── mod.rs
-    ├── grade_bar.rs    # Proportional grade bar (shared across views)
-    ├── text_utils.rs   # clean_description, relative_date, truncate_chars
-    ├── toast.rs        # Ephemeral notifications
-    └── layout.rs       # distribute() for dynamic block sizing
+    ├── grade_bar.rs              # Proportional grade bar (reused in dashboard + company detail)
+    ├── text_utils.rs             # clean_description, relative_date, truncate_chars
+    ├── toast.rs                  # Ephemeral notifications
+    └── layout.rs                 # distribute() for dynamic block sizing
 ```
+
+### Modularisation rationale (session 7)
+
+Three monolithic files were split into directories:
+
+| Original | Lines | Split into | Rationale |
+|----------|-------|------------|-----------|
+| `app.rs` | 1,112 | `app/` (6 files) | State, navigation, actions, pipeline, cleanup were distinct concerns tangled in one file |
+| `handler.rs` | 490 | `handler/` (4 files) | Navigation keys, overlay keys, and mouse events had no shared state |
+| `views/mod.rs` | 438 | `mod.rs` + `chrome.rs` + `overlays.rs` | Chrome (tabs, status bar) and overlays (help, search, grade picker) were independent rendering concerns |
 
 ### What the TUI owns
 
 - Terminal lifecycle (raw mode, alternate screen, cursor)
 - View rendering and navigation state
 - Key and mouse event handling and dispatch
-- Semantic theme (ANSI colour mapping)
-- DB read queries for display
+- Semantic theme (ANSI colour mapping + freshness/activity/badge styles)
+- DB read queries for display (including activity heatmap and timeline data)
 - Writing user decisions to `user_decisions` table
 - Markdown export of current view
 - Pipeline kanban state (watching/applied/interview columns)
@@ -54,6 +77,10 @@ src/tui/
 - Autofill launch (spawns `src/autofill/` with package data)
 - Auto-marking applied on URL open (`o` key)
 - Running `cernio format` silently on startup
+- Activity heatmap and timeline rendering
+- Session timer display
+- Quick-peek popup rendering
+- Smart job grouping by company
 
 ### What the TUI does not own
 
@@ -77,25 +104,27 @@ Crossterm is re-exported through ratatui — no separate dependency needed. Also
 ### Layout
 
 ```
-┌─ cernio ─── Dashboard │ Companies │ Jobs │ Pipeline ────────────────┐
+┌─ cernio ─── Dashboard │ Companies │ Jobs │ Pipeline │ Activity ────────┐
+│  breadcrumb: Dashboard > ...                                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  Content area — varies by active view:                                  │
 │                                                                         │
-│  Dashboard:  dynamic stats blocks, session summary, scrollable top      │
-│              roles, grade distribution bars, pipeline health, ATS       │
-│              coverage — two-column grid with dynamic block sizing       │
+│  Dashboard:  heatmap, search pulse, visa countdown, top companies,     │
+│              application progress, session diff, grade distribution,   │
+│              pipeline health, ATS coverage — dynamic block grid        │
 │                                                                         │
 │  Companies:  40% list / 60% detail (responsive)                         │
-│  Jobs:       45% list / 55% detail (responsive)                         │
-│  Pipeline:   3-column kanban (Watching / Applied / Interview)           │
+│  Jobs:       45% list / 55% detail (responsive), smart grouping        │
+│  Pipeline:   3-column kanban, one-line cards, scrollbars, spinners     │
+│  Activity:   Activity timeline with scroll                              │
 │                                                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
-│ j/k navigate  Tab detail  /search  s sort  ? help  q quit              │
+│ j/k navigate  Tab detail  /search  s sort  ? help  q quit    00:12:34 │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-Three layers: tab bar (3 rows), content area (fills remaining), status bar (1 row).
+Four layers: tab bar with coloured badges (3 rows), breadcrumb trail (1 row), content area (fills remaining), contextual status bar with session timer (1 row).
 
 ### Responsive layout
 
@@ -109,12 +138,24 @@ Terminal width determines layout mode:
 
 ### Views
 
-| View | Content | Layout |
-|------|---------|--------|
-| **Dashboard** | Dynamic stats blocks, session summary (from `state/tui-summary.md`), scrollable top roles (all SS/S/A), grade distribution bars, pipeline health, ATS coverage | Dynamic block sizing, two-column grid |
-| **Companies** | Table: grade, name, status, job count, ATS. Detail: description, grade reasoning, relevance, full job list (all jobs), grade bars | 40% list / 60% detail, responsive |
-| **Jobs** | Table: grade, title, company, location, decision, description indicator (✓/·), package indicator (yellow `●` in "P" column). Detail: full description with HTML cleanup, fit assessment, URL | 45% list / 55% detail, responsive |
-| **Pipeline** | Kanban: 3 columns (Watching / Applied / Interview). Cards show grade + title + company. Movement with `w`/`a`/`i` keys. Mouse click and scroll | 3-column layout |
+| View | Tab | Content | Key features |
+|------|-----|---------|--------------|
+| **Dashboard** | `1` | Stats, heatmap, search pulse, visa countdown, top companies, application progress, session diff, grade distribution, pipeline health, ATS coverage | GitHub-style 7×12 heatmap, freshness-coloured search pulse, urgency-coloured visa countdown, top 5 companies by SS+S+A count, "Since last session: +N jobs..." |
+| **Companies** | `2` | Table: grade, name, status, job count, ATS. Detail: description, grade reasoning, relevance, full job list, grade bars | 40% list / 60% detail, responsive |
+| **Jobs** | `3` | Table: grade, title, company, location, decision, description indicator (✓/·), package indicator (●). Detail: full description, fit assessment (Q1-Q5 structured), URL | New badges (magenta ●), smart grouping by company (Ctrl+G), quick-peek popup (Space), scrollbar indicators |
+| **Pipeline** | `4` | Kanban: 3 columns (Watching / Applied / Interview). One-line cards with grade + title + company. Movement with `w`/`a`/`i` keys | Animated spinners (◐◑◒◓) for pending/evaluating, viewport scrolling with scrollbars, decision history trail |
+| **Activity** | `5` | Chronological activity timeline with scroll | New in session 7 |
+
+### Dashboard components (session 7)
+
+| Component | Description | Visual |
+|-----------|-------------|--------|
+| **Activity heatmap** | GitHub-style 7×12 grid showing daily activity density | Colour-coded cells by activity count |
+| **Search pulse** | "search: Xh ago" showing time since last `cernio search` | Freshness colours: green (<24h) → yellow (1-3d) → red (>3d) → dim (>7d) |
+| **Application progress** | "Applied: ██████░░░░ 22/110" progress bar | Visual bar of applied vs total watchable jobs |
+| **Visa countdown** | "visa: 487d" with urgency colouring | Green (>365d) → yellow (180-365d) → red (<180d) |
+| **Top companies** | Top 5 companies ranked by SS+S+A job count | Leaderboard with hit counts |
+| **Session diff** | "Since last session: +N jobs, +N companies, +N decisions" | Shows what changed since TUI last opened |
 
 ### Colour strategy
 
@@ -145,6 +186,11 @@ Semantic colour assignments:
 | **Focused border** | Cyan |
 | **Unfocused border** | Dark gray |
 | **Headers** | Cyan, bold |
+| **Freshness green** | Green (fresh search/data) |
+| **Freshness yellow** | Yellow (aging search/data) |
+| **Freshness red** | Red (stale search/data) |
+| **Badge hot** | Magenta (new job badges) |
+| **Countdown urgent** | Red (visa <180d) |
 
 ### Navigation
 
@@ -156,7 +202,7 @@ Semantic colour assignments:
 | `Enter`/`l`/`→` | Drill into company → show its jobs |
 | `Esc`/`h`/`←` | Go back |
 | `Tab` | Toggle focus between list and detail |
-| `1` `2` `3` `4` | Switch view: Dashboard / Companies / Jobs / Pipeline |
+| `1` `2` `3` `4` `5` | Switch view: Dashboard / Companies / Jobs / Pipeline / Activity |
 | `w` | Mark watching |
 | `a` | Mark applied |
 | `x` | Mark rejected |
@@ -164,17 +210,20 @@ Semantic colour assignments:
 | `o` | Open URL in browser **and auto-mark as applied** |
 | `p` | Launch autofill (reads application_package from DB, opens Chrome with pre-filled form) |
 | `y` | Copy URL to clipboard (pbcopy) |
+| `Space` | Quick-peek popup (job detail overlay without leaving list) |
 | `/` | Search/filter (vim-style, instant matching) |
 | `s` | Sort toggle (grade → company → date → location) |
+| `f` | Focus mode — hide F/C graded jobs + applied jobs |
+| `Ctrl+G` | Toggle smart job grouping by company |
 | `g` (in job detail) | Grade override picker |
 | `e` | Export current view to markdown |
 | `A` | Toggle show/hide archived items |
 | `W` | Watch all jobs of current grade |
 | `[`/`]` | Jump between grade sections |
-| `D` | Database cleanup with confirmation |
+| `D` | Database cleanup — archives F jobs immediately |
 | `Ctrl+click` | Toggle multi-select on individual item |
 | `Shift+click` | Range select |
-| `?` | Help overlay |
+| `?` | Help overlay (6 categorised sections) |
 | `q`/`Ctrl+C` | Quit |
 
 ### Mouse support
@@ -187,9 +236,10 @@ Semantic colour assignments:
 
 ### App state model
 
-The `App` struct holds all runtime state:
+The `App` struct holds all runtime state, split across `app/state.rs` and `app/mod.rs`:
 
-- `view: View` — Dashboard, Companies, Jobs, Pipeline
+**Core state:**
+- `view: View` — Dashboard, Companies, Jobs, Pipeline, Activity
 - `focus: Focus` — List or Detail
 - `companies/jobs/pipeline data` — cached from DB
 - `sort_mode: SortMode` — Grade / Company / Date / Location
@@ -202,6 +252,20 @@ The `App` struct holds all runtime state:
 - `grade_picker_active: bool` — grade override popup state
 - `company_state / job_state: TableState` — ratatui selection tracking
 - `job_filter_company: Option<i64>` — company drill-down filter
+
+**Session 7 additions:**
+- `activity_data: Vec<(String, String)>` — (date, action_type) for heatmap
+- `last_search_at: Option<String>` — MAX(last_searched_at) for search pulse
+- `last_graded_at: Option<String>` — MAX(graded_at)
+- `session_start: Instant` — for session timer in status bar
+- `top_companies_by_hits: Vec<(String, i64)>` — top companies by SS+S+A count
+- `activity_timeline: Vec<ActivityEntry>` — chronological events for Activity view
+- `activity_scroll: u16` — scroll offset for Activity view
+- `show_quick_peek: bool` — quick-peek popup visibility
+- `group_by_company: bool` — smart grouping toggle (Ctrl+G)
+- `new_jobs_since_last: i64` — session diff counter
+- `new_companies_since_last: i64` — session diff counter
+- `new_decisions_since_last: i64` — session diff counter
 
 ### Entry point
 
@@ -225,12 +289,18 @@ state/tui-summary.md ──[read on refresh]──► session_summary field
 
 `src/tui/queries.rs` provides query functions:
 
-| Function | Returns | Query pattern |
-|----------|---------|---------------|
-| `fetch_companies()` | `Vec<CompanyRow>` | Joins `company_portals` for primary ATS, subqueries for job/fit counts, sorted by grade |
-| `fetch_jobs(filter)` | `Vec<JobRow>` | Joins companies for name, subquery for latest decision, optional company_id filter, sorted by grade |
-| `fetch_stats()` | `DashboardStats` | Multiple aggregate queries: counts by grade/status/evaluation, ATS coverage, top matches |
-| `fetch_pipeline()` | Pipeline data | Jobs grouped by decision status (watching/applied/interview) for kanban columns |
+| Function | Returns | Purpose |
+|----------|---------|---------|
+| `fetch_companies()` | `Vec<CompanyRow>` | Joins portals for ATS, subqueries for job/fit counts, sorted by grade |
+| `fetch_jobs(filter)` | `Vec<JobRow>` | Joins companies, subquery for latest decision, optional company_id filter |
+| `fetch_stats()` | `DashboardStats` | Aggregate counts by grade/status/evaluation, ATS coverage, top matches |
+| `fetch_pipeline()` | Pipeline data | Jobs grouped by decision status for kanban columns |
+| `fetch_activity_data()` | `Vec<(String, String)>` | (date, action_type) pairs for heatmap rendering |
+| `fetch_last_search_at()` | `Option<String>` | MAX(last_searched_at) for search pulse freshness |
+| `fetch_last_graded_at()` | `Option<String>` | MAX(graded_at) for staleness detection |
+| `fetch_top_companies_by_hits()` | `Vec<(String, i64)>` | Top companies ranked by SS+S+A job count |
+| `fetch_activity_timeline()` | `Vec<ActivityEntry>` | Chronological events for Activity view |
+| `fetch_new_since_session()` | `(i64, i64, i64)` | New jobs, companies, decisions since session start |
 
 Each refresh opens a fresh `Connection` — acceptable for SQLite's low overhead and avoids connection lifetime complexity.
 
@@ -246,18 +316,16 @@ User decisions: `INSERT INTO user_decisions (job_id, decision, decided_at)`. Tri
 
 ## Implemented Outputs / Artifacts
 
-- `src/tui/` — 14 Rust source files across `mod`, `app`, `handler`, `theme`, `queries`, `views/` (5 files), and `widgets/` (4 files)
+- `src/tui/` — 26 Rust source files across `mod`, `app/` (6), `handler/` (4), `theme`, `queries`, `views/` (8), and `widgets/` (5)
 - CLI command `cernio tui` — launches the TUI
 - User decisions written to `state/cernio.db` `user_decisions` table
 - Markdown export files from `e` key
-- 18 tests, 0 warnings
 
 ---
 
 ## Known Issues / Active Risks
 
 - The `open` command for URLs is macOS-specific — needs `xdg-open` on Linux.
-- Some dead-code warnings on struct fields kept for future use.
 
 ---
 
@@ -265,10 +333,7 @@ User decisions: `INSERT INTO user_decisions (job_id, decision, decided_at)`. Tri
 
 | Feature | Description |
 |---------|-------------|
-| **Activity/progress view** | Live pipeline operation progress display — modelled on Homebrew's `brew upgrade` UI with status indicators and completed items floating to the top. Depends on pipeline CLI reporting structured progress events. |
-| **Animated spinners** | Evaluating status cycles `◐ → ◑ → ◒ → ◓` instead of static text. `frame_count % 4` selects spinner character. |
 | **Section folding** | Collapsible detail sections with `▸`/`▾` toggles in detail panes. |
-| **Search pulse** | "Last search: X ago" with freshness colouring (green → yellow → red → dim) on the dashboard. |
 
 ---
 
@@ -280,11 +345,15 @@ User decisions: `INSERT INTO user_decisions (job_id, decision, decided_at)`. Tri
 - **Event drain per frame:** Events are drained in batches (up to 20 per frame) rather than one-at-a-time to prevent input buffering lag during rapid keystrokes or sustained scrolling.
 - **`o` auto-marks applied:** `open_selected_url()` changed from `&self` to `&mut self` in session 6. Opening a job URL now also records an "applied" decision. This reflects the real-world flow — if you opened the application page, you're applying.
 - **`p` for autofill:** Reads `application_packages` JSON from DB, spawns Chrome via `src/autofill/` with pre-filled data. Falls back to regular `open` for unsupported ATS providers.
+- **Modularisation over monolith (session 7):** Split three large files (app.rs 1,112 lines, handler.rs 490 lines, views/mod.rs 438 lines) into directories with focused modules. The split follows concern boundaries — state vs navigation vs actions, key events vs mouse events vs overlay events, chrome vs overlays vs content views. Each module is independently navigable and the interfaces between them are the App struct methods.
+- **One-line kanban cards:** Pipeline cards reduced to single lines (grade + title + company) from multi-line blocks. Fits more cards per column and reduces visual noise — the detail is available via quick-peek (Space).
+- **Quick-peek over drill-down:** Space key shows a popup overlay without leaving the current list position. This avoids the context-switch cost of Enter (drill into detail) for quick reference checks.
 
 ---
 
 ## Obsolete / No Longer Relevant
 
 - **"No mouse in v1" note** — mouse support is fully implemented as of v4.
-- **v2 functional features list** — search, sort, export, mouse, pipeline, job descriptions, grade override, archive toggle, and database cleanup are all implemented.
-- **Visual enhancements table** — kanban, toast notifications, grade bars, and dynamic dashboard blocks are implemented. Remaining items (spinners, section folding, search pulse) are tracked in Planned above.
+- **v2 functional features list** — all v2 features implemented.
+- **Visual enhancements table** — spinners, search pulse, activity heatmap all implemented in v5. Only section folding remains as planned.
+- **"14 files" count** — TUI is now 26 files after session 7 modularisation.
