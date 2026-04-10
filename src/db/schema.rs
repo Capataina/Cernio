@@ -638,4 +638,374 @@ mod tests {
 
         assert_eq!(status, "archived");
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // Migration / schema surface extensions
+    //
+    // These tests exercise the parts of the schema that the original
+    // suite did not cover: archival lifecycle, migration 004+ columns,
+    // application_packages, user_decisions, job-level constraints.
+    // ══════════════════════════════════════════════════════════════
+
+    /// Helper — insert a minimal company and return its id.
+    fn insert_company(db: &Database, name: &str, website: &str, status: &str) -> i64 {
+        db.conn().execute(
+            "INSERT INTO companies (name, website, what_they_do, discovery_source, discovered_at, status, why_relevant, relevance_updated_at)
+             VALUES (?1, ?2, 'w', 't', '2026-01-01', ?3, 'r', '2026-01-01')",
+            params![name, website, status],
+        ).unwrap();
+        db.conn().last_insert_rowid()
+    }
+
+    /// Helper — insert a minimal job and return its id.
+    fn insert_job(
+        db: &Database,
+        company_id: i64,
+        title: &str,
+        url: &str,
+        grade: Option<&str>,
+        status: &str,
+    ) -> i64 {
+        db.conn().execute(
+            "INSERT INTO jobs (company_id, title, url, grade, evaluation_status, discovered_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, '2026-01-01')",
+            params![company_id, title, url, grade, status],
+        ).unwrap();
+        db.conn().last_insert_rowid()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Job-level constraints and uniqueness
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn job_url_uniqueness() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "Acme", "https://acme.example", "resolved");
+        insert_job(&db, cid, "Eng 1", "https://j.example/1", None, "pending");
+        let result = db.conn().execute(
+            "INSERT INTO jobs (company_id, title, url, evaluation_status, discovered_at)
+             VALUES (?1, 'Eng 2', ?2, 'pending', '2026-01-01')",
+            params![cid, "https://j.example/1"],
+        );
+        assert!(result.is_err(), "duplicate URL should be rejected");
+    }
+
+    #[test]
+    fn job_grade_constraint() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "Acme", "https://acme.example", "resolved");
+
+        // Valid grades are SS, S, A, B, C, F (note: includes SS which is
+        // wider than the company grade set).
+        for g in &["SS", "S", "A", "B", "C", "F"] {
+            let url = format!("https://j.example/{g}");
+            let result = db.conn().execute(
+                "INSERT INTO jobs (company_id, title, url, grade, evaluation_status, discovered_at)
+                 VALUES (?1, 'x', ?2, ?3, 'pending', '2026-01-01')",
+                params![cid, url, g],
+            );
+            assert!(result.is_ok(), "grade {g} should be accepted");
+        }
+
+        // Invalid grade rejected.
+        let result = db.conn().execute(
+            "INSERT INTO jobs (company_id, title, url, grade, evaluation_status, discovered_at)
+             VALUES (?1, 'x', 'https://bad.example', 'X', 'pending', '2026-01-01')",
+            params![cid],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn job_evaluation_status_constraint() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "Acme", "https://acme.example", "resolved");
+
+        for s in &["pending", "evaluating", "strong_fit", "weak_fit", "no_fit", "archived"] {
+            let url = format!("https://j.example/{s}");
+            let result = db.conn().execute(
+                "INSERT INTO jobs (company_id, title, url, evaluation_status, discovered_at)
+                 VALUES (?1, 'x', ?2, ?3, '2026-01-01')",
+                params![cid, url, s],
+            );
+            assert!(result.is_ok(), "status {s} should be accepted");
+        }
+
+        // Invalid.
+        let result = db.conn().execute(
+            "INSERT INTO jobs (company_id, title, url, evaluation_status, discovered_at)
+             VALUES (?1, 'x', 'https://bad.example', 'wtf', '2026-01-01')",
+            params![cid],
+        );
+        assert!(result.is_err());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Migration 004: last_searched_at on companies
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn last_searched_at_column_exists_and_is_nullable() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+
+        // Initially NULL.
+        let v: Option<String> = db.conn().query_row(
+            "SELECT last_searched_at FROM companies WHERE id = ?1",
+            params![cid],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(v, None);
+
+        // Updatable.
+        db.conn().execute(
+            "UPDATE companies SET last_searched_at = ?1 WHERE id = ?2",
+            params!["2026-04-01", cid],
+        ).unwrap();
+        let v: Option<String> = db.conn().query_row(
+            "SELECT last_searched_at FROM companies WHERE id = ?1",
+            params![cid],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(v.as_deref(), Some("2026-04-01"));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Migration 005: archived_at on jobs
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn archived_at_column_exists_and_is_nullable() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
+
+        let v: Option<String> = db.conn().query_row(
+            "SELECT archived_at FROM jobs WHERE id = ?1",
+            params![jid],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(v, None);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Migration 006: application_packages
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn application_packages_crud() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
+
+        db.conn().execute(
+            "INSERT INTO application_packages (job_id, answers, created_at)
+             VALUES (?1, ?2, ?3)",
+            params![jid, r#"{"q1":"a1"}"#, "2026-04-01"],
+        ).unwrap();
+
+        let (ans, created_at): (String, String) = db.conn().query_row(
+            "SELECT answers, created_at FROM application_packages WHERE job_id = ?1",
+            params![jid],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(ans, r#"{"q1":"a1"}"#);
+        assert_eq!(created_at, "2026-04-01");
+    }
+
+    #[test]
+    fn application_packages_one_per_job() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
+
+        db.conn().execute(
+            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (?1, '{}', '2026-04-01')",
+            params![jid],
+        ).unwrap();
+
+        // job_id is PRIMARY KEY, so a second insert for the same job must fail.
+        let result = db.conn().execute(
+            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (?1, '{}', '2026-04-02')",
+            params![jid],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn application_packages_fk_to_jobs() {
+        let db = Database::open_in_memory().unwrap();
+        let result = db.conn().execute(
+            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (9999, '{}', '2026-04-01')",
+            [],
+        );
+        assert!(result.is_err(), "should reject package for non-existent job");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // user_decisions
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn user_decisions_enum_values() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
+
+        for d in &["watching", "applied", "rejected"] {
+            let result = db.conn().execute(
+                "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, '2026-04-01')",
+                params![jid, d],
+            );
+            assert!(result.is_ok(), "{d} should be accepted");
+        }
+
+        let result = db.conn().execute(
+            "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, 'hesitating', '2026-04-01')",
+            params![jid],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn user_decision_fk_to_jobs() {
+        let db = Database::open_in_memory().unwrap();
+        let result = db.conn().execute(
+            "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (9999, 'watching', '2026-04-01')",
+            [],
+        );
+        assert!(result.is_err());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Archival lifecycle — the clean pipeline depends on this.
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn job_can_transition_pending_to_archived() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", Some("B"), "pending");
+
+        db.conn().execute(
+            "UPDATE jobs SET evaluation_status = 'archived', archived_at = ?1 WHERE id = ?2",
+            params!["2026-04-01", jid],
+        ).unwrap();
+
+        let (status, archived_at): (String, Option<String>) = db.conn().query_row(
+            "SELECT evaluation_status, archived_at FROM jobs WHERE id = ?1",
+            params![jid],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(status, "archived");
+        assert_eq!(archived_at.as_deref(), Some("2026-04-01"));
+    }
+
+    #[test]
+    fn archived_job_can_be_unarchived_with_timer_reset() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let jid = insert_job(&db, cid, "t", "https://j.example/1", Some("A"), "archived");
+
+        // Simulate the unarchive --grade A flow from main.rs.
+        db.conn().execute(
+            "UPDATE jobs SET evaluation_status = CASE grade
+                 WHEN 'SS' THEN 'strong_fit' WHEN 'S' THEN 'strong_fit'
+                 WHEN 'A' THEN 'weak_fit' WHEN 'B' THEN 'weak_fit'
+                 ELSE 'no_fit' END,
+             discovered_at = '2026-04-10', archived_at = NULL
+             WHERE id = ?1 AND evaluation_status = 'archived'",
+            params![jid],
+        ).unwrap();
+
+        let (status, archived_at, discovered_at): (String, Option<String>, String) = db.conn().query_row(
+            "SELECT evaluation_status, archived_at, discovered_at FROM jobs WHERE id = ?1",
+            params![jid],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        ).unwrap();
+        assert_eq!(status, "weak_fit"); // A → weak_fit per the CASE expression
+        assert_eq!(archived_at, None);
+        assert_eq!(discovered_at, "2026-04-10");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Portal verification and is_primary
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn portal_verification_timestamp() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary, verified_at)
+             VALUES (?1, 'lever', 'x', 1, ?2)",
+            params![cid, "2026-04-01"],
+        ).unwrap();
+
+        let verified: String = db.conn().query_row(
+            "SELECT verified_at FROM company_portals WHERE company_id = ?1",
+            params![cid],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(verified, "2026-04-01");
+    }
+
+    #[test]
+    fn portal_ats_provider_constraint() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        let result = db.conn().execute(
+            "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+             VALUES (?1, 'bamboo', 'x', 1)",
+            params![cid],
+        );
+        assert!(result.is_err(), "unknown ATS provider should be rejected");
+    }
+
+    #[test]
+    fn portal_accepts_all_known_providers() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+        for p in &["greenhouse", "ashby", "lever", "workable", "smartrecruiters", "workday", "eightfold"] {
+            let result = db.conn().execute(
+                "INSERT INTO company_portals (company_id, ats_provider, ats_slug, is_primary)
+                 VALUES (?1, ?2, ?3, 1)",
+                params![cid, p, format!("{p}-slug")],
+            );
+            assert!(result.is_ok(), "provider {p} should be accepted");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Indexes exist (catch accidental migration breakage)
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn expected_indexes_are_created() {
+        let db = Database::open_in_memory().unwrap();
+        let indexes: Vec<String> = db
+            .conn()
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+
+        for expected in &[
+            "idx_companies_status",
+            "idx_companies_grade",
+            "idx_portals_company_id",
+            "idx_jobs_company_id",
+            "idx_jobs_evaluation_status",
+            "idx_jobs_grade",
+            "idx_user_decisions_job_id",
+        ] {
+            assert!(
+                indexes.contains(&expected.to_string()),
+                "missing index {expected}, have: {indexes:?}"
+            );
+        }
+    }
 }
