@@ -165,3 +165,196 @@ fn strip_html(html: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─────────────────────────────────────────────────────────────
+    // base_url
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn base_url_defaults_to_us() {
+        assert_eq!(base_url(None), BASE_URL);
+    }
+
+    #[test]
+    fn base_url_eu_json() {
+        assert_eq!(base_url(Some(r#"{"region":"eu"}"#)), BASE_URL_EU);
+    }
+
+    #[test]
+    fn base_url_eu_bare() {
+        assert_eq!(base_url(Some("eu")), BASE_URL_EU);
+    }
+
+    #[test]
+    fn base_url_us() {
+        assert_eq!(base_url(Some("us-east")), BASE_URL);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // normalise + JSON parsing
+    // ─────────────────────────────────────────────────────────────
+
+    fn parse_one(raw: &str) -> AtsJob {
+        let board: BoardResponse = serde_json::from_str(raw).expect("parse");
+        board.jobs.into_iter().map(normalise).next().expect("one job")
+    }
+
+    #[test]
+    fn normalise_basic_london_job() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 12345,
+                "title": "Backend Engineer",
+                "absolute_url": "https://boards.greenhouse.io/acme/jobs/12345",
+                "location": {"name": "London, UK"},
+                "first_published": "2026-04-01T00:00:00Z",
+                "updated_at": "2026-04-02T00:00:00Z",
+                "content": null,
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.external_id, "12345");
+        assert_eq!(job.title, "Backend Engineer");
+        assert_eq!(job.url, "https://boards.greenhouse.io/acme/jobs/12345");
+        assert_eq!(job.location.as_deref(), Some("London, UK"));
+        assert!(job.all_locations.contains(&"London, UK".to_string()));
+        assert_eq!(job.posted_date.as_deref(), Some("2026-04-01T00:00:00Z"));
+        assert_eq!(job.remote_policy, None);
+    }
+
+    #[test]
+    fn normalise_semicolon_separated_locations() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "Berlin; London; Munich"},
+                "content": null,
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        // The full string stays in all_locations, plus each split part.
+        assert!(job.all_locations.contains(&"Berlin".to_string()));
+        assert!(job.all_locations.contains(&"London".to_string()));
+        assert!(job.all_locations.contains(&"Munich".to_string()));
+    }
+
+    #[test]
+    fn normalise_remote_policy_inferred_from_location() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "Remote - UK"},
+                "content": null,
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy.as_deref(), Some("Remote"));
+    }
+
+    #[test]
+    fn normalise_hybrid_policy_inferred() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "London (Hybrid)"},
+                "content": null,
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy.as_deref(), Some("Hybrid"));
+    }
+
+    #[test]
+    fn normalise_office_locations_merged_into_all_locations() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "London"},
+                "content": null,
+                "offices": [
+                    {"name": "HQ London", "location": "UK"},
+                    {"name": "Remote Office", "location": null}
+                ]
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert!(job.all_locations.contains(&"HQ London".to_string()));
+        assert!(job.all_locations.contains(&"UK".to_string()));
+        assert!(job.all_locations.contains(&"Remote Office".to_string()));
+    }
+
+    #[test]
+    fn normalise_posted_date_falls_back_to_updated_at() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "London"},
+                "first_published": null,
+                "updated_at": "2026-04-02T00:00:00Z",
+                "content": null,
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.posted_date.as_deref(), Some("2026-04-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn normalise_content_html_stripped() {
+        let raw = r#"{
+            "jobs": [{
+                "id": 1,
+                "title": "x",
+                "absolute_url": "x",
+                "location": {"name": "London"},
+                "content": "<p>Build <strong>things</strong>.</p>",
+                "offices": null
+            }]
+        }"#;
+        let job = parse_one(raw);
+        let desc = job.description.expect("description");
+        assert!(!desc.contains('<'));
+        assert!(desc.contains("Build"));
+        assert!(desc.contains("things"));
+    }
+
+    #[test]
+    fn normalise_empty_jobs_array() {
+        let raw = r#"{"jobs": []}"#;
+        let board: BoardResponse = serde_json::from_str(raw).expect("parse");
+        assert!(board.jobs.is_empty());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // strip_html
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn greenhouse_strip_html_quoted_gt() {
+        let input = r#"<span data-x='{"k":">"}'>ok</span>"#;
+        assert_eq!(strip_html(input), "ok");
+    }
+
+    #[test]
+    fn greenhouse_strip_html_nested() {
+        assert_eq!(strip_html("<p><b>x</b></p>"), "x");
+    }
+}

@@ -158,3 +158,180 @@ fn normalise(job: WorkdayJob, subdomain: &str, wd: &str, site: &str) -> AtsJob {
         description,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─────────────────────────────────────────────────────────────
+    // parse_extra: the ats_extra JSON format for Workday
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_extra_valid() {
+        let (sub, wd, site) = parse_extra(
+            r#"{"subdomain":"gresearch","wd":"wd103","site":"G-Research"}"#,
+        )
+        .expect("parse");
+        assert_eq!(sub, "gresearch");
+        assert_eq!(wd, "wd103");
+        assert_eq!(site, "G-Research");
+    }
+
+    #[test]
+    fn parse_extra_missing_field_returns_none() {
+        assert!(parse_extra(r#"{"subdomain":"x"}"#).is_none());
+        assert!(parse_extra(r#"{"subdomain":"x","wd":"y"}"#).is_none());
+    }
+
+    #[test]
+    fn parse_extra_invalid_json_returns_none() {
+        assert!(parse_extra("not json").is_none());
+        assert!(parse_extra("").is_none());
+    }
+
+    #[test]
+    fn parse_extra_non_string_field_returns_none() {
+        assert!(parse_extra(r#"{"subdomain":123,"wd":"y","site":"z"}"#).is_none());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // URL construction
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn build_base_url_shape() {
+        let url = build_base_url("gresearch", "wd103", "G-Research");
+        assert_eq!(
+            url,
+            "https://gresearch.wd103.myworkdayjobs.com/wday/cxs/gresearch/G-Research/jobs"
+        );
+    }
+
+    #[test]
+    fn build_posting_url_joins_external_path() {
+        let url = build_posting_url("gresearch", "wd103", "G-Research", "/job/London/SWE_123");
+        assert_eq!(
+            url,
+            "https://gresearch.wd103.myworkdayjobs.com/en-US/G-Research/job/London/SWE_123"
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // normalise: locations, remote policy, description from bullets
+    // ─────────────────────────────────────────────────────────────
+
+    fn parse_one(raw: &str) -> AtsJob {
+        let resp: WorkdayResponse = serde_json::from_str(raw).expect("parse");
+        resp.job_postings
+            .into_iter()
+            .map(|j| normalise(j, "gresearch", "wd103", "G-Research"))
+            .next()
+            .expect("one job")
+    }
+
+    #[test]
+    fn normalise_single_location() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "Rust Engineer",
+                "externalPath": "/job/London/Rust_1",
+                "locationsText": "London, United Kingdom",
+                "postedOn": "Posted 2 days ago"
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.title, "Rust Engineer");
+        assert_eq!(job.location.as_deref(), Some("London, United Kingdom"));
+        assert!(job.all_locations.contains(&"London, United Kingdom".to_string()));
+        assert_eq!(job.posted_date.as_deref(), Some("Posted 2 days ago"));
+        assert!(job.url.ends_with("/job/London/Rust_1"));
+    }
+
+    #[test]
+    fn normalise_multi_location_pipe_separated() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "x",
+                "externalPath": "/x",
+                "locationsText": "London, UK | Cambridge, UK | Manchester, UK"
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        // Full string preserved, plus each split part added separately.
+        assert!(job.all_locations.contains(&"London, UK | Cambridge, UK | Manchester, UK".to_string()));
+        assert!(job.all_locations.contains(&"London, UK".to_string()));
+        assert!(job.all_locations.contains(&"Cambridge, UK".to_string()));
+        assert!(job.all_locations.contains(&"Manchester, UK".to_string()));
+    }
+
+    #[test]
+    fn normalise_remote_from_locations_text() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "x",
+                "externalPath": "/x",
+                "locationsText": "Remote - United Kingdom"
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy.as_deref(), Some("Remote"));
+    }
+
+    #[test]
+    fn normalise_hybrid_from_locations_text() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "x",
+                "externalPath": "/x",
+                "locationsText": "London (Hybrid)"
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy.as_deref(), Some("Hybrid"));
+    }
+
+    #[test]
+    fn normalise_bullet_fields_become_description() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "x",
+                "externalPath": "/x",
+                "locationsText": "London",
+                "bulletFields": ["Rust", "Linux", "5+ years"]
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        let desc = job.description.expect("description");
+        assert!(desc.contains("Rust"));
+        assert!(desc.contains("Linux"));
+        assert!(desc.contains("5+ years"));
+    }
+
+    #[test]
+    fn normalise_no_bullets_no_description() {
+        let raw = r#"{
+            "jobPostings": [{
+                "title": "x",
+                "externalPath": "/x",
+                "locationsText": "London"
+            }],
+            "total": 1
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.description, None);
+    }
+
+    #[test]
+    fn normalise_zero_total_response() {
+        let raw = r#"{"jobPostings": [], "total": 0}"#;
+        let resp: WorkdayResponse = serde_json::from_str(raw).expect("parse");
+        assert_eq!(resp.total, 0);
+        assert!(resp.job_postings.is_empty());
+    }
+}

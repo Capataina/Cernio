@@ -232,3 +232,180 @@ fn strip_html(html: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_one(raw: &str, slug: &str) -> AtsJob {
+        let list: ListResponse = serde_json::from_str(raw).expect("parse");
+        list.content
+            .into_iter()
+            .map(|j| normalise(j, slug))
+            .next()
+            .expect("one job")
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // The critical SmartRecruiters quirk: HTTP 200 with totalFound=0
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn total_found_zero_is_parseable() {
+        // The whole point of the probe function: even garbage slugs return
+        // HTTP 200 + totalFound=0. The parser must accept this shape cleanly
+        // so probe() can reject based on totalFound, not on response status.
+        let raw = r#"{"totalFound": 0, "content": []}"#;
+        let list: ListResponse = serde_json::from_str(raw).expect("parse");
+        assert_eq!(list.total_found, 0);
+        assert!(list.content.is_empty());
+    }
+
+    #[test]
+    fn total_found_positive_with_content() {
+        let raw = r#"{
+            "totalFound": 2,
+            "content": [
+                {"id": "a", "name": "Job A"},
+                {"id": "b", "name": "Job B"}
+            ]
+        }"#;
+        let list: ListResponse = serde_json::from_str(raw).expect("parse");
+        assert_eq!(list.total_found, 2);
+        assert_eq!(list.content.len(), 2);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // normalise
+    // ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn normalise_basic_with_ref_url() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "sr-1",
+                "name": "Backend Engineer",
+                "releasedDate": "2026-04-01",
+                "location": {
+                    "city": "London",
+                    "country": "United Kingdom"
+                },
+                "ref": "https://jobs.smartrecruiters.com/acme/sr-1"
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.external_id, "sr-1");
+        assert_eq!(job.title, "Backend Engineer");
+        assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-1");
+        assert_eq!(job.location.as_deref(), Some("London, United Kingdom"));
+        assert!(job.all_locations.contains(&"London".to_string()));
+        assert!(job.all_locations.contains(&"United Kingdom".to_string()));
+        assert_eq!(job.posted_date.as_deref(), Some("2026-04-01"));
+    }
+
+    #[test]
+    fn normalise_url_fallback_constructs_from_slug_and_id() {
+        // When `ref` is absent, the parser builds a URL from slug + id.
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "sr-2",
+                "name": "ML Engineer"
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-2");
+    }
+
+    #[test]
+    fn normalise_remote_flag() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "x",
+                "name": "x",
+                "location": {"city": "Anywhere", "remote": true}
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.remote_policy.as_deref(), Some("Remote"));
+    }
+
+    #[test]
+    fn normalise_remote_false_yields_no_policy() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "x",
+                "name": "x",
+                "location": {"city": "London", "remote": false}
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.remote_policy, None);
+    }
+
+    #[test]
+    fn normalise_location_with_region() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "x",
+                "name": "x",
+                "location": {"city": "Cambridge", "region": "Cambridgeshire", "country": "UK"}
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert!(job.all_locations.contains(&"Cambridge".to_string()));
+        assert!(job.all_locations.contains(&"Cambridgeshire".to_string()));
+        assert!(job.all_locations.contains(&"UK".to_string()));
+    }
+
+    #[test]
+    fn normalise_missing_country_only_city_primary() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "x",
+                "name": "x",
+                "location": {"city": "London"}
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.location.as_deref(), Some("London"));
+    }
+
+    #[test]
+    fn normalise_empty_location_object() {
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "x",
+                "name": "x",
+                "location": {}
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.location, None);
+        assert!(job.all_locations.is_empty());
+    }
+
+    #[test]
+    fn normalise_description_always_none_from_list_endpoint() {
+        // SmartRecruiters list endpoint doesn't carry descriptions. They
+        // have to be fetched separately via fetch_detail. This is a real
+        // constraint we've hit; keep it asserted.
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{"id": "x", "name": "x"}]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert_eq!(job.description, None);
+    }
+
+    #[test]
+    fn smartrecruiters_strip_html_simple() {
+        assert_eq!(strip_html("<p>hi</p>"), "hi");
+    }
+}

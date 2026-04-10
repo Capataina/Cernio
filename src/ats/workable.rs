@@ -152,3 +152,167 @@ fn strip_html(html: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_one(raw: &str) -> AtsJob {
+        let widget: WidgetResponse = serde_json::from_str(raw).expect("parse");
+        widget.jobs.into_iter().map(normalise).next().expect("one job")
+    }
+
+    #[test]
+    fn normalise_city_and_country() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "abc",
+                "title": "Rust Engineer",
+                "shortlink": "https://apply.workable.com/acme/j/abc",
+                "city": "London",
+                "state": "England",
+                "country": "United Kingdom",
+                "published_on": "2026-04-01"
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.external_id, "abc");
+        assert_eq!(job.title, "Rust Engineer");
+        assert_eq!(job.url, "https://apply.workable.com/acme/j/abc");
+        // Primary location is "City, Country".
+        assert_eq!(job.location.as_deref(), Some("London, United Kingdom"));
+        assert!(job.all_locations.contains(&"London".to_string()));
+        assert!(job.all_locations.contains(&"England".to_string()));
+        assert!(job.all_locations.contains(&"United Kingdom".to_string()));
+    }
+
+    #[test]
+    fn normalise_empty_city_country_skipped() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "city": "",
+                "country": "",
+                "state": ""
+            }]
+        }"#;
+        let job = parse_one(raw);
+        // None of the empty strings should land in all_locations.
+        assert!(job.all_locations.is_empty());
+        assert_eq!(job.location, None);
+    }
+
+    #[test]
+    fn normalise_telecommuting_becomes_remote() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "city": "Anywhere",
+                "telecommuting": true
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy.as_deref(), Some("Remote"));
+    }
+
+    #[test]
+    fn normalise_no_telecommuting_no_remote_policy() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "city": "London"
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.remote_policy, None);
+    }
+
+    #[test]
+    fn normalise_locations_array_with_country_code() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "locations": [
+                    {"city": "London", "country": "United Kingdom", "countryCode": "GB"}
+                ]
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert!(job.all_locations.contains(&"London".to_string()));
+        assert!(job.all_locations.contains(&"United Kingdom".to_string()));
+        assert!(job.all_locations.contains(&"GB".to_string()));
+    }
+
+    #[test]
+    fn normalise_locations_array_skips_empty_strings() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "locations": [
+                    {"city": "", "country": "", "countryCode": ""}
+                ]
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert!(job.all_locations.is_empty());
+    }
+
+    #[test]
+    fn normalise_primary_fallback_city_only() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "city": "London"
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.location.as_deref(), Some("London"));
+    }
+
+    #[test]
+    fn normalise_primary_fallback_country_only() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "country": "GB"
+            }]
+        }"#;
+        let job = parse_one(raw);
+        assert_eq!(job.location.as_deref(), Some("GB"));
+    }
+
+    #[test]
+    fn normalise_description_html_stripped() {
+        let raw = r#"{
+            "jobs": [{
+                "shortcode": "x",
+                "title": "x",
+                "shortlink": "x",
+                "description": "<p>Build things.</p>"
+            }]
+        }"#;
+        let job = parse_one(raw);
+        let desc = job.description.expect("description");
+        assert!(!desc.contains('<'));
+        assert!(desc.contains("Build things."));
+    }
+
+    #[test]
+    fn workable_strip_html_simple() {
+        assert_eq!(strip_html("<p>hi</p>"), "hi");
+    }
+}
