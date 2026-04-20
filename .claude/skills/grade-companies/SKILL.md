@@ -28,7 +28,7 @@ When delegating grading to parallel subagents, every subagent prompt embeds:
 - The **calibration anchors** pulled from the database at the start of this grading session — 2–3 real examples per tier (S / A / B / C) with their `grade_reasoning` (agents cannot query the database)
 - **Explicit instruction** to output UPDATE statements in the exact SQL format below, not narrative summaries
 
-Under-contextualising a subagent produces grades that pattern-match against the agent's pretraining rather than the Cernio rubric. Over-share.
+Under-contextualising a subagent produces grades that pattern-match against the agent's pretraining rather than the Cernio rubric. Subagent prompts that summarise the profile or paraphrase the rubric produce tier-accurate grades with profile-unspecific reasoning, failing Inviolable Rule 1's citation requirement — verified in prior production runs.
 
 ---
 
@@ -130,6 +130,10 @@ UPDATE companies SET what_they_do = 'description paragraph', location = 'London'
 
 **Do not set `status = 'archived'` for any grade, including C.** Archival is a separate workflow with its own triggers.
 
+### 8. Declare what was skipped
+
+Close the batch with a "What I did not do" section covering: companies where research could not produce sufficient evidence for a confident grade (left ungraded with the reason — dead website, ambiguous signals, no careers page); companies where a marginal-call decision was made between two tiers (name the company, name the tiers considered, cite the anchor comparison that broke the tie); companies flagged as possible hard-exclusions that belong in archival rather than graded (surface them as recommendations; the archival decision is a separate workflow). If every queued company was graded cleanly with no marginal calls and no ambiguous research, say so explicitly.
+
 ---
 
 ## Regrading
@@ -183,3 +187,4 @@ Both files are read at invocation — not one or the other. The rubric without t
 - [ ] **SQL format:** exact column names, single-line UPDATE statements, single quotes escaped by doubling, `datetime('now')` for both timestamps
 - [ ] **Results presented grouped by tier** for user review before any DB write happened
 - [ ] **User approved** the grouped results before the UPDATE statements ran
+- [ ] **Step 8 "What I did not do" declaration emitted** — names ungraded-with-reason companies, marginal-call tie-break citations, hard-exclusion recommendations, or explicitly states "every queued company graded cleanly"
