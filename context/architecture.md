@@ -149,7 +149,7 @@ cernio/
 │   │   └── references/search-strategies.md
 │   ├── populate-db/SKILL.md
 │   ├── resolve-portals/SKILL.md  # Redesigned — AI fallback only
-│   ├── search-jobs/SKILL.md      # Legacy — job search moved to script
+│   ├── search-jobs/SKILL.md      # Orchestrates cernio search + bespoke-company pass
 │   ├── grade-companies/
 │   │   ├── SKILL.md
 │   │   └── references/          # grading-rubric.md, profile-context.md
@@ -198,7 +198,7 @@ Skills handle slow, fuzzy, infrequent work that requires reasoning. Invoked conv
 | `resolve-portals` | Redesigned | AI fallback for companies that fail script-based ATS resolution |
 | `grade-companies` | Designed | Grade ungraded companies (S/A/B/C) with extensive rubric and profile context |
 | `grade-jobs` | Designed | Grade ungraded jobs (SS/S/A/B/C/F) with smart prioritisation by company grade × title signal |
-| `search-jobs` | Legacy | Original job search skill — search logic moved to `cernio search` script |
+| `search-jobs` | Designed | Orchestrates the full search cycle — runs `cernio search` for resolved-ATS companies, dispatches parallel subagents to search the 121 bespoke companies (Apple, Google, Meta, Citadel, etc.) via careers pages + aggregators, inserts every found role via `INSERT OR IGNORE INTO jobs`, hands pending queue to `grade-jobs` |
 | `check-integrity` | Designed | AI-driven re-evaluation and grade quality auditing (runs `cernio format` as step 2) |
 | `prepare-applications` | Designed | Generate tailored application answers per job, stored in `application_packages` table |
 
@@ -387,7 +387,7 @@ The conversation layer sits at the top and drives everything. It invokes Rust sc
 | profile-scrape skill | Designed, tested on NeuroDrive |
 | discover-companies skill | 9-agent discovery run produced 228 raw companies (161 new after dedup). Agents write to individual files. |
 | populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
-| search-jobs skill | Legacy — job search moved to `cernio search` script |
+| search-jobs skill | Orchestrates the full search cycle — runs `cernio search` for resolved-ATS companies (287), dispatches parallel subagents to search the 121 bespoke companies via careers pages + aggregators (LinkedIn / Indeed / Glassdoor / BuiltIn), inserts via `INSERT OR IGNORE INTO jobs`, hands to `grade-jobs` |
 | check-integrity skill | AI-driven re-evaluation, cross-checking guide (4 reference files), active portfolio gap maintenance (10 jobs per grade tier). Step 2 runs `cernio format`. |
 | resolve-portals skill | AI fallback for companies that fail script resolution |
 | prepare-applications skill | Generate tailored application answers per job. Reads profile + job description + fit assessment, stores JSON answers in `application_packages` table. |
