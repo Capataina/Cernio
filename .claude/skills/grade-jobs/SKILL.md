@@ -155,7 +155,7 @@ Grading is parallelised. Split the pending queue into batches by company cluster
 - The list of assigned jobs with company name, company grade, title, location, and description excerpt from the DB
 - Explicit instruction to output SQL UPDATE statements directly — not narrative summaries
 
-Subagents that do not receive these files produce shallow, generic assessments. Under-contextualising is the single largest parallel-grading quality failure. Over-share.
+Subagents that do not receive these files produce shallow, generic assessments. Under-contextualising is the single largest parallel-grading quality failure — verified by prior production runs where summarised-profile subagents produced grade-level-correct but profile-unspecific assessments that failed the citation rule.
 
 **Subagent output format — exact SQL:**
 
@@ -225,6 +225,10 @@ For SS and S roles, the full `fit_assessment` is available on request. Inline th
 
 Flag any jobs graded without descriptions (should be zero — step 4 is a hard gate). Report the portfolio-gaps update — what was added, what was null. Ask the user whether to continue with the remaining queue or stop.
 
+### 12. Declare what was skipped
+
+Close the batch report with a "What I did not do" section covering: jobs left at `pending` because no description could be fetched; jobs the orchestrator deferred to a later batch (with reason — low company grade + generic title + weak role-type alignment); portfolio-gap patterns the orchestrator noticed but did not write to `portfolio-gaps.md` because they appeared only once (single occurrences are not patterns); any subagent that returned incomplete output (missing SQL for assigned jobs, assessments failing the citation rule). If every assigned job was graded and every portfolio-gap pattern was written, say so explicitly.
+
 ---
 
 ## Reference Loading
@@ -254,18 +258,20 @@ All three are read at invocation. The rubric alone without profile-context produ
 
 ## Quality Checklist
 
-- [ ] All 15 files in `profile/` were read this invocation
-- [ ] All three reference files were read this invocation
-- [ ] Calibration anchors were pulled from the DB (2–3 per tier) and embedded in every subagent's prompt
-- [ ] Every job graded in this batch had its full description — no title-only grades in the session transcript
-- [ ] Every SS / S / A fit assessment names at least one specific project from `projects.md`, one technology from `skills.md`, one visa fact from `visa.md`, and one career target from `preferences.toml`
-- [ ] Seniority assessment cites what the description actually says about experience (quoted text), not the agent's interpretation
-- [ ] Career ceiling reasoning considers the 10–15 year trajectory, not just the immediate role
-- [ ] Company grade was factored into each job grade (mediocre role at S-tier company carries more signal than the same role at C-tier)
-- [ ] Sponsorship was assessed with reference to `visa.md` timeline + the company's evidenced sponsorship capability (sponsor register / description signals)
-- [ ] SS and S grades have multi-paragraph assessments with all six required components (alignment, tech match, gap analysis, sponsorship, trajectory, application narrative)
-- [ ] C and F grades cite a specific dealbreaker or weakness
-- [ ] `evaluation_status` mapping is correct per tier (SS/S → strong_fit, A/B → weak_fit, C/F → no_fit)
-- [ ] `fit_score` decimal is within the tier's band
-- [ ] `profile/portfolio-gaps.md` was updated with this batch's patterns — or a dated null-result note was written
-- [ ] Batch report includes count breakdown + highlights + any flagged jobs (no-description cases)
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. An item that cannot be evidenced in the agent's output is either unmet and surfaced under step 12 "What I did not do," or the skill has not finished.
+
+- [ ] **All 15 files in `profile/` read fresh this invocation** — cite the tool call per file.
+- [ ] **All three reference files read fresh this invocation** — cite the tool call per file.
+- [ ] **Calibration anchors pulled from the DB** — cite the SQL query run and reproduce the rows returned (2–3 per tier); the same block appears in every subagent's prompt.
+- [ ] **Every subagent prompt embeds the full profile + three reference files verbatim** — verifiable by inspecting the prompt contents in the transcript.
+- [ ] **No title-only grades** — for every graded job, the transcript shows the description was read (fetched or already present, ≥100 words). Jobs that could not satisfy this remain at `pending` and appear in step 12.
+- [ ] **SS / S / A fit assessments name specific profile elements** — each such assessment cites at least one project from `projects.md`, one technology from `skills.md`, one fact from `visa.md`, and one career target from `preferences.toml`. The specific element name appears in the assessment text.
+- [ ] **Seniority quote present** — every fit assessment contains a quoted fragment from the description about experience / years / seniority, or the exact phrase "No experience requirements mentioned in description" when the description is silent on seniority.
+- [ ] **Technology quote present** — SS / S / A assessments contain a quoted fragment from the description naming a required technology or stack element that matches a `profile/skills.md` entry.
+- [ ] **Sponsorship citation present** — every graded-job assessment either cites the company's sponsorship evidence (sponsor register, description language, prior evidence in the DB) or explicitly names the sponsorship question as open and flags the job as needing verification before application.
+- [ ] **SS / S assessments have all six components** — alignment, tech match, gap analysis, sponsorship, trajectory, application narrative. Each is identifiable as its own paragraph or sentence cluster. A missing component downgrades to A.
+- [ ] **C / F assessments cite the specific dealbreaker** — named quoted text from the description (seniority gap, technology mismatch, role-type exclusion). "Bad fit" without citation fails this item.
+- [ ] **Column mapping correct** — `evaluation_status` maps exactly to tier (SS/S → `strong_fit`; A/B → `weak_fit`; C/F → `no_fit`); `fit_score` is within the tier's band. Cite a spot-check row (id + grade + evaluation_status + fit_score) per subagent.
+- [ ] **`profile/portfolio-gaps.md` updated** — the diff to `portfolio-gaps.md` is cited (either new patterns with counts + role names + companies, or a dated null-result note for this batch). Silent omission of the update is a skill-failure per Inviolable Rule 6.
+- [ ] **Batch report includes breakdown + highlights + flagged jobs** — count by tier, SS / S highlights with company names, explicit list of any job flagged as no-description (should be zero after step 4).
+- [ ] **Step 12 "What I did not do" declaration emitted** — names deferred jobs, pattern-threshold misses, or subagent-output issues, or explicitly states none.
