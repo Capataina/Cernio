@@ -101,4 +101,4 @@ Steady state: ~50–100 active jobs, refreshed weekly
 
 ## Full design
 
-See `context/plans/pipeline-separation.md` for the complete implementation plan with checkboxes, CLI commands, schema changes, and phased implementation order.
+The pipeline is implemented — see `systems/pipeline.md` for the canonical implementation doc covering all six CLI subcommands, the `cernio search` filter stack, and the tiered archival lifecycle. The original execution plan was absorbed into `systems/pipeline.md` once the work shipped.

@@ -36,7 +36,7 @@ This means the user's daily view in the TUI is a prioritised list, not a wall of
 
 As we evaluate more jobs, patterns will emerge. If every A-grade role has the same gap (e.g. "requires Kubernetes"), that's a portfolio gap worth closing. The rubric feeds the career coaching loop.
 
-Full rubric details: `skills/grade-companies/references/grading-rubric.md` (companies) and `skills/grade-jobs/references/grading-rubric.md` (jobs). The `search-jobs` rubric is legacy and should not be used — the dedicated grading skills have more comprehensive rubrics with worked examples, boundary cases, and evidence standards.
+Full rubric details: `.claude/skills/grade-companies/references/grading-rubric.md` (companies) and `.claude/skills/grade-jobs/references/grading-rubric.md` (jobs). The `search-jobs` rubric is legacy and should not be used — the dedicated grading skills have more comprehensive rubrics with worked examples, boundary cases, and evidence standards.
 
 ---
 

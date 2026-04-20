@@ -15,7 +15,7 @@
 | TUI `p` key | Working | Spawns autofill, reads package from DB, marks applied |
 | TUI `●` indicator | Working | Yellow dot in "P" column for jobs with prepared packages |
 | Package cleanup | Working | Deletes package on "applied" decision |
-| `prepare-applications` skill | Designed | `skills/prepare-applications/SKILL.md` |
+| `prepare-applications` skill | Designed | `.claude/skills/prepare-applications/SKILL.md` |
 | `chromiumoxide` dependency | Working | Chrome launches in headed mode, navigates to URL |
 
 ## What's broken

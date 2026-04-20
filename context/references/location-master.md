@@ -1,6 +1,6 @@
 # Location Master Synthesis — 10-Agent Research Pass
 
-> **What this is.** A cross-agent synthesis of 10 independent location research agents, each of which read the full profile and rubric, conducted live 2026 web research, and produced ~500-700 line independent verdicts. Source files: `context/location-search/agent-01.md` through `agent-10.md`. Rubric: `context/notes/location-rubric.md`.
+> **What this is.** A cross-agent synthesis of 10 independent location research agents, each of which read the full profile and rubric, conducted live 2026 web research, and produced ~500-700 line independent verdicts. Source files: `context/references/location-search/agent-01.md` through `agent-10.md`. Rubric: `context/notes/location-rubric.md`.
 >
 > **Methodology.** All 10 agents received identical instructions and profile data. None was told what the other agents were concluding. All were explicitly instructed to **ignore prior session verdicts** in the profile files (including the "Amsterdam rejected" framing and the Geographic Patterns table in `portfolio-gaps.md`), to reach their own verdicts independently through fresh research, and to produce strong opinions rather than hedges. Variance across the 10 agents reflects genuine interpretive differences, not random noise.
 >
@@ -706,16 +706,16 @@ Once the first role is established and 12-24 months of professional experience i
 
 ## 📂 Source files
 
-- `context/location-search/agent-01.md` — 774 lines, London #1 primary
-- `context/location-search/agent-02.md` — 683 lines, Amsterdam contrarian advocate (top 3)
-- `context/location-search/agent-03.md` — 638 lines, Amsterdam-Zuidas distinction framing
-- `context/location-search/agent-04.md` — 539 lines, Stockholm dark-horse advocate
-- `context/location-search/agent-05.md` — 657 lines, Amsterdam + Dubai dual-override
-- `context/location-search/agent-06.md` — 612 lines, Berlin #3 minority advocate
-- `context/location-search/agent-07.md` — 659 lines, Vienna stealth pick + Tokyo direct-apply advocate
-- `context/location-search/agent-08.md` — 658 lines, Google KGX1 Platform 37 weighting
-- `context/location-search/agent-09.md` — 786 lines, most comprehensive deep-dive on Amsterdam override
-- `context/location-search/agent-10.md` — 550 lines, Copenhagen dark-horse advocate + Tokyo direct-apply
+- `context/references/location-search/agent-01.md` — 774 lines, London #1 primary
+- `context/references/location-search/agent-02.md` — 683 lines, Amsterdam contrarian advocate (top 3)
+- `context/references/location-search/agent-03.md` — 638 lines, Amsterdam-Zuidas distinction framing
+- `context/references/location-search/agent-04.md` — 539 lines, Stockholm dark-horse advocate
+- `context/references/location-search/agent-05.md` — 657 lines, Amsterdam + Dubai dual-override
+- `context/references/location-search/agent-06.md` — 612 lines, Berlin #3 minority advocate
+- `context/references/location-search/agent-07.md` — 659 lines, Vienna stealth pick + Tokyo direct-apply advocate
+- `context/references/location-search/agent-08.md` — 658 lines, Google KGX1 Platform 37 weighting
+- `context/references/location-search/agent-09.md` — 786 lines, most comprehensive deep-dive on Amsterdam override
+- `context/references/location-search/agent-10.md` — 550 lines, Copenhagen dark-horse advocate + Tokyo direct-apply
 
 **Total:** 6,556 lines of independent research across 10 agents, ~300 unique URLs cited, 90%+ of current-state claims web-verified to April 2026.
 

@@ -329,7 +329,13 @@ User decisions: `INSERT INTO user_decisions (job_id, decision, decided_at)`. Tri
 
 ---
 
-## Planned / Missing
+## Partial / In Progress
+
+None. The v5 surface is complete and routinely used.
+
+---
+
+## Planned / Missing / Likely Changes
 
 | Feature | Description |
 |---------|-------------|

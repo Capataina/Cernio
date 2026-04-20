@@ -6,7 +6,7 @@ How Cernio's skills are structured, invoked, and relate to the upstream framewor
 
 ## Project-specific skills live in this repo
 
-Cernio's skills (discovery, population, profile scraping) are specific to this project and live in `skills/` within the repo. They are tightly coupled to Cernio's data model, filesystem layout, and workflow.
+Cernio's skills (discovery, population, profile scraping) are specific to this project and live in `.claude/skills/` within the repo — native Claude Code skills migrated from the project-local `skills/` folder in commit `bebfbc5` (legacy folder removed in `d3e4e58`). They are tightly coupled to Cernio's data model, filesystem layout, and workflow.
 
 The upstream `agent-skills` repo (`Capataina/agent-skills`) contains universal, reusable skills (upkeep-context, code-health-audit, etc.) plus the principal-engineer personality template and 95KB of research on writing effective agent skills. Cernio's `CLAUDE.md` was derived from the principal-engineer personality but has been customised.
 
@@ -49,7 +49,7 @@ The original CLAUDE.md treated README.md as read-only. This was changed — the 
 
 ## Mandatory-read protocol (added session 3, 2026-04-08)
 
-All 8 skills now enforce a mandatory-read block at the top of their SKILL.md. This block requires reading:
+All 9 skills now enforce a mandatory-read block at the top of their SKILL.md. This block requires reading:
 1. The skill's SKILL.md itself
 2. Every file in the skill's `references/` directory
 3. All files in `profile/`
@@ -64,7 +64,7 @@ CLAUDE.md now enforces this globally via three sections: Skill Execution Protoco
 
 ## Question-first grading rubric rewrite (session 4, 2026-04-09)
 
-Both grading rubrics (`skills/grade-companies/references/grading-rubric.md` and `skills/grade-jobs/references/grading-rubric.md`) were completely rewritten from a dimension-weighted scoring approach to a question-first approach:
+Both grading rubrics (`.claude/skills/grade-companies/references/grading-rubric.md` and `.claude/skills/grade-jobs/references/grading-rubric.md`) were completely rewritten from a dimension-weighted scoring approach to a question-first approach:
 
 - **Old approach:** Score each dimension (career ceiling, tech stack, sponsorship, etc.) independently, then combine into a grade. This led to mechanical scoring where agents would assign 3/5 to every dimension and call it a B.
 - **New approach:** Start by answering core questions ("What does this company mean for the candidate's career?", "Would you recommend a friend apply here?"). The answers force genuine reasoning. Dimensions are then used as analytical support, not the primary scoring mechanism.

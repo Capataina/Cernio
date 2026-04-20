@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-04-09 (session 7). 408 companies, 1184 jobs (484 graded non-archived, 0 pending). Profile scrape rewrote projects.md (honest tiers: Nyquestro→Notable, Aurix→Notable), resume.md, cover-letter.md. Job search: 255 new + 13 bespoke (Citadel, Bloomberg, Google, Apple, Arm). Full grading run: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Added Sr./Lead exclusion keywords (51 jobs archived). TUI v5: major modularisation (app.rs→6 files, handler.rs→4 files, views/mod.rs→3 files), 5 views (new Activity Timeline tab), dashboard overhaul (heatmap, search pulse, visa countdown, top companies leaderboard), quick-peek popup, breadcrumb nav, smart grouping, contextual status bar. 26 TUI source files, 7 ATS fetchers, 6 pipeline scripts, 9 skills, 6 DB migrations.
+> **Last updated:** 2026-04-21, session 9 (current upkeep). Testing infrastructure is now mature — 316 tests across 6 phases cover all pure logic, ATS parsers, pipeline entry points, and the CLI. Skills migrated from `skills/` to `.claude/skills/` and are native Claude Code skills; legacy folder removed. Session 8 produced a 10-agent location research pass + evaluation rubric (`context/references/location-master.md`, `context/references/location-search/`, `context/notes/location-rubric.md`). Two silent data-loss bugs surfaced during the test pass and were fixed. Autofill remains scaffolded-but-broken (Chrome launches; React form filling unresolved).
 
 ---
 
@@ -14,7 +14,7 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 
 ## Repository Overview
 
-### Three-Layer Architecture
+### Three-layer architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -28,41 +28,46 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
            │ invokes                          │ writes evaluations
            ▼                                  ▼
 ┌─────────────────────────┐    ┌──────────────────────────────────┐
-│    Rust Scripts          │    │      SQLite (state/cernio.db)    │
-│    (parameterised tools) │    │                                  │
+│    Rust CLI (`cernio`)   │    │      SQLite (state/cernio.db)    │
+│    parameterised tools   │    │                                  │
 │                          │───►│  companies ── lifecycle:         │
-│  • search: scan ATS      │    │    potential → resolved/bespoke  │
-│    boards for terms      │    │  jobs ── evaluation lifecycle:   │
-│  • resolve: probe slugs  │    │    pending → evaluating → fit    │
-│  • export: generate md   │    │  user_decisions ── tracking:     │
-│                          │    │    watching / applied / rejected  │
-└──────────────────────────┘    └──────────────┬──────────────────┘
+│  resolve / search /      │    │    potential → resolved/bespoke  │
+│  clean / check /         │    │  company_portals ── 1:N per co   │
+│  format / import         │    │  jobs ── evaluation lifecycle:   │
+│                          │    │    pending → evaluating → fit    │
+└──────────────────────────┘    │  user_decisions ── tracking:     │
+                                │    watching / applied / rejected  │
+                                │  application_packages ── autofill │
+                                └──────────────┬──────────────────┘
                                                │ watches
                                                ▼
                                 ┌──────────────────────────────────┐
                                 │         Ratatui TUI               │
                                 │         (live dashboard)          │
                                 │                                   │
-                                │  • Company universe browser       │
-                                │  • Live evaluation status         │
-                                │  • User confirms/rejects/exports  │
+                                │  5 views, 26 source files, v5     │
+                                │  Dashboard · Companies · Jobs ·   │
+                                │  Pipeline · Activity Timeline     │
                                 └──────────────────────────────────┘
 ```
 
-### Technology Stack
+The conversation layer invokes scripts and skills. Rust scripts write to SQLite. The TUI watches SQLite and writes user decisions back. No layer depends upward.
+
+### Technology stack
 
 | Component | Choice | Status |
 |-----------|--------|--------|
 | Core language | Rust (edition 2024) | In use |
-| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — schema, 6 migrations, 11 tests |
+| Database | SQLite via `rusqlite` (bundled, WAL mode) | Implemented — 6 migrations, 29 inline tests |
 | Date handling | `chrono` | In use |
-| Async runtime | Tokio | In use — pipeline scripts (resolve, search, clean, check) |
-| HTTP | Reqwest | In use — ATS API calls across 6 providers (incl. Workday) |
+| Async runtime | Tokio | In use — resolve, search, check pipelines |
+| HTTP | Reqwest with retry helpers | In use — 6 ATS providers |
 | Serialisation | Serde | In use — JSON (ATS responses), TOML (config) |
-| Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed config structs |
-| TUI | Ratatui 0.29 + Crossterm backend | v5 implemented — 5 views (dashboard, companies, jobs, pipeline, activity), modular architecture (26 source files), heatmap, search pulse, visa countdown, quick-peek, breadcrumbs, smart grouping, contextual status bar, session timer |
-| Browser automation | `chromiumoxide` (Chrome CDP) + `futures` | Scaffolded — Chrome launches, navigates; form filling broken on React forms |
-| AI layer | Claude Code skills (conversational invocation) | 9 skills with mandatory-read blocks enforced on all skills. check-integrity has 3 reference files (remediation-guide, quality-standards, profile-context) |
+| Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed structs |
+| TUI | Ratatui 0.29 + Crossterm backend | v5 implemented — 5 views, modular (26 source files) |
+| Browser automation | `chromiumoxide` (Chrome CDP) + `futures` | Scaffolded — Chrome launches; React form filling broken |
+| Testing | `cargo test`, `assert_cmd`, `proptest`, `tempfile`, `predicates` | 316 tests across 6 phases (inline + integration + CLI) |
+| AI layer | Claude Code skills at `.claude/skills/` | 9 skills, all obligation-anchored via skill-creator |
 
 ---
 
@@ -70,339 +75,314 @@ Cernio is not an automated pipeline. Every action happens in a collaborative ses
 
 ```text
 cernio/
-├── src/
-│   ├── main.rs                 # Entry point, CLI dispatch (resolve/search/clean/check/import/tui)
-│   ├── config.rs               # TOML config parser (preferences.toml → typed structs)
-│   ├── http.rs                  # Shared HTTP client with retry logic and rate limiting
+├── src/                              # ~14,000 lines of Rust (56 files)
+│   ├── main.rs                       # CLI dispatch
+│   ├── lib.rs                        # Library surface (lib+bin split enables integration tests)
+│   ├── config.rs                     # TOML config parser + filter predicates
+│   ├── http.rs                       # Shared HTTP client with retry
 │   ├── db/
-│   │   ├── mod.rs              # Public DB interface
-│   │   └── schema.rs           # Migration (001 + 002), schema, 11 tests
-│   ├── ats/
-│   │   ├── mod.rs              # ATS provider trait, provider dispatch
-│   │   ├── common.rs           # Shared types (AtsJob, slug normalisation)
-│   │   ├── lever.rs            # Lever API fetcher
-│   │   ├── greenhouse.rs       # Greenhouse API fetcher
-│   │   ├── ashby.rs            # Ashby API fetcher
-│   │   ├── workable.rs         # Workable API fetcher
-│   │   ├── smartrecruiters.rs  # SmartRecruiters API fetcher (totalFound>0 check)
-│   │   └── workday.rs          # Workday API fetcher (variable subdomain + site)
-│   ├── autofill/
-│   │   ├── mod.rs              # ApplicantProfile, provider dispatch, package JSON parsing
-│   │   ├── common.rs           # Chrome launch via chromiumoxide CDP, field filling helpers
-│   │   └── greenhouse.rs       # Greenhouse-specific form selectors (broken — React state issue)
-│   ├── pipeline/
-│   │   ├── mod.rs              # Pipeline module exports
-│   │   ├── resolve.rs          # cernio resolve — slug probing, multi-provider
-│   │   ├── search.rs           # cernio search — fetch → filter → insert
-│   │   ├── clean.rs            # cernio clean — job removal, company archival
-│   │   ├── check.rs            # cernio check — integrity report
-│   │   ├── import.rs           # cernio import — bulk import from external sources
-│   │   └── format.rs           # cernio format — HTML/entity-encoded descriptions → clean plaintext
-│   └── tui/                    # 26 source files, v5
-│       ├── mod.rs              # Terminal setup/teardown, event loop
-│       ├── app/                # App state (modularised from single app.rs)
-│       │   ├── mod.rs          # App struct, new(), refresh(), entry point
-│       │   ├── state.rs        # View/Focus/SortMode enums, App fields, ActivityEntry
-│       │   ├── navigation.rs   # View switching, selection, drill-down, scroll
-│       │   ├── actions.rs      # User actions (decisions, export, URL open, grade override)
-│       │   ├── pipeline.rs     # Pipeline-specific state management
-│       │   └── cleanup.rs      # Database cleanup confirmation and execution
-│       ├── handler/            # Event handling (modularised from single handler.rs)
-│       │   ├── mod.rs          # Top-level event dispatch
-│       │   ├── navigation.rs   # Key-based navigation (j/k/g/G/Tab/1-5)
-│       │   ├── overlays.rs     # Help, grade picker, search bar input
-│       │   └── mouse.rs        # Click, scroll, multi-select mouse events
-│       ├── theme.rs            # Semantic ANSI colour palette + freshness/activity/badge styles
-│       ├── queries.rs          # DB read queries (companies, jobs, stats, pipeline, activity, heatmap)
-│       ├── views/
-│       │   ├── mod.rs          # Draw dispatcher, view routing
-│       │   ├── chrome.rs       # Tab bar, status bar, breadcrumbs, session timer
-│       │   ├── overlays.rs     # Help overlay, search bar, grade picker, toast, quick-peek popup
-│       │   ├── dashboard.rs    # Stats, heatmap, search pulse, visa countdown, top companies, session diff
-│       │   ├── companies.rs    # Company table + detail with full job list, grade bars, sort
-│       │   ├── jobs.rs         # Job table + detail, description indicator, new badges, smart grouping
-│       │   ├── pipeline.rs     # Kanban view — 3 columns, one-line cards, scrollbar, spinners
-│       │   └── activity.rs     # Activity Timeline tab (5th view)
-│       └── widgets/
-│           ├── mod.rs
-│           ├── grade_bar.rs    # Proportional grade bar (reused in dashboard + company detail)
-│           ├── text_utils.rs   # HTML cleanup, relative dates, truncation (shared across views)
-│           ├── toast.rs        # Toast notification rendering
-│           └── layout.rs       # Dynamic layout system with distribute() function
-├── profile/                    # Structured personal profile (read every startup)
-│   ├── personal.md             # Name, contact, links
-│   ├── education.md            # Degrees, modules
-│   ├── experience.md           # Work history
-│   ├── projects.md             # Full project inventory (16 projects)
-│   ├── skills.md               # Languages, frameworks, domains
-│   ├── preferences.toml        # Search filters, cleanup config, location patterns
-│   ├── visa.md                 # Right to work, sponsorship needs
-│   ├── portfolio-gaps.md       # Strengths, gaps, closure opportunities
-│   ├── resume.md               # LaTeX resume source
-│   └── ...                     # certifications, languages, interests, etc.
-├── companies/
-│   └── potential.md            # Discovery landing zone (pre-DB)
-├── skills/
-│   ├── profile-scrape/SKILL.md
+│   │   ├── mod.rs                    # Public DB interface
+│   │   └── schema.rs                 # Migrations 001-006, 29 tests
+│   ├── ats/                          # 6 ATS fetchers + common types
+│   │   ├── mod.rs
+│   │   ├── common.rs                 # AtsJob, SlugProbeResult, get_with_retry
+│   │   ├── lever.rs                  # US + EU domains
+│   │   ├── greenhouse.rs
+│   │   ├── ashby.rs
+│   │   ├── workable.rs
+│   │   ├── smartrecruiters.rs        # totalFound > 0 check
+│   │   └── workday.rs                # variable subdomain + site in ats_extra
+│   ├── autofill/                     # Scaffolded — broken on React forms
+│   │   ├── mod.rs
+│   │   ├── common.rs
+│   │   └── greenhouse.rs
+│   ├── pipeline/                     # The 6 mainline CLI subcommands
+│   │   ├── mod.rs
+│   │   ├── resolve.rs                # cernio resolve — slug probing
+│   │   ├── search.rs                 # cernio search — fetch → filter → insert
+│   │   ├── clean.rs                  # cernio clean — tiered archival
+│   │   ├── check.rs                  # cernio check — integrity report
+│   │   ├── format.rs                 # cernio format — HTML → plaintext (idempotent)
+│   │   └── import.rs                 # cernio import — CSV/JSON bulk load
+│   └── tui/                          # 26 source files, v5 (modular)
+│       ├── mod.rs                    # Terminal setup/teardown, event loop
+│       ├── app/                      # State, navigation, actions, pipeline, cleanup (6 files)
+│       ├── handler/                  # Keyboard + mouse event dispatch (4 files)
+│       ├── theme.rs                  # Semantic palette + freshness/activity/badge styles
+│       ├── queries.rs                # DB read queries
+│       ├── views/                    # 5 views + chrome + overlays (8 files)
+│       └── widgets/                  # grade_bar, text_utils, toast, layout (5 files)
+├── tests/                            # Integration tests (Phase 5 + 6)
+│   ├── common/mod.rs                 # CompanySeed, JobSeed, fixtures
+│   ├── cli.rs                        # 16 CLI tests via assert_cmd + CERNIO_DB_PATH
+│   ├── pipeline_clean.rs             # 11 tests
+│   ├── pipeline_format.rs            # 5 tests
+│   ├── pipeline_import.rs            # 12 tests
+│   └── smoke.rs                      # Harness sanity
+├── profile/                          # Structured personal profile (read every startup)
+│   ├── personal.md, education.md, experience.md, projects.md, skills.md
+│   ├── preferences.toml              # Search filters, cleanup config, location patterns
+│   ├── visa.md, portfolio-gaps.md, resume.md, lifestyle-preferences.md
+│   └── …                             # certifications, languages, interests, etc.
+├── companies/potential.md            # Discovery landing zone (pre-DB)
+├── .claude/skills/                   # Native Claude Code skills — 9 total
+│   ├── profile-scrape/
 │   ├── discover-companies/
-│   │   ├── SKILL.md
-│   │   └── references/search-strategies.md
-│   ├── populate-db/SKILL.md
-│   ├── resolve-portals/SKILL.md  # Redesigned — AI fallback only
-│   ├── search-jobs/SKILL.md      # Orchestrates cernio search + bespoke-company pass
+│   ├── populate-db/
+│   ├── resolve-portals/
+│   ├── search-jobs/
 │   ├── grade-companies/
-│   │   ├── SKILL.md
-│   │   └── references/          # grading-rubric.md, profile-context.md
 │   ├── grade-jobs/
-│   │   ├── SKILL.md
-│   │   └── references/          # grading-rubric.md, profile-context.md, prioritisation-guide.md
 │   ├── check-integrity/
-│   │   ├── SKILL.md             # AI-driven re-evaluation and grade quality auditing
-│   │   └── references/
-│   │       ├── remediation-guide.md
-│   │       ├── quality-standards.md
-│   │       └── profile-context.md
 │   └── prepare-applications/
-│       └── SKILL.md             # Generate tailored application answers per job
-├── state/
-│   └── cernio.db               # SQLite database (gitignored)
-├── AgentCreationResearch/      # Skill authoring research (reference)
-├── context/                    # Project memory
-├── Cargo.toml                  # rusqlite, chrono, tokio, reqwest, serde, toml, chromiumoxide, futures
-├── claude.md                   # Session configuration
-└── README.md                   # Project vision and milestones
+├── state/cernio.db                   # SQLite (gitignored)
+├── context/                          # Project memory
+│   ├── architecture.md               # This file
+│   ├── notes.md + notes/             # Design rationale, lessons, preferences (16 topics)
+│   ├── systems/                      # Canonical implementation docs
+│   │   ├── ats.md                    # NEW — 6 ATS fetchers
+│   │   ├── pipeline.md               # NEW — 6+ CLI subcommands
+│   │   ├── database.md               # Schema + migrations + tests
+│   │   └── tui.md                    # v5 modular architecture
+│   └── references/                   # Durable supporting material
+│       ├── greenhouse-api.md, smartrecruiters-api.md, workable-api.md
+│       ├── location-master.md        # 10-agent synthesis (session 8)
+│       └── location-search/          # 10 agent outputs, ~6,500 lines total
+├── Cargo.toml
+├── CLAUDE.md                         # Principal-engineer personality + Cernio doctrine
+└── README.md                         # Project intent and direction
 ```
 
 ---
 
 ## Subsystem Responsibilities
 
-### Layer Responsibilities
-
 | Layer | Does | Does not |
 |-------|------|----------|
 | **Conversation** | Orchestrates skills and scripts, evaluates jobs against profile, recommends actions, tracks portfolio gaps | Submit applications, make decisions without user input |
-| **Rust scripts** | Combinatorial volume: scan ATS boards, probe slug patterns, fetch job JSON, generate exports | Make judgments, know about the profile, decide what to search for |
-| **TUI** | Real-time display of company universe, evaluation progress, and user decisions; markdown export on keypress | Run scripts, evaluate jobs, or modify data independently |
+| **Rust pipeline (`cernio` CLI)** | Combinatorial volume: scan ATS boards, probe slug patterns, fetch job JSON, filter, archive, format, import | Make judgments, know about the profile, decide what to search for |
+| **TUI** | Real-time display of company universe, evaluation progress, user decisions; markdown export on keypress | Run scripts, evaluate jobs, or modify data independently |
 | **SQLite** | Contract between all layers — single source of truth for structured data | Contain business logic |
 
-### AI Layer — Claude Code Skills
+### Canonical subsystem owners
 
-Skills handle slow, fuzzy, infrequent work that requires reasoning. Invoked conversationally ("run a discovery"), not via CLI syntax.
+| Subsystem | Canonical home | Maturity |
+|-----------|----------------|----------|
+| ATS fetchers (6 providers) | `systems/ats.md` | Comprehensive |
+| CLI pipeline (6 commands) | `systems/pipeline.md` | Comprehensive |
+| SQLite schema + migrations | `systems/database.md` | Comprehensive |
+| Ratatui TUI | `systems/tui.md` | Comprehensive |
+| Testing infrastructure | `notes/testing-strategy.md` | Working — 316 tests documented |
+| Autofill (broken) | `notes/autofill-status.md` | Working — status + fix approach captured |
+| Claude Code skills | `.claude/skills/<name>/SKILL.md` + `notes/skill-architecture.md` | 9 skills, all skill-creator-audited |
 
-| Skill | Status | Purpose |
-|-------|--------|---------|
-| `profile-scrape` | Designed, tested | Scrape GitHub repos and update profile with evidence-based entries |
-| `discover-companies` | Designed | Profile-aware company discovery with parallel sector agents and creative search strategies |
-| `populate-db` | Designed | Research companies from discovery, find ATS slugs, verify endpoints, insert into SQLite |
-| `resolve-portals` | Redesigned | AI fallback for companies that fail script-based ATS resolution |
-| `grade-companies` | Designed | Grade ungraded companies (S/A/B/C) with extensive rubric and profile context |
-| `grade-jobs` | Designed | Grade ungraded jobs (SS/S/A/B/C/F) with smart prioritisation by company grade × title signal |
-| `search-jobs` | Designed | Orchestrates the full search cycle — runs `cernio search` for resolved-ATS companies, dispatches parallel subagents to search the 121 bespoke companies (Apple, Google, Meta, Citadel, etc.) via careers pages + aggregators, inserts every found role via `INSERT OR IGNORE INTO jobs`, hands pending queue to `grade-jobs` |
-| `check-integrity` | Designed | AI-driven re-evaluation and grade quality auditing (runs `cernio format` as step 2) |
-| `prepare-applications` | Designed | Generate tailored application answers per job, stored in `application_packages` table |
+### AI layer — Claude Code skills
 
-Skills live in `skills/` within this repo, not in the upstream `agent-skills` framework. They are project-specific.
+Skills are native Claude Code skills at `.claude/skills/` (migrated from the project-local `skills/` folder in commit `bebfbc5`; legacy folder removed in `d3e4e58`). Each has YAML frontmatter with engineered triggers + a negative-trigger clause and is auto-discovered via the Skill tool. Invoked conversationally — no CLI syntax required.
 
-### Rust Scripts (Pipeline)
+| Skill | Purpose |
+|-------|---------|
+| `profile-scrape` | Scrape a GitHub repo and update profile with evidence-based entries |
+| `discover-companies` | Parallel-agent company discovery with creative search strategies |
+| `populate-db` | Research companies from discovery, find ATS slugs, insert into SQLite |
+| `resolve-portals` | AI fallback for companies that failed script-based ATS resolution |
+| `grade-companies` | Enrich + grade companies (S/A/B/C) with calibration-anchored rubric |
+| `grade-jobs` | Grade jobs (SS/S/A/B/C/F) with mandatory description citation |
+| `search-jobs` | Orchestrate the full search cycle (script + bespoke pass, insert-obligation-anchored) |
+| `check-integrity` | AI-driven re-evaluation, cross-checking, portfolio gap maintenance |
+| `prepare-applications` | Generate tailored application answers per job → `application_packages` |
 
-Scripts handle all mechanical volume work. Each has a single purpose and takes no judgment decisions.
-
-| Script | CLI | Purpose | Status |
-|--------|-----|---------|--------|
-| `resolve` | `cernio resolve [--company] [--dry-run]` | Probe ATS slug candidates across 5 providers, insert portals | Implemented |
-| `search` | `cernio search [--company] [--grade] [--dry-run]` | Fetch jobs → location/exclusion/inclusion filter → dedup → insert | Implemented |
-| `clean` | `cernio clean [--dry-run] [--jobs-only]` | Remove F/C jobs, stale jobs, archive C companies | Implemented |
-| `check` | `cernio check [--ats-only] [--fix]` | Integrity report: health, completeness, staleness, recommendations | Implemented |
-| `import` | `cernio import <file>` | Bulk import companies from external sources (CSV/JSON) | Implemented |
-| `format` | `cernio format` | Convert raw HTML/entity-encoded descriptions to clean plaintext. Idempotent. Runs on TUI startup via `run_silent()`. | Implemented |
-| `export` | — | Markdown export of curated results | Not started |
-
-### Data Layer
-
-SQLite (`state/cernio.db`) is the single source of truth for all structured data.
-
-#### Schema
-
-```
-companies
-  id, name, website (UNIQUE), what_they_do, discovery_source,
-  discovered_at, status (potential/resolved/bespoke),
-  location, sector_tags, ats_provider, ats_slug, ats_extra,
-  ats_verified_at, careers_url, why_relevant, relevance_updated_at
-
-jobs
-  id, company_id → companies, title, url (UNIQUE), location,
-  remote_policy, posted_date, raw_description, parsed_tags,
-  evaluation_status (pending/evaluating/strong_fit/weak_fit/no_fit),
-  fit_assessment, fit_score, discovered_at
-
-user_decisions
-  id, job_id → jobs, decision (watching/applied/rejected),
-  decided_at, notes
-
-application_packages
-  job_id → jobs (PRIMARY KEY), answers (JSON), created_at
-```
-
-#### Field Categories
-
-| Category | Fields | Staleness trigger |
-|----------|--------|-------------------|
-| **Facts** (stable) | name, website, what_they_do, discovery_source, discovered_at | Company pivots or rebrands |
-| **Checkpoints** (verify periodically) | ats_provider, ats_slug, ats_extra, ats_verified_at, careers_url, status, location, sector_tags | Company switches ATS, relocates, or pivots |
-| **Judgments** (tied to profile) | why_relevant, relevance_updated_at | Profile changes — new projects, shifted interests |
-
-Continuously changing metrics (headcount, funding, ratings) are deliberately excluded. Look them up live during evaluation, don't cache stale guesses.
-
-#### Supported ATS Providers
-
-| Provider | API Pattern | Slug Discovery |
-|----------|-------------|----------------|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` | Simple slug probe |
-| Lever | `api.lever.co/v0/postings/{slug}` | Simple slug probe |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Simple slug probe |
-| Workable | `apply.workable.com/api/v1/widget/accounts/{slug}` | Simple slug probe |
-| SmartRecruiters | `api.smartrecruiters.com/v1/companies/{slug}/postings` | Simple slug probe |
-| Workday | `{company}.{wd1-12}.myworkdayjobs.com/wday/cxs/{company}/{site}/jobs` | Complex — variable subdomain and site name, stored in `ats_extra` |
-| Eightfold.ai | `{subdomain}/api/apply/v2/jobs?domain={domain}` | Complex — company-specific subdomain, stored in `ats_extra` |
-
-Companies on iCIMS, Taleo, BambooHR, Jobvite, Personio, or custom portals → `bespoke` with careers URL preserved.
-
-#### What Lives Where
-
-| Store | Contains |
-|-------|----------|
-| **SQLite** | Companies (full lifecycle), jobs, evaluations, user decisions |
-| **Markdown** | `profile/` (human-edited), `companies/potential.md` (discovery landing zone before DB migration), `exports/` (generated on demand) |
+All nine went through a full skill-creator iteration in session 9 (commits `319ed60` through `1c9ab85`): evidence-anchored quality checklists, What-I-Did-Not-Do declarations, obligation-vs-exhortation rewrites, per-reference TOCs where missing. See `notes/skill-architecture.md` for the design rationale.
 
 ---
 
 ## Dependency Direction
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Conversational Session                         │
-│                   (User + Claude Code)                           │
-│                                                                  │
-│  • Decide what to do: discover, populate, search, evaluate      │
-│  • Claude orchestrates skills/scripts, evaluates results        │
-│  • User makes all application decisions                         │
-└──────────┬──────────────────────────────────┬───────────────────┘
-           │ invokes                          │ writes evaluations
-           ▼                                  ▼
-┌─────────────────────────┐    ┌──────────────────────────────────┐
-│    Rust Scripts          │    │      SQLite (state/cernio.db)    │
-│    (parameterised tools) │    │                                  │
-│                          │───►│  companies ── lifecycle:         │
-│  • search: scan ATS      │    │    potential → resolved/bespoke  │
-│    boards for terms      │    │  jobs ── evaluation lifecycle:   │
-│  • resolve: probe slugs  │    │    pending → evaluating → fit    │
-│  • export: generate md   │    │  user_decisions ── tracking:     │
-│                          │    │    watching / applied / rejected  │
-└──────────────────────────┘    └──────────────┬──────────────────┘
-                                               │ watches
-                                               ▼
-                                ┌──────────────────────────────────┐
-                                │         Ratatui TUI               │
-                                │         (live dashboard)          │
-                                │                                   │
-                                │  • Company universe browser       │
-                                │  • Live evaluation status         │
-                                │  • User confirms/rejects/exports  │
-                                └──────────────────────────────────┘
+                            ┌────────────────────────┐
+                            │  Conversation (user +  │
+                            │  Claude Code + skills) │
+                            └───────┬────────────────┘
+                                    │
+                       ┌────────────┼─────────────────┐
+                       ▼            ▼                 ▼
+              ┌──────────────┐ ┌───────────┐ ┌───────────────────┐
+              │  cernio CLI  │ │   TUI     │ │ SQLite (cernio.db)│
+              │  (pipeline)  │ │           │ │  single source of │
+              │              │ │           │ │  structured truth │
+              └──────┬───────┘ └─────┬─────┘ └─────────┬─────────┘
+                     │               │ reads + writes  │
+                     │ reads config  │ user_decisions  │
+                     │ + writes data │                 │
+                     └─────┬─────────┘                 │
+                           │                           │
+                           ▼                           │
+                     ┌─────────┐  ┌─────────┐  ┌───────┘
+                     │ ats/    │  │config.rs│  │
+                     │ (6 prov)│  │(filters)│  │
+                     └─────────┘  └─────────┘  │
+                           │                   │
+                           └─── HTTP ──────────┘
+                                to 6 external
+                                ATS providers
 ```
 
-The conversation layer sits at the top and drives everything. It invokes Rust scripts downward and writes evaluations into SQLite. Rust scripts write results into SQLite but never read the profile or make judgments. The TUI watches SQLite for changes but never modifies data independently — user actions in the TUI (confirm, reject, export) write back through SQLite. All layers depend on SQLite as the shared contract; no layer depends upward.
+No layer depends upward. The pipeline depends on `ats/`, `config`, and `db` (reads and writes). The TUI depends only on `db`. Skills depend on `profile/` (fresh reads) and indirectly on `db` (through Claude's SQL invocations).
 
 ---
 
 ## Core Execution / Data Flow
 
+The canonical session flow:
+
 ```
 1. Session starts
-   └─► Claude reads profile/, context/, README.md
+   └─► Claude reads profile/, context/architecture.md, context/notes.md, README.md
    └─► User and Claude discuss what to do
 
 2. Profile update (when projects or skills have changed)
-   └─► User provides a GitHub repo link
-   └─► profile-scrape skill reads repo (context/, README, code)
+   └─► profile-scrape skill reads repo context/ + README + code
    └─► Updates projects.md, skills.md, portfolio-gaps.md
 
 3. Discovery (when the universe needs expanding)
    └─► discover-companies skill dispatches parallel sector agents
-   └─► Each agent searches its territory creatively
-   └─► Orchestrator deduplicates, user reviews
-   └─► Accepted companies land in companies/potential.md
+   └─► Agents write to per-agent files in companies/potential.md
+   └─► User reviews, accepted companies migrated into SQLite via populate-db
 
-4. Population (after discovery produces new companies)
+4. Population (new companies → resolved or bespoke)
    └─► populate-db skill researches each company
-   └─► Deterministic slug probing (parallelisable, scriptable)
-   └─► Web search fallback for unmatched (Claude judgment)
-   └─► Companies inserted into SQLite as resolved or bespoke
-   └─► TUI shows progress in real time
+   └─► Deterministic slug probing via `cernio resolve`
+   └─► AI fallback (resolve-portals skill) for companies that fail
+   └─► Companies + portals inserted into SQLite
 
-5. Job search (collaborative decision)
-   └─► User and Claude decide what to search for
-   └─► Claude invokes Rust search script with params
-   └─► Results written to SQLite
-   └─► TUI shows results appearing
+5. Job search
+   └─► Claude runs `cernio search` (script half)
+   └─► search-jobs skill dispatches bespoke agents for companies without ATS (bespoke half)
+   └─► All results INSERT OR IGNORE INTO jobs with evaluation_status='pending'
 
-6. Evaluation (Claude)
-   └─► Claude reads each job description
-   └─► Compares against profile
-   └─► Writes evaluation to SQLite
-   └─► TUI updates: pending → evaluating → fit/no fit
-   └─► Tracks market patterns → portfolio-gaps.md
+6. Evaluation
+   └─► grade-jobs skill reads descriptions, compares against profile, writes grades
+   └─► Portfolio gap tracking → profile/portfolio-gaps.md
+   └─► TUI updates in real time
 
 7. Review and export
    └─► User reviews in TUI, marks watching/applied/rejected
-   └─► Presses export key → markdown report generated
+   └─► prepare-applications skill generates tailored answers (→ application_packages)
+   └─► Autofill (when fixed) launches Chrome and fills forms
 
-8. Session wrap-up
-   └─► User reports what they applied to
-   └─► Claude updates state, suggests next focus
+8. Maintenance
+   └─► cernio clean archives stale jobs by tiered lifecycle
+   └─► cernio check + check-integrity skill flag staleness and profile drift
+   └─► cernio format normalises descriptions (runs silently on TUI startup)
 ```
+
+---
+
+## Inter-System Relationships
+
+Five relationships matter for understanding cross-system behaviour — they are the contracts that break loudest when violated:
+
+| A | B | Mechanism | What breaks if it fails |
+|---|---|-----------|-------------------------|
+| `ats/` (provider modules) | `config::SearchFilters::passes_location` | Shared identifier — provider name string (`"lever"`, `"greenhouse"`, ...) used as both a module name and a TOML key in `preferences.toml` | A new provider with no `[search_filters.locations.<provider>]` entry produces zero jobs post-filter. Mitigated by unknown-provider passthrough, but still a silent dropout for non-UK locations |
+| `pipeline/search` | `db` (`jobs` table) | `INSERT OR IGNORE INTO jobs` keyed on `url UNIQUE` | The unique constraint is the dedup mechanism. Dropping it would cause search to emit duplicates across runs. The `INSERT OR IGNORE` vs `INSERT` distinction is load-bearing — plain `INSERT` would error on every re-run |
+| `pipeline/format` | `tui/mod::run_silent` | Called on TUI startup via subprocess; must be idempotent | If `format` were not idempotent, every TUI launch would further mangle already-cleaned descriptions. The property is guarded by an explicit test (`idempotency_on_realistic_payload`) |
+| `db` (`application_packages`) | `autofill/` | JSON answers written by `prepare-applications` skill, read by the autofill binary at launch | Schema contract: `job_id` → `answers` (JSON) → consumed by provider-specific field mapper. If the JSON key set drifts, autofill produces partial forms silently |
+| Skills in `.claude/skills/` | `profile/` (read fresh every invocation) | Skill SKILL.md bodies enforce a mandatory-read block; CLAUDE.md re-enforces it globally | Skills that silently embed profile snapshots (instead of reading fresh) go stale the moment the profile updates. Visa dates, project tiers, degree classification all drift. This was the discovery that led to the Living System Philosophy in CLAUDE.md |
+
+### Hidden coupling
+
+- **Provider names are a shared string across `ats/`, `config.rs`, `preferences.toml`, and `db` (`ats_provider` CHECK constraint).** Renaming `smartrecruiters` anywhere requires touching all four. No single source of truth.
+- **`ats_extra` JSON structure is provider-specific and unversioned.** Changing the Workday `{subdomain, site}` shape without migrating existing rows produces silent zero-job runs for Workday portals.
+- **`profile/preferences.toml` is read directly by `config.rs` at every pipeline invocation.** The TUI does not re-read it. If the user edits preferences while the TUI is running, the user keeps the stale config until restart. Acceptable trade-off — flagged here so nobody is surprised.
+
+---
+
+## Critical Paths and Blast Radius
+
+### `cernio search` — the critical operation
+
+This is the chain that fails loudest in production. Every step is documented in `systems/pipeline.md` §Key Interfaces with the per-step failure behaviour. Summary:
+
+```
+argv → main.rs → config::load → pipeline::search::run
+  → get_search_targets (SELECT FROM company_portals WHERE companies.grade >= threshold)
+  → fetch_all_parallel (Tokio Semaphore, N × {provider}::fetch_jobs)
+  → per-portal HTTP via common::get_with_retry
+  → serde deserialise → normalise_* → Vec<AtsJob>
+  → filter stack (location → exclusion → inclusion)
+  → db::job_exists → INSERT OR IGNORE INTO jobs
+  → UPDATE companies SET last_searched_at
+  → TUI picks up via 2s poll → Jobs view, "New ●" badge
+```
+
+Blast radius of each step is in `systems/pipeline.md`. Short version: HTTP failures fail per-portal (other portals keep going); deserialise failures silently drop that portal; filter drops are counted and reported; DB writes are atomic per-URL via `INSERT OR IGNORE`.
+
+### Secondary critical path: startup
+
+TUI startup silently runs `cernio format` via `run_silent()`. If `format` crashes or hangs, the TUI hangs. The three format invariants (no raw tags, no triple blanks, never panics) + the idempotency test guard this path.
 
 ---
 
 ## Structural Notes / Current Reality
 
-**End of session 7 (2026-04-09).** Profile scrape found major discrepancies — Nyquestro only has type system implemented, Aurix only Tab 1. projects.md rewritten with honest entries, resume.md and cover-letter.md rebuilt. Nyquestro downgraded from Flagship to Notable, Aurix from Flagship to Notable. Job search: 255 new jobs from `cernio search` + 13 bespoke from S/A-tier companies (Apple, Citadel, Bloomberg, Google, Arm, Mastercard, Amazon). Full grading run: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Added "Sr.", "Sr ", "Lead" to exclusion keywords — 51 leaked senior jobs archived. 39 bespoke companies marked as searched. DB: 408 companies, 1184 jobs (484 graded non-archived), 0 pending.
+### Session 8 — location research + lifestyle modulator (2026-04-10)
 
-**TUI v5 overhaul (session 7):** Major modularisation — `app.rs` (1,112 lines) split into `app/` directory (6 files), `handler.rs` (490 lines) into `handler/` (4 files), `views/mod.rs` (438 lines) into 3 files (mod.rs, chrome.rs, overlays.rs). New 5th view: Activity Timeline. Dashboard enhancements: GitHub-style activity heatmap, search pulse with freshness colouring, application progress bar, visa countdown with urgency colours, top companies leaderboard, session welcome diff. View enhancements: one-line kanban cards, viewport scrolling with scrollbars, animated spinners (◐◑◒◓), fit assessment structured rendering (Q1-Q5), quick-peek popup (Space), breadcrumb navigation, "New" badges (magenta ●), smart job grouping (Ctrl+G). Chrome: contextual status bar, coloured tab badges, session timer, URL preview, decision history indicator, enhanced help overlay (6 sections). Filter fixes: focus mode (f) hides F/C + applied, D key archives F jobs immediately.
+A 10-agent location research pass (captured in `context/references/location-master.md` + `location-search/`) reached unanimous agreement on London as #1 and unanimous reversal of a prior "Amsterdam rejected" framing. The session also introduced `profile/lifestyle-preferences.md` and integrated it as a same-tier modulator in `notes/grading-rubric.md` — Kings Cross / Nine Elms-class lifestyle fits lift boundary grades; Croydon-class areas push them down. The `notes/location-rubric.md` captures the reasoning framework, not a scoring formula.
 
-| Component | Status |
-|-----------|--------|
-| Profile (15 files) | Fully populated. Session 7: profile-scrape found major discrepancies, projects.md rewritten with honest entries (Nyquestro Notable, Aurix Notable), resume.md rebuilt (verified with tectonic), cover-letter.md rebuilt. Project tiers (Flagship/Notable/Minor). Portfolio-gaps.md actively maintained. |
-| SQLite schema | 5 tables, 6 migrations (001 base, 002 archived status, 003 job archival, 004 last_searched_at, 005 archived_at, 006 application_packages), 18 tests passing, WAL mode |
-| Config (`src/config.rs`) | TOML parser for `preferences.toml` — search filters, cleanup config, location patterns |
-| ATS fetchers (`src/ats/`) | 6 providers: Lever, Greenhouse, Ashby, Workable, SmartRecruiters, Workday. All fetchers use `get_with_retry`. Attribute-aware HTML stripping. |
-| Pipeline: resolve (`src/pipeline/resolve.rs`) | Expanded slug generator (punctuation stripping, domain suffixes, acronyms, first-two-words). No early termination — probes all providers for all slugs. SmartRecruiters probed for all companies. |
-| Pipeline: search (`src/pipeline/search.rs`) | Fetch → location filter → exclusion filter → inclusion filter → dedup → insert. Retry on empty results. Sets `last_searched_at` per company. |
-| Pipeline: clean (`src/pipeline/clean.rs`) | Tiered archival: SS=28d, S=21d, A=14d, B=7d, C/F=3d. Archive expires after 14 days (tracked via `archived_at`). No company auto-archival. |
-| Pipeline: check (`src/pipeline/check.rs`) | ATS re-verification, stale detection, completeness, dead URLs, duplicates, profile-change, structured report |
-| Pipeline: format (`src/pipeline/format.rs`) | Converts raw HTML/entity-encoded descriptions to clean plaintext. Idempotent. Runs on TUI startup via `run_silent()`. Also step 2 in check-integrity skill. |
-| Pipeline: import (`src/pipeline/import.rs`) | Bulk import from discovery files. Supports `--file` flag. Dedup via website URL unique constraint. |
-| profile-scrape skill | Designed, tested on NeuroDrive |
-| discover-companies skill | 9-agent discovery run produced 228 raw companies (161 new after dedup). Agents write to individual files. |
-| populate-db skill | Designed with company grading rubric and ATS docs for 7 providers |
-| search-jobs skill | Orchestrates the full search cycle — runs `cernio search` for resolved-ATS companies (287), dispatches parallel subagents to search the 121 bespoke companies via careers pages + aggregators (LinkedIn / Indeed / Glassdoor / BuiltIn), inserts via `INSERT OR IGNORE INTO jobs`, hands to `grade-jobs` |
-| check-integrity skill | AI-driven re-evaluation, cross-checking guide (4 reference files), active portfolio gap maintenance (10 jobs per grade tier). Step 2 runs `cernio format`. |
-| resolve-portals skill | AI fallback for companies that fail script resolution |
-| prepare-applications skill | Generate tailored application answers per job. Reads profile + job description + fit assessment, stores JSON answers in `application_packages` table. |
-| Autofill (`src/autofill/`) | Scaffolded. Chrome CDP via `chromiumoxide`. Provider dispatch (Greenhouse first). TUI `p` key triggers. **Broken:** JS value injection doesn't trigger React state. Needs nativeInputValueSetter or CDP Input.insertText. |
-| grade-companies skill | Enriches + grades: writes `what_they_do` (3-5 sentences), `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`. Calibration-anchored grading. |
-| grade-jobs skill | Question-first rubric, project tier awareness, calibration-anchored grading, mandatory description citation, prioritisation guide |
-| Company universe | 408 total (287 resolved, 121 bespoke, 0 potential). ATS: 114 Greenhouse, 70 Ashby, 31 Workable, 26 Lever, 20 Workday, 8 SmartRecruiters, 1 Eightfold. Every company has a known path to job discovery. |
-| Jobs | 1184 jobs (484 graded non-archived, 0 pending). Full grading: 13 SS, 27 S, 70 A, 142 B, 20 C, 212 F. Every SS/S assessment is multi-paragraph with description citations. |
-| TUI (`src/tui/`, 26 files) | v5 — 5 views (dashboard, companies, jobs, pipeline, activity). Modularised: app/ (6 files), handler/ (4 files), views/ (8 files), widgets/ (5 files) + mod.rs, queries.rs, theme.rs. Dashboard: heatmap, search pulse, visa countdown, top companies, session diff. Views: one-line kanban cards, scrollbars, spinners, quick-peek (Space), breadcrumbs, new badges, smart grouping (Ctrl+G). Chrome: contextual status bar, session timer, coloured tab badges, URL preview, decision history, enhanced help (6 sections). Focus mode hides F/C + applied. D archives F immediately. |
-| Export | Implemented — `e` key exports current view to `exports/YYYY-MM-DD-*.md` |
-| Unarchive | `cernio unarchive --jobs [--grade G]` restores archived jobs with timer reset |
+### Session 9 — testing foundation + skills migration (2026-04-10 to 2026-04-21)
 
-**Next priorities:**
-1. Fix autofill React form filling (nativeInputValueSetter or CDP Input.insertText)
-2. Interview prep skill design and implementation
-3. Integrity check after session 7 grading
-4. Add Lever and Ashby autofill modules once Greenhouse works
-5. Next job search cycle (periodic re-search of resolved companies)
+**Testing push:** 316 tests across 6 phases (up from 18 baseline). Full decisions and phase breakdown in `notes/testing-strategy.md`. Key architectural moves: lib+bin split (`src/lib.rs` + `src/main.rs` shim), `CERNIO_DB_PATH` env var, `test_support::open_in_memory_db()`, offline JSON fixtures for ATS parsers, CLI tests via `assert_cmd`. **Found and fixed two silent data-loss bugs** during the test pass (commit `12897aa`).
+
+**Skills migration:** all 9 project-local skills moved from `skills/` to `.claude/skills/` (commit `bebfbc5`) to gain native Claude Code integration (Skill tool auto-discovery, YAML frontmatter, `/skill-name` slash completion). Every SKILL.md gained engineered trigger descriptions, obligation-anchored language replacing exhortation framing, evidence-anchored mandatory-read tables. Legacy `skills/` folder removed (commit `d3e4e58`).
+
+**Skill-creator session:** nine individual skill-creator iterations (commits `319ed60` through `1c9ab85`) applied the full two-pass protocol. Each produced: evidence-anchored quality checklists, What-I-Did-Not-Do declarations between workflow steps and the section separator, Over-share-exhortation cleanups, hard-rule-4 TOC additions on long reference files. Session 9 also iterated skill-creator **on itself** (commit in `~/.claude/skills/skill-creator/`, +451 lines) adding: anti-compression gate, session-aware Pass 0 for research/references, per-invocation Step 5 Post-Run Findings enforcement, worked Pass 2 example.
+
+**CLAUDE.md:** migrated to the principal-engineer personality (commit `ce24790`). Teaches as it works, challenges weak reasoning, proactive improvement, obligation audit before declaring done. Incorporates the Cernio doctrine (Living System Philosophy, skill execution protocol, grade-quality standard, portfolio-gap tracking).
+
+### Current project state
+
+| Artefact | State |
+|----------|-------|
+| Profile (15 files) | Actively maintained; projects with honest tier labels (Flagship / Notable / Minor); portfolio-gaps.md actively updated |
+| SQLite schema | 5 tables, 6 migrations, 29 inline tests (was 11 at session 7) |
+| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet) |
+| Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug |
+| Testing | 316 tests, zero failing, runs under a second once compiled |
+| TUI | v5, 5 views, modular (26 source files), dashboard overhaul applied |
+| Autofill | Scaffolded, broken on React forms; fix approach documented |
+| Skills | 9 skills at `.claude/skills/`, all skill-creator-audited |
+| Skill-creator | Self-iterated in session 9; anti-compression + session-aware Pass 0 live |
+
+### Next priorities
+
+1. **Fix autofill React form filling** — `nativeInputValueSetter` or CDP `Input.insertText` (blocking applications at scale).
+2. **Eightfold fetcher** — currently recorded as bespoke; migration is straightforward once prioritised.
+3. **Interview prep skill** — designed in `notes/interview-prep-design.md`, not yet implemented.
+4. **Periodic integrity check** — ATS re-verification + grade drift detection after the next search cycle.
+5. **Resume + cover-letter refresh** — `profile/resume.md` and `cover-letter.md` rebuilt session 7 against the honest project tiers; next pass after the next significant project update.
+
+---
+
+## Coverage
+
+This upkeep pass (2026-04-21) inspected:
+
+- All files under `context/` end-to-end (architecture.md, notes.md, 16 notes files, 2 system files, 3 references).
+- `src/lib.rs`, `src/main.rs` (first 100 lines), `src/ats/mod.rs`, `src/ats/common.rs`, `src/pipeline/search.rs` (first 80 lines), `src/config.rs` (first 60 lines).
+- `git log --format=fuller --since='2026-04-09'` (18 commits since last upkeep).
+- Full-source grep for `WHY|NOTE|HACK|IMPORTANT|SAFETY|TODO|FIXME` annotations.
+- `scripts/scan_repo.py` output (repo inventory + import graph).
+
+Inferred from structure (not end-to-end read):
+
+- Detailed internals of `pipeline/resolve.rs`, `pipeline/clean.rs`, `pipeline/check.rs`, `pipeline/format.rs`, `pipeline/import.rs` — captured at the behaviour-contract level in `systems/pipeline.md` from recent commit bodies (phase 2–5 testing commits) + existing notes, not by re-reading each file this session.
+- Individual per-provider fetcher internals (`src/ats/{lever,greenhouse,ashby,workable,smartrecruiters,workday}.rs`) — captured from test file descriptions + `notes/populate-db-lessons.md` + external API reference files. Not re-read in this pass.
+- `src/tui/*` — `systems/tui.md` covers this subsystem at working-level depth; not re-verified against code in this pass.
+- `src/autofill/*` — captured through `notes/autofill-status.md`; status unchanged since it was last written.
+
+Deliberately not inspected:
+
+- Individual location-research agent files (`context/references/location-search/agent-*.md`) — treated as research artefacts, moved intact, and spot-checked only via `location-master.md`. Their 6,500-line content is the synthesis in `location-master.md`.
+
+No subsystem was noted-but-not-read at the boundary level. The specific gap worth surfacing: pipeline and ATS internals were updated from commit history and existing notes rather than a fresh line-by-line re-read. If drift is suspected next upkeep, `pipeline/resolve.rs` and one provider fetcher should be the first re-verification targets.

@@ -27,7 +27,7 @@ Creative sources include:
 - LinkedIn alumni patterns — where do people at interesting companies come from?
 - Non-obvious sector matches (healthcare AI, climate tech, biotech infrastructure)
 
-The creativity in *where to look* and *how to look sideways* is the skill's entire value. Full search strategies documented in `skills/discover-companies/references/search-strategies.md`.
+The creativity in *where to look* and *how to look sideways* is the skill's entire value. Full search strategies documented in `.claude/skills/discover-companies/references/search-strategies.md`.
 
 ---
 

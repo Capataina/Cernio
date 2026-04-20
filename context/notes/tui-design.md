@@ -1,6 +1,6 @@
 # TUI Design Decisions
 
-Rationale and principles behind TUI design choices. For the full implementation plan, see `context/plans/tui-v3.md`.
+Rationale and principles behind TUI design choices. Implementation state is documented in `systems/tui.md`; this note captures the **why** behind the choices.
 
 ---
 
