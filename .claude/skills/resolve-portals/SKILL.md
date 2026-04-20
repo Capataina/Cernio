@@ -1,6 +1,6 @@
 ---
 name: resolve-portals
-description: "AI fallback for ATS portal resolution — handles the companies that the mechanical `cernio resolve` Rust script could not match. Uses WebSearch + careers-page inspection to extract the correct ATS slug (which the script missed because the slug is non-obvious: legal entity name, former name, abbreviation, domain-based) or to identify an unsupported ATS provider (iCIMS, Taleo, Personio, Pinpoint HQ, BambooHR, Jobvite, Recruitee) and mark the company as bespoke with the careers URL preserved. Verifies every supposed slug against the provider's JSON API before writing. Invoke when the user says 'resolve portals', 'find ATS for remaining companies', 'handle unresolved companies', 'resolve the unmatched ones', 'find their job boards', 'the resolver failed on these', or names specific companies that stayed in `potential` status after `cernio resolve` ran. Not for running the initial mechanical probe (that is `cernio resolve` via populate-db), discovering new companies (use discover-companies), grading (use grade-companies), or searching jobs on already-resolved companies (use search-jobs). Use this skill whenever companies remain in `potential` status after the script has run, even if the user does not name it explicitly."
+description: "AI fallback for ATS portal resolution — handles companies the mechanical `cernio resolve` Rust script could not match. Uses WebSearch + careers-page inspection to extract the real ATS slug (non-obvious: legal entity, former name) or to mark the company bespoke when the provider is unsupported (iCIMS, Taleo, Personio, etc.). Every slug is verified against the provider's JSON API before write. Invoke when the user says 'resolve portals', 'find ATS for remaining companies', 'handle unresolved companies', 'resolve the unmatched ones', 'find their job boards', 'the resolver failed on these', or names companies still in `potential` status after `cernio resolve` ran. Not for the initial mechanical probe (that is `cernio resolve` via populate-db), discovering new companies (use discover-companies), grading (use grade-companies), or searching already-resolved companies (use search-jobs). Use this skill whenever companies remain in `potential` after the script has run, even if the user does not name it explicitly."
 ---
 
 # Resolve Portals
@@ -61,6 +61,16 @@ ATS identification signals per provider (full playbook in `references/ats-provid
 - `*.myworkdayjobs.com` → Workday (stores subdomain + site name in `ats_extra`)
 - `eightfold.ai` in page source → Eightfold (stores subdomain in `ats_extra`)
 
+**Per-company evidence obligation.** `WebSearch` is a low-pretraining-support tool and page-source inspection is a specific action the agent will quietly substitute with prose reasoning unless evidence is required. For each company, the step-5 summary-table `Evidence` column cites:
+
+- The exact `WebSearch` query used (or the direct careers URL from `companies.careers_url` if already known, identified as such).
+- The careers-page URL visited.
+- The specific ATS signal observed — outbound link domain, iframe src, embed-script URL, or redirect-chain target. Quote the signal verbatim, not as paraphrase.
+- When the signal points at an unsupported provider (bespoke path), quote the URL fragment that matched the unsupported-providers table in `references/ats-providers.md`.
+- When the company is dead, cite the specific source — Companies House URL with status text, the HTTP response code of the website, or the parent-company redirect destination.
+
+An evidence-column entry that reads "found via careers page" without the URL and the signal is not evidence; it is narrative. Such rows are not permitted to pass to step 3.
+
 ### 3. Verify the portal against the provider's JSON API
 
 Finding an ATS URL on the careers page is evidence; confirming the slug returns valid job data is verification. Extract the slug, hit the provider's JSON API endpoint (exact endpoints in the reference file), and confirm a parseable response:
@@ -101,14 +111,20 @@ Do not insert. Report to the user with specific evidence — Companies House sta
 ### 5. Present the summary table before any DB write
 
 ```
-| Company        | Result   | ATS        | Slug                     | Evidence                              |
-|----------------|----------|------------|--------------------------|---------------------------------------|
-| XTX Markets    | resolved | greenhouse | xtxmarketstechnologies   | Found via careers page outbound link  |
-| SurrealDB      | bespoke  | pinpoint   | —                        | surrealdb.pinpointhq.com (unsupported)|
-| Vypercore      | dead     | —          | —                        | Companies House: in liquidation 2025-08|
+| Company        | Result   | ATS        | Slug                     | Evidence                                                                        |
+|----------------|----------|------------|--------------------------|---------------------------------------------------------------------------------|
+| XTX Markets    | resolved | greenhouse | xtxmarketstechnologies   | `xtxmarkets.com/careers` → outbound `boards.greenhouse.io/xtxmarketstechnologies` · API `total=14` |
+| SurrealDB      | bespoke  | pinpoint   | —                        | `surrealdb.com/careers` → iframe src `surrealdb.pinpointhq.com/en/jobs` (unsupported) |
+| Vypercore      | dead     | —          | —                        | Companies House `13859477` status "Liquidation" (2025-08-14)                    |
 ```
 
+Evidence column entries read like the rows above — specific URLs, quoted outbound-link domains, API response fields. Prose assertions ("found via careers page") are not accepted — they do not constitute evidence.
+
 Wait for user approval before executing any SQL. This is a review gate — the user catches misclassified providers, wrong slugs, or premature "dead" calls.
+
+### 6. Declare what was skipped
+
+Close the run with a "What I did not do" section covering: companies left in `potential` status because evidence could not be gathered confidently, SmartRecruiters cases where `totalFound = 0` on an apparent SmartRecruiters careers page made the slug ambiguous, companies where the careers page itself failed to load, and any company where the three-bucket classification (supported / bespoke / dead) did not land cleanly. If nothing was skipped, say so explicitly — silence is the Claude abstention pattern, and the declaration is the structural counter.
 
 ---
 
@@ -126,14 +142,15 @@ These are failure modes observed in real resolution runs, not theoretical concer
 
 ## Subagent Context Requirements
 
-When dispatching parallel resolution work (one subagent per 3–5 unresolved companies), each prompt includes:
+When dispatching parallel resolution work (one subagent per 3–5 unresolved companies), each subagent prompt embeds every item below. Subagents run in isolated contexts and cannot read the skill directory or query the database themselves; anything not embedded in the prompt is invisible to them.
 
-- The **full text of `references/ats-providers.md`** — verbatim. Subagents cannot read it.
+- The **full text of `references/ats-providers.md`** — verbatim, not summarised.
 - The **list of assigned companies** with their existing `website` and `careers_url` fields.
-- Explicit instruction to produce the summary-table rows (company / result / ATS / slug / evidence) directly, not a narrative.
-- The SmartRecruiters `totalFound > 0` rule stated inline, not only linked — tool-use obligations degrade when buried in references.
+- The step-2 per-company evidence obligation reproduced verbatim, so the subagent returns rows with query + page URL + ATS signal quote (not narrative).
+- The summary-table column format from step 5 reproduced verbatim (company / result / ATS / slug / evidence), so subagent output can be concatenated without reformatting.
+- The SmartRecruiters `totalFound > 0` rule stated inline in the prompt, not only linked — tool-use obligations degrade when buried in references (F13).
 
-Under-contextualised subagents misclassify providers. Over-share.
+The failure mode this section defends against is subagent prompts that paraphrase the reference material rather than embed it. Paraphrased-input subagents drop the SmartRecruiters false-positive trap on real companies — this has been observed in practice, not a theoretical concern.
 
 ---
 
@@ -152,16 +169,22 @@ Under-contextualised subagents misclassify providers. Over-share.
 3. **No DB write without user approval of the summary table.** The review gate catches mislabelled providers and wrong-slug assignments before they reach production.
 4. **Bespoke entries point to a working job listings page.** Not a homepage. Downstream bespoke search depends on this.
 5. **Dead-company claims carry concrete evidence.** Companies House status, HTTP 404, redirect-to-parent. No unsubstantiated "seems dead" calls.
+6. **Every summary-table row cites specific artefacts.** URLs, quoted outbound-link domains, API response fields, Companies House numbers — not narrative. Prose evidence ("found via careers page") is rejected at step 3.
 
 ---
 
 ## Quality Checklist
 
-- [ ] Every resolved portal verified against the provider's JSON API with parseable response data
-- [ ] All SmartRecruiters entries have `totalFound > 0` or are backed by a careers-page link plus noted ambiguity — no zero-totalFound 200s treated as confirmation
-- [ ] Each slug verifiably belongs to the correct company, not a similarly-named different entity
-- [ ] No duplicate `company_portals` rows — existing entries checked before insert
-- [ ] Bespoke entries point to an actual job listings page, not the company homepage
-- [ ] Dead-company findings cite specific evidence (Companies House status, HTTP response, redirect chain)
-- [ ] When multiple portals exist for one company, `is_primary` is set correctly (active = 1, residual = 0)
-- [ ] Summary table was presented and user-approved before any SQL executed
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. Items that cannot be evidenced in the agent's own output are either skipped and declared under "What I did not do" (step 6), or the skill has not finished.
+
+- [ ] **Reference read fresh this invocation** — cite the tool call that read `references/ats-providers.md` in full.
+- [ ] **SQL query for unresolved companies run and shown** — the `SELECT ... WHERE status = 'potential'` result is visible in the transcript; row count named.
+- [ ] **Each company has a per-company evidence row** — summary table Evidence column names a careers-page URL + ATS signal quote (or equivalent for bespoke and dead paths).
+- [ ] **Each supported-ATS resolution has a JSON API response line** — endpoint hit, HTTP status, and the response field that confirms it (`total`, `totalFound`, array length).
+- [ ] **SmartRecruiters rows cite `totalFound > 0`** explicitly, or are demoted to bespoke with the careers-page link documenting the ambiguity.
+- [ ] **Bespoke rows cite the careers URL and the unsupported-ATS signal** — URL fragment matching the unsupported-providers table in `ats-providers.md`.
+- [ ] **Dead rows cite a source** — Companies House URL + status text, HTTP error code, or redirect-target URL. Prose-only "seems dead" rows fail this item.
+- [ ] **Multi-portal cases have `is_primary` assignments justified in the Evidence column** — active = 1, residual = 0, with a sentence naming which portal is active and why.
+- [ ] **Duplicate `company_portals` rows avoided** — cite the pre-insert check (SELECT query or UNIQUE constraint reliance) that catches duplicates.
+- [ ] **Summary table presented and approved** — the table was emitted, the user explicitly approved, and the approval turn is identifiable in the transcript.
+- [ ] **"What I did not do" declaration emitted** — at the end of the run, a section names every company left in `potential`, every SmartRecruiters ambiguity resolved against confirmation, every careers-page that failed to load. If nothing was skipped, the section says so explicitly; it is not absent.
