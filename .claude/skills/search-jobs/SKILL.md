@@ -111,6 +111,10 @@ This skill ends at insertion. Grading is `grade-jobs`'s job. Recommend the user 
 
 Do not grade inline in this skill. The old version of this skill attempted inline grading and produced inconsistent results because the full rubric lived elsewhere. The current split — search-jobs discovers, grade-jobs grades — keeps each skill's purpose clean and the quality anchored to the right reference files.
 
+### 7. Declare what was skipped
+
+Close the run with a "What I did not do" section covering: resolved-ATS companies that errored during the script run and were not retried; bespoke companies whose careers pages failed to load and whose aggregator fallbacks found nothing; subagent-returned company names that did not resolve to a `company_id` and were flagged rather than inserted; known-bespoke companies that were deferred for this session (e.g. C-tier not worth the manual-search cost). If the search was clean — all ATS companies succeeded, all bespoke companies either returned roles or produced zero-result records, every returned name mapped — say so explicitly. Silent omission is not the same as nothing-to-declare.
+
 ---
 
 ## Reference Loading
@@ -135,14 +139,20 @@ Do not grade inline in this skill. The old version of this skill attempted inlin
 
 ## Quality Checklist
 
-- [ ] `profile/` was read this invocation
-- [ ] `references/bespoke-search-playbook.md` was read this invocation
-- [ ] `cargo run -- search --dry-run` was run before the full search to confirm scope
-- [ ] `cargo run -- search` completed; per-company output was reviewed; error-row companies were flagged for retry
-- [ ] The bespoke-search pass ran — S-tier bespoke first, A-tier second, B-tier if time permitted
-- [ ] Every dispatched subagent prompt embedded the full bespoke-search playbook + the relevant profile slice verbatim
-- [ ] Every subagent return was structured per-company findings, not narrative
-- [ ] The orchestrator inserted every returned role via `INSERT OR IGNORE INTO jobs` — not just reported them
-- [ ] Duplicate counts (already-in-DB by URL) were reported alongside new-insert counts
-- [ ] The new pending queue count was summarised and the handoff to `grade-jobs` was stated explicitly
-- [ ] No grading happened in this skill — every new job is in `evaluation_status = 'pending'`
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. An item that cannot be evidenced in the agent's output is either unmet and surfaced under step 7 "What I did not do," or the skill has not finished.
+
+- [ ] **`profile/` read fresh this invocation** — cite the tool call per file.
+- [ ] **`references/bespoke-search-playbook.md` read fresh this invocation** — cite the tool call.
+- [ ] **`cargo run -- search --dry-run` output pasted verbatim** — company list and expected counts appear in chat before the real run.
+- [ ] **`cargo run -- search` output pasted verbatim** — per-company fetch results visible; error rows identified by company name.
+- [ ] **Bespoke SQL query run and row count reported** — the `SELECT ... WHERE status = 'bespoke' AND grade IN ('S','A','B')` result is identifiable in the transcript.
+- [ ] **Bespoke pass ran in priority order** — S-tier first, A-tier second, B-tier third; per-tier subagent dispatch counts cited.
+- [ ] **Every subagent prompt embedded the full playbook + profile slice** — verified by inspecting the prompt contents in the transcript.
+- [ ] **Subagent returns are structured per-company findings** — titles, URLs, locations in the per-company blocks; no narrative-only returns accepted.
+- [ ] **Every returned role was inserted via `INSERT OR IGNORE INTO jobs`** — cite the generated SQL batch; every returned role appears in the SQL. A role reported but not inserted is the session-7 failure and fails this item.
+- [ ] **Unresolved company-name flags surfaced** — any subagent-returned name that did not map to a `company_id` is named in step 7's declaration (not silently dropped).
+- [ ] **Per-source insert vs already-duplicate counts cited** — the count of jobs the OR IGNORE silently skipped is reported alongside the new-insert count.
+- [ ] **Pending queue count after insert cited** — `SELECT COUNT(*) FROM jobs WHERE evaluation_status = 'pending'` result appears in the handoff.
+- [ ] **Handoff to `grade-jobs` stated** — the final report names `grade-jobs` as the next step.
+- [ ] **No grading happened** — every new job is at `evaluation_status = 'pending'`; no `UPDATE jobs SET grade = ...` statements executed by this skill.
+- [ ] **Step 7 "What I did not do" declaration emitted** — names errored ATS companies, bespoke-pass failures, unresolved names, deferred companies, or explicitly states "clean run".

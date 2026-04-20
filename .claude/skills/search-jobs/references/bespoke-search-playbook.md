@@ -77,7 +77,7 @@ For each bespoke company in priority order:
 4. **For FAANG / major public companies** specifically: visit their careers site and use the in-page search. Query for roles matching profile target terms. Apple's careers site, Google Careers, Microsoft Careers, Meta Careers, Amazon Jobs all have functional search.
 5. **If no relevant roles exist or none can be found:** record that this company was searched and returned nothing. Do not insert — bespoke companies with no current openings are a valid zero-result.
 
-Depth over breadth per company. Spending two minutes thoroughly on Citadel's careers page beats skim-reading five companies.
+Depth over breadth per company. Two minutes spent end-to-end on Citadel's careers page beats skim-reading five companies.
 
 ---
 
