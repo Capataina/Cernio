@@ -86,7 +86,9 @@ After scraping, report to the user:
 
 1. **What was found** — brief summary of the repo state and anything notable (status mismatch, stack divergence from README, newly-visible strengths)
 2. **What was changed** — which profile files were updated and the substance of each change
-3. **Suggestions** — gaps spotted, resume items worth considering, improvements deferred because they exceed scraping scope
+3. **What was not changed and why** — entries that looked stale on first glance but checked out on closer look; upward proficiency revisions considered and rejected; gaps that the project nearly closes but does not quite
+4. **What I did not do** — repos in a multi-repo scrape that were skipped (with reason: already current, archived, inaccessible), proficiency revisions deferred pending a second supporting project, README claims contradicted by manifest that were preserved as a flag for the user rather than silently changed. If nothing was deferred or skipped, say so explicitly — silence is not the same as nothing-to-declare.
+5. **Suggestions** — gaps spotted, resume items worth considering, improvements deferred because they exceed scraping scope
 
 ---
 
@@ -104,14 +106,18 @@ After scraping, report to the user:
 
 ## Quality Checklist
 
-- [ ] Both reference files (`scraping-methodology.md`, `profile-format.md`) were read before scraping began
-- [ ] Every factual claim in the new / updated entries is grounded in something observed in the repo (file path, API field, dependency manifest, commit activity)
-- [ ] Technical highlights pass the depth test — each sentence names a specific technique, structure, algorithm, or decision; generic phrasing is flagged and rewritten
-- [ ] Technical highlights describe what is built, not planned — aspirational README features are excluded
-- [ ] Dependency manifests were read; stack reflects actual dependencies, not README claims
-- [ ] Proficiency levels follow the `profile-format.md` definitions — upward revisions require deeper evidence than what was previously recorded
-- [ ] Project status reflects actual repo activity (`pushed_at`, recent commits), not README tone
-- [ ] Existing entries are preserved where they are already good; updates are proportionate to real drift
-- [ ] User voice is preserved in entries that were already well-written
-- [ ] Cross-references are consistent — new skills added to `skills.md`, gap closures noted in `portfolio-gaps.md`, session-worthy insights in `context/notes.md`
-- [ ] `profile/resume.md` was not edited; any suggestions for it are in the report
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. A checklist item that cannot be evidenced in the agent's output is either unmet and surfaced under "What I did not do" in the report, or the skill has not finished.
+
+- [ ] **Both reference files read fresh this invocation** — cite the tool call for `scraping-methodology.md` and `profile-format.md`.
+- [ ] **Every file in `profile/` read fresh this invocation** — cite the tool call for each file under `profile/`.
+- [ ] **Dependency manifest(s) read** — cite the exact file path (`Cargo.toml`, `package.json`, `pyproject.toml`, `go.mod`, etc.) and the dependency list extracted. When the manifest and the README disagree on stack, the manifest wins; the disagreement is named in the report.
+- [ ] **GitHub API metadata fetched** — cite the WebFetch or `gh api` call that returned `pushed_at`, the primary language, and the top-level directory listing. "Inferred from source code" does not substitute.
+- [ ] **Every factual claim in new / updated entries cites a source** — file path, manifest line, API field, or commit reference. Assertions without source citations fail this item.
+- [ ] **Technical highlights pass the depth test, per-highlight** — for each new or updated highlight sentence, name the specific technique, structure, algorithm, or decision it cites; "uses modern patterns"-class phrasings fail and are rewritten.
+- [ ] **Built vs planned is distinguished** — every highlight describes something visible in the repo right now; no roadmap items claimed as present. Cite the specific file or module where the built thing lives.
+- [ ] **Proficiency upgrades (if any) cite the new evidence** — the second or third project demonstrating deeper usage is named, with the specific patterns that justify the upgrade. Upgrades without new evidence fail this item.
+- [ ] **Project status matches repo signal** — cite `pushed_at` or the most recent commit date and the decision that status maps to (Completed / In Progress / In Progress (not enough interest) / Paused / Abandoned).
+- [ ] **Existing entries preserved where already good** — diff between old and new entry is surfaced in the report; unchanged sections are explicitly unchanged, not silently rewritten.
+- [ ] **Cross-file updates are consistent** — new skills added to `skills.md` are referenced in the relevant `projects.md` entry; gap closures noted in `portfolio-gaps.md` name the project; `context/notes.md` entries (if any) cite the scrape's findings.
+- [ ] **`profile/resume.md` untouched** — confirmed by checking the file's modification time (or, if in the same session, by naming which files were edited and noting `resume.md` is not one of them).
+- [ ] **Report includes "What I did not do" section** — either names specific deferrals or states "no deferrals or skipped work" explicitly; absence is not permitted.

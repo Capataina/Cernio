@@ -4,6 +4,16 @@
 
 ---
 
+## Table of Contents
+
+- [Information sources, in priority order](#information-sources-in-priority-order) — context → README → manifests → API → source; priority explained
+- [Assessing technical depth](#assessing-technical-depth) — what to look for, what NOT to highlight, the depth test
+- [Assessing project status](#assessing-project-status) — status levels with evidence signals; the "not enough interest" nuance
+- [Multi-repo scraping](#multi-repo-scraping) — iteration pattern and the skip-if-accurate rule
+- [Cross-referencing across profile files](#cross-referencing-across-profile-files) — which profile file each finding updates
+
+---
+
 ## Information sources, in priority order
 
 ### 1. Context folder (richest source)
@@ -42,7 +52,7 @@ These tell you what the code actually uses, regardless of what the README claims
 | `go.mod` | Go — modules |
 | `pom.xml` / `build.gradle` | Java — dependencies |
 
-Read the dependency list carefully. Each dependency tells you something:
+Read the dependency list end to end. Each dependency tells you something:
 - `tokio` → async Rust
 - `ratatui` → terminal UI
 - `rusqlite` → SQLite integration

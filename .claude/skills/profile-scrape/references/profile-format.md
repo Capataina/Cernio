@@ -4,6 +4,17 @@
 
 ---
 
+## Table of Contents
+
+- [projects.md entry format](#projectsmd-entry-format) — per-project field structure and what each field carries
+- [The technical highlights field](#the-technical-highlights-field) — the load-bearing field; structure, content rules, length, voice
+- [Example: what good technical highlights look like](#example-what-good-technical-highlights-look-like) — worked comparisons, deep and shallow, good and bad
+- [skills.md format](#skillsmd-format) — language and domain tables, proficiency-level definitions, upgrade rules
+- [portfolio-gaps.md format](#portfolio-gapsmd-format) — gap closures and new strengths
+- [What NOT to touch](#what-not-to-touch) — resume.md, preferences.toml, personal files
+
+---
+
 ## projects.md entry format
 
 Every project entry follows this exact format. Do not deviate from the field structure.
