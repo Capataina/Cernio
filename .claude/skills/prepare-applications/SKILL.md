@@ -92,10 +92,10 @@ VALUES (?1, ?2, datetime('now'));
 
 Tell the user:
 
-- How many packages were created
-- Which jobs are now ready (they show the yellow `●` indicator in the TUI)
-- Which jobs were skipped and why (already packaged, already applied, no description available)
-- The reminder: press `p` on any job with `●` to open Chrome with the form prefilled
+- How many packages were created, and the job IDs affected.
+- Which jobs are now ready (they show the yellow `●` indicator in the TUI).
+- Which jobs were skipped and why — one row per skipped job with the specific reason (already packaged, already applied, description missing, fit assessment missing, company context missing, or an answer failed a generation-standard bar and could not be salvaged). Silent omission of the skipped-jobs list is not permitted; if nothing was skipped, say so explicitly.
+- The reminder: press `p` on any job with `●` to open Chrome with the form prefilled.
 
 ---
 
@@ -125,15 +125,16 @@ Do not fabricate experience. If the role asks for Kubernetes and the profile doe
 
 For batches of 5 or more jobs, dispatch parallel subagents — one per 2–3 jobs. The main agent is the orchestrator; subagents generate the JSON and return SQL INSERT statements, which the orchestrator collects and executes.
 
-Each subagent prompt includes:
+Each subagent prompt embeds every item below. Subagents run in isolated contexts and cannot read the profile, the skill directory, or the database themselves.
 
-- **The full content of every file in `profile/`** (the agent cannot read the profile itself)
-- The full `raw_description`, `fit_assessment`, `grade`, and company context for each assigned job
-- The answer generation standard from this skill file, embedded verbatim
-- The JSON key contract (`why_interested`, `why_company`, `technical_project`, `cover_letter`)
-- Explicit instruction to output the SQL INSERT statements directly, not a narrative summary
+- **The full content of every file in `profile/`** — verbatim, not summarised.
+- The full `raw_description`, `fit_assessment`, `grade`, and company context for each assigned job.
+- The Answer Generation Standard from this skill file, reproduced verbatim.
+- The JSON key contract (`why_interested`, `why_company`, `technical_project`, `cover_letter`) reproduced verbatim, so subagent output concatenates without reformatting.
+- The four mandatory-reads table reproduced verbatim, so the subagent cannot silently skip the profile / job-description / fit-assessment / company-context preconditions.
+- Explicit instruction to output the SQL INSERT statements directly, not a narrative summary.
 
-Under-contextualising a subagent produces generic answers that fail the generation standard. Over-share the profile rather than summarise it.
+The failure mode this defends against is paraphrased-profile subagents generating answers that match the profile summary but not the actual profile — these ship with subtle factual drift (wrong project names, claimed skills the profile does not support) that only surfaces at interview.
 
 ---
 
@@ -148,15 +149,18 @@ Under-contextualising a subagent produces generic answers that fail the generati
 
 ## Quality Checklist
 
-Before declaring the batch complete:
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. Items that cannot be evidenced in the agent's output are either skipped and declared in step 6's skipped-jobs list, or the skill has not finished.
 
-- [ ] Every answer references at least one specific project or skill from the profile by name
-- [ ] The `why_company` answer cites something the company actually builds or a specific team / product area from the job description — not generic praise
-- [ ] No fabricated experience: any gap against the job's requirements is framed honestly with adjacent evidence
-- [ ] Every answer is 2–4 paragraphs, dense, and specific
-- [ ] The cover letter has a clear structure: specific-role hook → technical fit with named evidence → why-this-company → short close
-- [ ] The JSON is syntactically valid and the keys match the autofill provider module's expected contract
-- [ ] The full profile was read in this invocation — no reliance on earlier-session memory
-- [ ] Jobs skipped due to missing description / fit assessment / company context are reported with the specific reason
-- [ ] The package was written via `INSERT OR REPLACE` so reruns update rather than error
-- [ ] The user was reminded that `p` in the TUI launches the autofill on any job with the yellow `●` indicator
+- [ ] **Profile read fresh this invocation** — cite the tool call that read each file under `profile/`. Relying on earlier-session memory fails this item.
+- [ ] **Per-job quotation evidence** — for every job that received a package, the `why_interested` answer quotes at least one responsibility or stack element verbatim from the job's `raw_description`. The quotation is identifiable in the generated text.
+- [ ] **Per-answer named profile element** — every answer names a specific project, skill, or experience from the profile. The project name appears in the answer (e.g. "Nyquestro"), not a generic reference ("one of my projects").
+- [ ] **`why_company` cites company-specific content** — the answer quotes or paraphrases the company's `what_they_do` field and names either the team/product area from the job description or a specific product the company ships. Generic "great company" phrasings fail this item.
+- [ ] **No fabricated experience** — every skill or technology claimed in the answers maps to an entry in `profile/skills.md` or a demonstrated usage in `profile/projects.md`. Gaps are framed with adjacent evidence, not filled with plausible-sounding claims.
+- [ ] **Answer length bounds** — each answer is between 2 and 4 paragraphs. Count before submitting.
+- [ ] **Cover letter structure verified** — the cover letter has four identifiable parts: specific-role hook, technical fit with named evidence, why-this-company, short close. Each part is visible as its own paragraph or sentence cluster.
+- [ ] **JSON syntactic validity** — the JSON parses (test with a JSON-parsing tool or language runtime). Syntactically-invalid JSON breaks the autofill pipeline silently.
+- [ ] **JSON key contract** — every package contains exactly the keys `why_interested`, `why_company`, `technical_project`, `cover_letter`, plus any job-specific extras from standard factual questions. Missing keys fail autofill; extra unexpected keys are ignored but noted.
+- [ ] **`INSERT OR REPLACE` used** — cite the actual SQL statement executed. `INSERT` without `OR REPLACE` risks erroring on rerun.
+- [ ] **Only `application_packages` modified** — no writes to `jobs`, `user_decisions`, or `companies`. Cite the set of tables written to this invocation.
+- [ ] **Skipped-jobs list emitted** — step 6 report contains the explicit skipped-jobs list with per-job reasons, or an explicit "no jobs skipped" line. Absence of the list fails this item.
+- [ ] **TUI reminder included** — the final report tells the user to press `p` on any job with the `●` indicator.
