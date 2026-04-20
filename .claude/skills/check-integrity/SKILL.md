@@ -206,6 +206,10 @@ Structure the output by severity:
 
 No DB writes. Every recommendation is for user approval before action.
 
+### 11. Declare what was skipped
+
+Close the report with a "What I did not do" section covering: graded entities the orchestrator considered but did not flag because the profile change was not directly relevant (the filter from step 4 — worth naming which kind of non-relevance was most common); grade-tier portfolio-gap samples where `< 10` jobs existed in the tier (step 8 sampled what was available; this names it explicitly); cross-checking comparisons deferred because the universe is too large for an exhaustive within-tier comparison this pass; relevance-refresh candidates noticed but not drafted because the volume would overwhelm the report. If the check ran to completion with nothing deferred, say so explicitly.
+
 ---
 
 ## Remediation Mode
@@ -271,16 +275,19 @@ All four are read at invocation. The remediation guide alone without the quality
 
 ## Quality Checklist
 
-- [ ] All four reference files were read before the check began
-- [ ] All files in `profile/` were read this invocation
-- [ ] `cernio check` ran and its output is in the report
-- [ ] `cernio format` ran in step 2 — format counts noted if any rows were touched
-- [ ] Staleness detection focused on entries where the profile change is directly relevant to the specific reasoning, not blanket re-evaluation
-- [ ] Grade-quality spot-check included quoted examples of acceptable and unacceptable reasoning per `quality-standards.md`
-- [ ] Cross-checking pass ran per `cross-checking-guide.md`, including within-tier coherence and across-tier gradient checks
-- [ ] Step 8 portfolio gap analysis sampled 10 jobs per grade tier (or the maximum available), prioritised by company grade
-- [ ] `profile/portfolio-gaps.md` was updated — "Patterns from Job Evaluations", "Known Gaps", and "Current Strengths" sections as applicable, or dated "no new patterns found" note
-- [ ] Missing-data queries ran and quantified results
-- [ ] Recommendations prioritised — most impactful first
-- [ ] Zero DB writes in report mode (except `portfolio-gaps.md`)
-- [ ] In remediation mode: each fix presented for user approval before write; no batch auto-fix
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. An item that cannot be evidenced in the agent's output is either unmet and surfaced under step 11 "What I did not do," or the skill has not finished.
+
+- [ ] **All four reference files read fresh this invocation** — cite the tool call per file.
+- [ ] **All files in `profile/` read fresh this invocation** — cite the tool call per file.
+- [ ] **`cernio check` output pasted verbatim in the Mechanical Issues section** — not paraphrased.
+- [ ] **`cernio format` output noted** — if rows were formatted, the row count appears in the report; if zero rows were touched, say so.
+- [ ] **Every profile-driven staleness finding cites two things** — the specific profile file + element that changed, and the specific quoted fragment of `grade_reasoning` it contradicts. A flag that cites only one is unmet.
+- [ ] **Grade-quality spot-check quotes specific examples** — the report reproduces at least two `grade_reasoning` or `fit_assessment` fragments that match either the "acceptable" or "unacceptable" examples in `quality-standards.md`, with the matching standard cited.
+- [ ] **Cross-checking pass cites comparisons per `cross-checking-guide.md`** — within-tier coherence pairs (X vs Y, both A-tier, ranked), across-tier gradient comparisons (lowest A ≥ highest B), and specific red-flag spot-checks — each with the pair named in the report.
+- [ ] **Step 8 sampled 10 jobs per tier (or the max available)** — cite the SQL per tier and the row counts returned; if `< 10` available the exact number is named.
+- [ ] **`profile/portfolio-gaps.md` diff cited** — either new-patterns-with-counts or a dated null-result note, evidenced by the before/after of the file or the patch applied.
+- [ ] **Missing-data queries ran with counts** — the four SQL queries from step 7 were executed and the row count from each appears in the report.
+- [ ] **Report sections present and ordered per step 10** — Mechanical → Staleness → Quality → Cross-Tier → Missing → Gaps → Relevance → Recommendations.
+- [ ] **Zero DB writes in report mode (except `portfolio-gaps.md`)** — cite the set of tables written to this invocation; `portfolio-gaps.md` is the only permitted write.
+- [ ] **In remediation mode: per-fix user approval cited** — for each fix applied, the user-approval turn is identifiable in the transcript; batch auto-fix is a rule violation.
+- [ ] **Step 11 "What I did not do" declaration emitted** — names deferred comparisons, tier-sample shortfalls, or non-relevance filter decisions, or explicitly states "nothing deferred".
