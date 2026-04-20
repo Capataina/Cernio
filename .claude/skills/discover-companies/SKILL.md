@@ -93,10 +93,14 @@ Run once per discovery file. The DB's unique-constraint on `website` handles ded
 
 Tell the user:
 
-- How many companies each agent found
-- How many were new vs duplicates (reported by `cernio import`)
-- Notable finds worth highlighting — particularly strong profile alignments or surprising sources
-- Which sources were most productive (signal for the next discovery run)
+- How many companies each agent found, itemised by territory.
+- How many were new vs duplicates per territory (reported by `cernio import`).
+- Notable finds worth highlighting — particularly strong profile alignments or surprising sources (name the source explicitly).
+- Which sources were most productive (signal for the next discovery run).
+
+### 7. Declare what was skipped
+
+Close the run with a "What I did not do" section covering: territories that were designed but not dispatched (with reason); subagents that returned empty or near-empty results (what they searched, why the well was dry); sources the orchestrator considered but did not include in the subagent starting-source lists; companies surfaced by subagents but rejected before import (with the reason — duplicate, not-profile-aligned, insufficient evidence, dead website). If nothing was skipped or deferred, say so explicitly — silence is the Claude abstention pattern.
 
 ---
 
@@ -147,15 +151,18 @@ Discovery is broad by design. The funnel narrows at every subsequent step.
 
 ## Quality Checklist
 
-- [ ] Every subagent prompt embeds the full text of `references/search-strategies.md` verbatim — verifiable by checking the prompt contents
-- [ ] The existing universe was queried and passed to every subagent before dispatch — no re-discoveries in the results
-- [ ] Territories were derived from the profile this invocation, not from a hardcoded list — the session transcript shows the derivation
-- [ ] The non-obvious-sources agent was dispatched with source choices derived from the profile's specific technologies and domains
-- [ ] Every discovered company has a specific, concrete "why relevant" naming at least one profile element
-- [ ] The source field is specific and verifiable (named page / dated thread / identifiable repository / contributor URL), not "web search"
-- [ ] Results include non-obvious finds, not just well-known names everyone already surfaces
-- [ ] Each subagent went beyond first-page search results — depth over breadth
-- [ ] The "what they do" field describes the actual product or service, not the sector label
-- [ ] Companies span a range of sizes and stages, not exclusively large firms or exclusively tiny startups
-- [ ] Each subagent's discoveries landed in its own `companies/discovery-{territory}.md` file, not a shared file
-- [ ] `cargo run -- import` was run per file; dedup counts reported to the user
+Each item is an obligation with a concrete evidence slot, not a subjective self-rating. An item that cannot be evidenced in the agent's output is either unmet and surfaced under step 7 "What I did not do," or the skill has not finished.
+
+- [ ] **Profile read fresh this invocation** — cite the tool call that read each file in `profile/`.
+- [ ] **Existing universe queried** — cite the SQL query run and the row count returned; the set of `(name, website)` passed to subagents is identifiable in the transcript.
+- [ ] **Territory derivation shown** — the session transcript names the specific profile elements (skill, domain interest, sector preference) that produced each territory. "Designed from profile" without citation fails this item.
+- [ ] **Non-obvious-sources agent dispatched with explicit source list** — the agent's starting-source list is reproduced in the dispatch prompt and is derived from specific profile technologies / domains (not a generic "OSS contributors" placeholder).
+- [ ] **Every subagent prompt embeds `references/search-strategies.md` verbatim** — the prompt contents for every dispatched subagent are visible in the transcript; full file is present, not paraphrased.
+- [ ] **Every subagent's prompt embeds the deduplication list** — the list of known `(name, website)` pairs appears in the prompt; subagents cannot re-discover companies already in the universe.
+- [ ] **Each subagent's output cites WebSearch queries used** — per-company rows cite the actual query text or the fetched URL, not "via web search". Per-agent aggregate: at least one non-trivial WebSearch query per 3-5 companies claimed.
+- [ ] **Per-company "why relevant" names a specific profile element** — a project, a skill, or a domain interest by name (e.g. "Nyquestro", not "my trading-system work"). Generic relevance fails this item.
+- [ ] **Per-company "source" field is verifiable** — a named page URL with date, a specific repository URL, an identifiable contributor profile URL, or a dated thread URL. "Web search" or "Google" fails this item.
+- [ ] **Per-company "what they do" describes product/service specifically** — names the product, the target user, and the technical surface. Sector-label answers ("fintech company") fail this item.
+- [ ] **Each subagent's discoveries landed in its own `companies/discovery-{territory}.md` file** — verify by listing the new files after the run; no shared writes to `companies/potential.md`.
+- [ ] **`cernio import` run once per discovery file** — cite the import commands executed and the per-file dedup counts reported by each.
+- [ ] **Step 7 "What I did not do" declaration emitted** — names specific skipped territories, empty-result subagents, or rejected companies, or explicitly states "no deferrals or skipped territories".
