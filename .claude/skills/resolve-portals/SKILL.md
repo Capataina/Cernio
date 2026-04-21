@@ -33,6 +33,21 @@ The companies reaching this skill fall into three buckets. Categorisation happen
 
 ## Workflow
 
+### 0. Run `cernio resolve` first
+
+The mechanical resolver is free to run and may resolve companies that have never been probed — typically newly inserted rows added after the last `populate-db` cycle, or rows whose probe candidate set has been updated since they last failed. Running the script first converts those rows from `potential` to `resolved` at zero cost, shrinking the set this skill has to AI-fallback.
+
+Dry-run first, real run second:
+
+```bash
+cernio resolve --dry-run    # preview the candidate list + slug candidates
+cernio resolve              # execute the mechanical probe
+```
+
+Paste both outputs into the chat response before moving to step 1. If `cernio resolve --dry-run` shows zero unresolved companies, skip the execution and note "no unresolved companies; cernio resolve not run" explicitly — silence on this is the documented abstention pattern, not evidence the step was unnecessary.
+
+**No substitution.** Do not skip this step on the assumption that `populate-db` or a previous `resolve-portals` run has already resolved everything. The skill's input (`WHERE status = 'potential'`) is defined by DB state, and DB state changes between invocations; running the script first is the only way to guarantee the AI fallback handles genuinely-unresolved companies, not ones the script could have resolved mechanically.
+
 ### 1. Query unresolved companies
 
 ```sql
@@ -178,6 +193,7 @@ The failure mode this section defends against is subagent prompts that paraphras
 Each item is an obligation with a concrete evidence slot, not a subjective self-rating. Items that cannot be evidenced in the agent's own output are either skipped and declared under "What I did not do" (step 6), or the skill has not finished.
 
 - [ ] **Reference read fresh this invocation** — cite the tool call that read `references/ats-providers.md` in full.
+- [ ] **`cernio resolve --dry-run` + `cernio resolve` run at step 0** — both outputs pasted verbatim in chat before step 1. If the dry-run showed zero candidates, the "not run" declaration is stated explicitly; silence fails this item.
 - [ ] **SQL query for unresolved companies run and shown** — the `SELECT ... WHERE status = 'potential'` result is visible in the transcript; row count named.
 - [ ] **Each company has a per-company evidence row** — summary table Evidence column names a careers-page URL + ATS signal quote (or equivalent for bespoke and dead paths).
 - [ ] **Each supported-ATS resolution has a JSON API response line** — endpoint hit, HTTP status, and the response field that confirms it (`total`, `totalFound`, array length).

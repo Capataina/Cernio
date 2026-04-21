@@ -26,6 +26,16 @@ The profile is not cached in this skill or in any reference file. Every invocati
 
 ## Workflow
 
+### 0. Run `cernio format` before any grading starts
+
+Grading agents read `raw_description` verbatim (see step 1's SELECT). Raw HTML — `<p>`, `<strong>`, `&nbsp;`, `&amp;` — degrades grading quality: tokens are spent parsing markup, seniority cues buried in `<h3>` headers get missed, and the description-quote evidence obligation in step 5 produces rows with HTML fragments instead of readable prose. `cernio format` converts HTML to clean plaintext in-place on `raw_description` and `fit_assessment` (the same fields the calibration-anchor query in step 2 reads) and is fully idempotent, so running it at the top of every invocation is free insurance.
+
+```bash
+cernio format
+```
+
+Paste the row-count summary into the chat response. If zero rows were touched (already clean), say so explicitly — the step is required evidence that cleanliness is verified this run, not assumed. Without this step, every subagent that grades an HTML-laden job is reasoning against broken input.
+
 ### 1. Query the pending queue and report the count
 
 ```sql
@@ -262,6 +272,7 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 
 - [ ] **All 15 files in `profile/` read fresh this invocation** — cite the tool call per file.
 - [ ] **All three reference files read fresh this invocation** — cite the tool call per file.
+- [ ] **`cernio format` run at step 0** — the row-count summary appears in chat before step 1. If zero rows were touched, the "already clean" declaration is stated explicitly; silence fails this item.
 - [ ] **Calibration anchors pulled from the DB** — cite the SQL query run and reproduce the rows returned (2–3 per tier); the same block appears in every subagent's prompt.
 - [ ] **Every subagent prompt embeds the full profile + three reference files verbatim** — verifiable by inspecting the prompt contents in the transcript.
 - [ ] **No title-only grades** — for every graded job, the transcript shows the description was read (fetched or already present, ≥100 words). Jobs that could not satisfy this remain at `pending` and appear in step 12.
