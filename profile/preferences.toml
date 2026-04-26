@@ -293,6 +293,9 @@ patterns = ["London", "GB", "United Kingdom", "Remote", "Cambridge"]
 [search_filters.locations.smartrecruiters]
 patterns = ["London", "gb", "United Kingdom", "Remote", "Cambridge"]
 
+[search_filters.locations.workday]
+patterns = ["London", "UK", "United Kingdom", "England", "Remote", "Cambridge"]
+
 # ─────────────────────────────────────────────────────────────────
 # CLEANUP THRESHOLDS
 # ─────────────────────────────────────────────────────────────────
