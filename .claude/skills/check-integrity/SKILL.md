@@ -17,7 +17,7 @@ The output is not just a report. Step 8 — portfolio gap analysis — writes di
 
 | # | What | Evidence |
 |---|---|---|
-| 1 | **Every file in `profile/`** | Findings cite specific profile files and the specific element that is now stale relative to a grade (e.g. "Company X's grade_reasoning says 'lacks cloud experience'; `profile/projects.md` now includes an AWS deployment in project Y") |
+| 1 | **Every file in `profile/`** | Findings cite specific profile files and the specific element that is now stale relative to a grade (e.g. "Company X's grade_reasoning says 'lacks cloud experience'; the per-project file in `profile/projects/` now includes an AWS deployment in project Y") |
 | 2 | **`references/remediation-guide.md`** (191 lines, TOC present) | Each report-mode finding maps to a named remediation procedure ready for the remediation-mode switch |
 | 3 | **`references/quality-standards.md`** (83 lines) | Grade-quality flagging cites the specific "acceptable" / "unacceptable" examples from this file |
 | 4 | **`references/profile-context.md`** (52 lines) | Staleness detection focuses on the profile-change-to-grade-reasoning link, not blanket re-evaluation |
@@ -74,9 +74,9 @@ For each graded company, the question is not "has this grade aged" but "does the
 
 Examples of what to flag:
 
-- Grade reasoning cites a skill gap that the profile has since filled ("lacks Kubernetes" → `profile/projects.md` now has a K8s project → recommend upward re-grade)
+- Grade reasoning cites a skill gap that the profile has since filled ("lacks Kubernetes" → a per-project file in `profile/projects/` now describes a K8s project → recommend upward re-grade)
 - Grade reasoning relies on a preference that has changed ("London-only" → `profile/preferences.toml` now accepts Manchester → reasoning is stale)
-- Grade reasoning predates a significant new flagship project that strengthens the technical-alignment argument
+- Grade reasoning predates a significant new active or complete project that strengthens the technical-alignment argument
 
 A new Rust project does not affect a company graded on sponsorship concerns. Relevance of the profile change to the specific reasoning is the filter.
 

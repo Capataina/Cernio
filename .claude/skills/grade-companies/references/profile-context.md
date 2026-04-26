@@ -34,8 +34,9 @@ Read **all** of the following files at the start of every grading session. Do no
 | `profile/visa.md` | **Critical.** Current visa type, expiry date, right-to-work status, sponsorship requirements and timeline. This determines how to weight sponsorship capability for every company. |
 | `profile/education.md` | Degree classification, university, graduation date. Degree classification affects whether HR screening filters at prestigious companies will pass or reject the candidate. |
 | `profile/experience.md` | Formal work experience (or lack thereof). The presence or absence of professional experience fundamentally changes what company attributes matter most — e.g., if there is no work history, engineering reputation and CV signal from the first employer become disproportionately important. |
-| `profile/projects.md` | **Critical.** The project portfolio is the primary evidence of engineering capability. Extract: languages used, domains covered, technical depth demonstrated, and what kinds of company problems the portfolio aligns with. This is what determines technical alignment scoring. |
-| `profile/skills.md` | Technical skills inventory — languages, frameworks, tools, domains. Use this to assess stack alignment with each company's engineering work. |
+| `profile/projects/` (per-project files + `index.md`) | **Critical.** The project portfolio is the primary evidence of engineering capability. Read `profile/projects/index.md` for the inventory, then read every per-project file. Extract: languages used, domains covered, technical depth demonstrated, the project's `status` from frontmatter (active/complete/paused/dormant/abandoned), and what kinds of company problems the portfolio aligns with. This is what determines technical alignment scoring. |
+| `profile/projects/open-source-contributions.md` | OSS contributions and community involvement. Minor factor but can signal cultural alignment with mission-driven companies. |
+| `profile/skills.md` | Technical skills inventory across six tables (Programming Languages, Frameworks, Libraries, Engines and Runtimes, Tools and Platforms, Concepts and Domains) with four bands (Proficient/Comfortable/Familiar/Beginner). Use this to assess stack alignment with each company's engineering work. |
 | `profile/preferences.toml` | **Critical.** Hard constraints (excluded sectors, dealbreakers, location requirements) and soft preferences (preferred sectors, role types, work arrangements). Any company in an excluded sector gets rejected outright — do not grade it. |
 | `profile/portfolio-gaps.md` | Known gaps in the profile — skills the market asks for that the candidate currently lacks. Use this to assess whether a company's stack requirements hit a gap vs. a strength. |
 | `profile/resume.md` | The structured CV. Cross-reference with other files for a complete picture of what the candidate presents to employers. |
@@ -44,7 +45,6 @@ Read **all** of the following files at the start of every grading session. Do no
 | `profile/certifications.md` | Professional certifications held. Relevant for companies that value or require specific credentials. |
 | `profile/languages.md` | Spoken languages. Relevant for companies with international teams or specific language requirements. |
 | `profile/military.md` | Military service status. May be relevant for defence-sector companies or security clearance eligibility. |
-| `profile/volunteering.md` | Volunteering and community involvement. Minor factor but can signal cultural alignment with mission-driven companies. |
 
 ---
 
@@ -54,13 +54,13 @@ After reading all profile files, you should have a mental model of:
 
 ### 1. Technical identity
 
-Synthesise from `projects.md`, `skills.md`, and `experience.md`:
+Synthesise from the per-project files in `profile/projects/`, `skills.md`, and `experience.md`:
 - What is the candidate's primary language and technical domain?
 - What kinds of engineering problems does the portfolio demonstrate competence in?
 - What is the depth vs. breadth balance?
 - Where does the portfolio convert most effectively — i.e., which company types would see this work and immediately recognise its relevance?
 
-**Project tiers matter.** Each project in `projects.md` has a Tier field (Flagship, Notable, Minor) and a Status field. Flagship projects represent the candidate's strongest, deepest work — these are what demonstrate real capability. Minor or abandoned projects show breadth of interest but not depth. When assessing technical identity, weight flagship projects heavily; treat minor/abandoned projects as background context, not primary evidence.
+**Project status matters.** Each per-project file in `profile/projects/` has a `status` frontmatter field (active/complete/paused/dormant/abandoned). Active and complete projects represent the candidate's strongest evidence of capability. Paused and dormant projects are secondary evidence — solid but not currently invested in. Abandoned projects show breadth of interest but not depth. When assessing technical identity, weight active and complete projects heavily; treat abandoned projects as background context, not primary evidence.
 
 ### 2. Career targets and constraints
 
@@ -82,15 +82,15 @@ Synthesise from all files:
 
 When writing grade reasoning and why_relevant fields, you must connect companies to the profile concretely. Build a mental checklist of profile elements to reference:
 
-**Projects (from `projects.md`):**
+**Projects (from `profile/projects/`):**
 For each company, identify which projects from the portfolio align with the company's work. Name them explicitly. "The candidate's Nyquestro project demonstrates lock-free matching engine design" is useful. "The candidate has relevant projects" is not.
 
-**Weight projects by their Tier field.** Each project has a Tier (Flagship, Notable, Minor) reflecting how much the candidate values it and how much engineering depth it demonstrates. Flagship projects are the candidate's strongest evidence — alignment with flagships is a much stronger signal than alignment with minor or abandoned projects. If a company's work only aligns with minor-tier projects, that is weak technical alignment regardless of nominal technology overlap.
+**Weight projects by their `status` frontmatter field.** Each per-project file in `profile/projects/` has a `status` field (active/complete/paused/dormant/abandoned) reflecting whether the candidate is currently invested in it and how much engineering depth it demonstrates. Active and complete projects are the candidate's strongest evidence — alignment with these is a much stronger signal than alignment with abandoned projects. If a company's work only aligns with abandoned projects, that is weak technical alignment regardless of nominal technology overlap.
 
 **Technologies (from `skills.md`):**
 For each company, identify which of the candidate's technologies the company uses in production. "Production Rust — the candidate's primary language" is useful. "Good tech stack" is not.
 
-**Domain alignment (from `projects.md` + `interests.md`):**
+**Domain alignment (from `profile/projects/` + `interests.md`):**
 For each company, identify which domains from the candidate's project portfolio and interests overlap with the company's core work. "DeFi analytics from Aurix maps to their blockchain infrastructure" is useful. "Fintech alignment" is not.
 
 **Career targets (from `preferences.toml`):**
@@ -108,11 +108,11 @@ The following evaluation priorities are derived from the profile. Read the profi
 
 **Why it matters:** Read `experience.md` to understand the candidate's work history. If formal experience is limited, the name on the first/next employer compensates for gaps that credentials alone cannot fill. A company with strong engineering reputation provides career signal per year of employment. The less conventional the candidate's background, the more this dimension matters.
 
-**How the profile informs this:** The gap between the candidate's demonstrated technical ability (from `projects.md`) and their formal credentials (from `education.md` and `experience.md`) determines how much weight to place on engineering reputation. A large gap means reputation matters enormously.
+**How the profile informs this:** The gap between the candidate's demonstrated technical ability (from the per-project files in `profile/projects/`) and their formal credentials (from `education.md` and `experience.md`) determines how much weight to place on engineering reputation. A large gap means reputation matters enormously.
 
 ### 2. Technical alignment with the portfolio
 
-**Why it matters:** Read `projects.md` and `skills.md` to understand what the candidate builds. Companies whose day-to-day engineering problems resemble the candidate's project work are companies where the portfolio converts most effectively in interviews and where daily work builds on existing strength.
+**Why it matters:** Read the per-project files in `profile/projects/` and `skills.md` to understand what the candidate builds. Companies whose day-to-day engineering problems resemble the candidate's project work are companies where the portfolio converts most effectively in interviews and where daily work builds on existing strength.
 
 **How the profile informs this:** Map the technologies, domains, and problem types from the projects to each company's engineering work. Direct overlap (same language, same domain, same problem type) is the strongest signal.
 

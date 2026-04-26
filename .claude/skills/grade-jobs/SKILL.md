@@ -15,7 +15,7 @@ Grades are not permanent. They reflect the current profile state. When the profi
 
 | # | What | Evidence |
 |---|---|---|
-| 1 | **Every file in `profile/`** — 15 files | The SS / S / A fit assessments cite at least one project from `projects.md` by name, one technology from `skills.md` by name, one element from `visa.md` (sponsorship situation), and one target from `preferences.toml` (career trajectory) |
+| 1 | **Every file in `profile/`** | The SS / S / A fit assessments cite at least one project from `profile/projects/` by name, one technology from `skills.md` by name, one element from `visa.md` (sponsorship situation), and one target from `preferences.toml` (career trajectory) |
 | 2 | **`references/grading-rubric.md`** | You can cite the six tiers, the two critical-dimension F-forcers (career ceiling, seniority match), and the mandatory-description-citation rule from the Thought Machine failure |
 | 3 | **`references/profile-context.md`** | You can name the profile file and element you pulled each piece of alignment evidence from |
 | 4 | **`references/prioritisation-guide.md`** | The first batch you grade is prioritised by `company_grade × title_promise × role_type_alignment`, not database insertion order |
@@ -130,7 +130,7 @@ WHERE id = ?;
 
 **SS / S assessments include all of:**
 
-- **Profile alignment** — name specific projects from `profile/projects.md`. Example: *"Your Nyquestro matching engine demonstrates exactly the lock-free, low-latency systems thinking this role demands."* Not *"you have relevant experience."*
+- **Profile alignment** — name specific projects from `profile/projects/`. Example: *"Your Nyquestro matching engine demonstrates exactly the lock-free, low-latency systems thinking this role demands."* Not *"you have relevant experience."*
 - **Technology match** — name specific technologies from `profile/skills.md` that the job requires. *"Requires Rust — your primary language at proficient level."* Not *"good tech stack match."*
 - **Gap analysis** — name specific gaps from `profile/portfolio-gaps.md` or skills the job wants that the profile lacks. *"Heavy Kubernetes usage — currently a gap, but your Docker experience from NeuroDrive provides a foundation."*
 - **Sponsorship analysis** — cite `profile/visa.md`: current status, timeline, whether the company can sponsor when needed.
@@ -257,7 +257,7 @@ All three are read at invocation. The rubric alone without profile-context produ
 
 1. **Never grade on title alone.** If `raw_description` is missing / under 100 words / vague, fetch via WebFetch or WebSearch before grading. If no description can be found, leave at `pending` — do not assign any grade.
 2. **The fit assessment cites the description verbatim for seniority and technology claims.** Not paraphrase, not interpretation — quoted text from the description. Guards against the Thought Machine class of misgrade.
-3. **SS / S / A fit assessments name specific profile elements by name.** Projects from `projects.md`, technologies from `skills.md`, visa facts from `visa.md`, career targets from `preferences.toml`. Generic phrases fail the standard.
+3. **SS / S / A fit assessments name specific profile elements by name.** Projects from `profile/projects/`, technologies from `skills.md`, visa facts from `visa.md`, career targets from `preferences.toml`. Generic phrases fail the standard.
 4. **Profile is read fresh every invocation.** No caching, no embedded snapshots.
 5. **Grades are calibrated against DB anchors, not the current batch.** A batch of genuinely excellent jobs produces excellent grades — no distribution flattening.
 6. **`profile/portfolio-gaps.md` is updated after every batch.** Even a null update ("no new patterns this batch") is written — silent skipping breaks the career-coaching loop.
@@ -270,13 +270,13 @@ All three are read at invocation. The rubric alone without profile-context produ
 
 Each item is an obligation with a concrete evidence slot, not a subjective self-rating. An item that cannot be evidenced in the agent's output is either unmet and surfaced under step 12 "What I did not do," or the skill has not finished.
 
-- [ ] **All 15 files in `profile/` read fresh this invocation** — cite the tool call per file.
+- [ ] **All files in `profile/` read fresh this invocation** — cite the tool call per file (this includes every per-project file in `profile/projects/` and `profile/projects/index.md`).
 - [ ] **All three reference files read fresh this invocation** — cite the tool call per file.
 - [ ] **`cernio format` run at step 0** — the row-count summary appears in chat before step 1. If zero rows were touched, the "already clean" declaration is stated explicitly; silence fails this item.
 - [ ] **Calibration anchors pulled from the DB** — cite the SQL query run and reproduce the rows returned (2–3 per tier); the same block appears in every subagent's prompt.
 - [ ] **Every subagent prompt embeds the full profile + three reference files verbatim** — verifiable by inspecting the prompt contents in the transcript.
 - [ ] **No title-only grades** — for every graded job, the transcript shows the description was read (fetched or already present, ≥100 words). Jobs that could not satisfy this remain at `pending` and appear in step 12.
-- [ ] **SS / S / A fit assessments name specific profile elements** — each such assessment cites at least one project from `projects.md`, one technology from `skills.md`, one fact from `visa.md`, and one career target from `preferences.toml`. The specific element name appears in the assessment text.
+- [ ] **SS / S / A fit assessments name specific profile elements** — each such assessment cites at least one project from `profile/projects/`, one technology from `skills.md`, one fact from `visa.md`, and one career target from `preferences.toml`. The specific element name appears in the assessment text.
 - [ ] **Seniority quote present** — every fit assessment contains a quoted fragment from the description about experience / years / seniority, or the exact phrase "No experience requirements mentioned in description" when the description is silent on seniority.
 - [ ] **Technology quote present** — SS / S / A assessments contain a quoted fragment from the description naming a required technology or stack element that matches a `profile/skills.md` entry.
 - [ ] **Sponsorship citation present** — every graded-job assessment either cites the company's sponsorship evidence (sponsor register, description language, prior evidence in the DB) or explicitly names the sponsorship question as open and flags the job as needing verification before application.

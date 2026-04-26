@@ -17,7 +17,7 @@ These four reads are non-negotiable preconditions. Answers produced without them
 
 | # | What to read | Evidence that it was read |
 |---|---|---|
-| 1 | **Every file in `profile/`** — all files, no exceptions | You can cite the specific project from `profile/projects.md` that grounds the technical-project answer, and the specific skill from `profile/skills.md` that the role asks for |
+| 1 | **Every file in `profile/`** — all files, no exceptions | You can cite the specific project from `profile/projects/` that grounds the technical-project answer, and the specific skill from `profile/skills.md` that the role asks for |
 | 2 | **The job's `raw_description`** from the DB | You can quote two concrete responsibilities or stack elements from the description in the "why this role" answer |
 | 3 | **The job's `fit_assessment`** from the DB | Your answer builds on the fit assessment's analysis rather than restating it; the assessment is internal reasoning, the answer is external-facing |
 | 4 | **The company's `what_they_do` and `grade_reasoning`** from the DB | The "why this company" answer references what the company actually builds, not generic praise |
@@ -62,7 +62,7 @@ The `NOT IN` clauses are load-bearing — re-preparing a job that already has a 
 
 Read every file in `profile/`. Pay particular attention to:
 
-- `projects.md` — flagship projects are the strongest material for the technical-project answer
+- `projects/` — substantive active or complete projects are the strongest material for the technical-project answer; see `projects/index.md` for the inventory and read the relevant per-project files
 - `skills.md` — what the candidate can honestly claim
 - `experience.md` — work-history context for seniority framing
 - `portfolio-gaps.md` — named gaps; the answers must not overclaim against these
@@ -166,7 +166,7 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Per-job quotation evidence** — for every job that received a package, the `why_interested` answer quotes at least one responsibility or stack element verbatim from the job's `raw_description`. The quotation is identifiable in the generated text.
 - [ ] **Per-answer named profile element** — every answer names a specific project, skill, or experience from the profile. The project name appears in the answer (e.g. "Nyquestro"), not a generic reference ("one of my projects").
 - [ ] **`why_company` cites company-specific content** — the answer quotes or paraphrases the company's `what_they_do` field and names either the team/product area from the job description or a specific product the company ships. Generic "great company" phrasings fail this item.
-- [ ] **No fabricated experience** — every skill or technology claimed in the answers maps to an entry in `profile/skills.md` or a demonstrated usage in `profile/projects.md`. Gaps are framed with adjacent evidence, not filled with plausible-sounding claims.
+- [ ] **No fabricated experience** — every skill or technology claimed in the answers maps to an entry in `profile/skills.md` or a demonstrated usage in a per-project file in `profile/projects/`. Gaps are framed with adjacent evidence, not filled with plausible-sounding claims.
 - [ ] **Answer length bounds** — each answer is between 2 and 4 paragraphs. Count before submitting.
 - [ ] **Cover letter structure verified** — the cover letter has four identifiable parts: specific-role hook, technical fit with named evidence, why-this-company, short close. Each part is visible as its own paragraph or sentence cluster.
 - [ ] **JSON syntactic validity** — the JSON parses (test with a JSON-parsing tool or language runtime). Syntactically-invalid JSON breaks the autofill pipeline silently.

@@ -2,7 +2,7 @@
 
 The evaluation framework for grading individual jobs. Job grading is where the real decision happens — company grading determines what we search, but job grading determines what we apply to. Every grade should emerge from careful reasoning about this specific role for this specific candidate, not from mechanically scoring dimensions.
 
-**Important:** All profile facts must come from reading `profile/` files — never from hardcoded values. When this rubric says "the candidate's portfolio" or "the visa timeline," it means: read `projects.md`, read `visa.md`, etc.
+**Important:** All profile facts must come from reading `profile/` files — never from hardcoded values. When this rubric says "the candidate's portfolio" or "the visa timeline," it means: read the per-project files in `profile/projects/`, read `visa.md`, etc.
 
 ---
 
@@ -53,7 +53,7 @@ Look for:
 - Production expectations — "incident management experience" presupposes operational maturity
 - "Or equivalent demonstrated ability" — this is an opening for strong portfolios
 
-Read `experience.md` for formal work history and `projects.md` for demonstrated capability. The portfolio can substitute for 1-2 years of professional experience if the projects demonstrate genuine depth — but it cannot substitute for 5 years of production systems ownership.
+Read `experience.md` for formal work history and the per-project files in `profile/projects/` for demonstrated capability. The portfolio can substitute for 1-2 years of professional experience if the projects demonstrate genuine depth — but it cannot substitute for 5 years of production systems ownership.
 
 **If the answer is clearly no — hard 5+ years requirement, staff/principal scope, leadership expectations — the grade is F. No other question matters.** This is the only question that can unilaterally determine the grade.
 
@@ -73,26 +73,21 @@ The company name, the role title, and what the candidate would actually learn al
 
 This is where the profile matching actually matters — not as an abstract dimension score, but as a practical question: would the candidate's specific projects, skills, and experience make them a standout applicant for this role?
 
-Read `projects.md` carefully. Every project has a **Tier** field (Flagship, Notable, Minor) and a **Status** field. Both matter:
+Read each per-project file in `profile/projects/` carefully. Every project file has a `status` frontmatter field. The status determines the evidence weight:
 
-**Project tiers determine evidence weight:**
+**Status weighting determines evidence depth:**
 
-| Tier | Meaning | How to use in fit assessment |
-|------|---------|------------------------------|
-| **Flagship** | Deep, substantial, actively maintained — the candidate's strongest work | Primary evidence. Cite these by name when assessing fit. A role that aligns with 2-3 flagship projects is one where the candidate has a genuine edge. |
-| **Notable** | Solid projects showing real skill, but less depth or no longer active | Supporting evidence. Cite when directly relevant to the role, but don't build the entire fit case on these. |
-| **Minor** | Small, abandoned early, or completed but not valued by the candidate | Mention only if directly relevant. Never use as primary evidence of capability. An abandoned particle sim website does not demonstrate the same thing as a lock-free matching engine. |
+| Status | Meaning | How to use in fit assessment |
+|--------|---------|------------------------------|
+| **active** | Currently being built / actively invested in | Primary evidence. Cite by name when assessing fit. A role that aligns with 2-3 active projects is one where the candidate has a genuine edge. |
+| **complete** | Substantively built and finished | Primary evidence. The candidate can finish what they start; cite by name. |
+| **paused** | Real work invested, paused but not abandoned | Secondary evidence. Cite when directly relevant; don't build the entire fit case on these. |
+| **dormant** | Substantive but not currently active | Secondary evidence. Same treatment as paused. |
+| **abandoned** | Started but not followed through | Background context only. Never use as primary evidence of capability. An abandoned particle sim does not demonstrate the same thing as a lock-free matching engine. |
 
-**Status matters too.** An "In Progress" flagship that the candidate is actively investing in demonstrates current capability and genuine interest. An "Abandoned" project — regardless of how interesting the concept was — shows the candidate started but didn't follow through, which is weaker evidence. A "Completed" project shows the candidate can finish what they start. Weight accordingly.
+A role that aligns with 2-3 active or complete projects is one where the candidate has a genuine edge over typical applicants. A role where only abandoned projects are relevant means the candidate is competing without their strongest evidence — that's a weaker fit even if the technology nominally matches.
 
-**What the flagship projects demonstrate:**
-- Nyquestro → lock-free concurrency, low-latency systems, financial domain knowledge
-- NeuroDrive → ML from scratch, RL, performance engineering under real-time constraints
-- Aurix → DeFi analytics, quantitative risk modelling, financial mathematics
-- Cernio → async networking, database integration, TUI development, systems architecture
-- Image Browser → local ML inference, desktop application architecture, ONNX/CLIP integration
-
-A role where 2-3 flagship projects map directly to the requirements is one where the candidate has a genuine edge over typical applicants. A role where only minor/abandoned projects are relevant means the candidate is competing without their strongest evidence — that's a weaker fit even if the technology nominally matches.
+**Each per-project file describes what the project demonstrates** — its technologies, domain, scope, and what kind of engineering it shows. Read those files (and `profile/projects/index.md` for the inventory) rather than relying on hardcoded project summaries; the per-project files are the source of truth and evolve over time.
 
 Also check `portfolio-gaps.md` — does this role require something the profile explicitly lacks? A gap in a "nice to have" is different from a gap in a core requirement.
 
@@ -100,7 +95,7 @@ Also check `portfolio-gaps.md` — does this role require something the profile 
 
 Not "is it systems engineering" in the abstract, but "would the candidate find this specific work interesting for 2 years?"
 
-**Read the ENTIRE profile — not just projects.** `projects.md` shows what the candidate CAN build. `interests.md` shows what the candidate WANTS to build. These are not always the same. The candidate might have zero health projects but a deep interest in the intersection of AI and health — a health platform engineering role could be highly engaging despite no portfolio evidence. Similarly, `preferences.toml` captures sector preferences and `cover-letter.md` reveals how the candidate frames their motivations.
+**Read the ENTIRE profile — not just projects.** The per-project files in `profile/projects/` show what the candidate CAN build. `interests.md` shows what the candidate WANTS to build. These are not always the same. The candidate might have zero health projects but a deep interest in the intersection of AI and health — a health platform engineering role could be highly engaging despite no portfolio evidence. Similarly, `preferences.toml` captures sector preferences and `cover-letter.md` reveals how the candidate frames their motivations.
 
 What genuine engagement looks like (from the full profile):
 - Building from scratch rather than configuring existing tools
@@ -135,7 +130,7 @@ These add precision to the question-based reasoning. They are not a replacement 
 
 | Dimension | What to assess |
 |-----------|---------------|
-| **Seniority match** | Can the candidate realistically get hired? Based on `experience.md` and `projects.md`, not the title. |
+| **Seniority match** | Can the candidate realistically get hired? Based on `experience.md` and the per-project files in `profile/projects/`, not the title. |
 | **Career ceiling** | Does this domain lead to high-income, high-impact positions at 10-15 years? Read `preferences.toml` for targets. |
 
 ### High weight

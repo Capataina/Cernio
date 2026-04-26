@@ -15,7 +15,7 @@ Grades are not permanent. They are snapshots tied to the current profile state. 
 
 | # | What | Evidence that the read happened |
 |---|---|---|
-| 1 | **Every file in `profile/`** — 15 files, no exceptions | The grade reasoning written to the DB cites at least two specific profile elements by name (project from `projects.md`, technology from `skills.md`, preference from `preferences.toml`, visa fact from `visa.md`, etc.) |
+| 1 | **Every file in `profile/`** — no exceptions, including every per-project file in `profile/projects/` | The grade reasoning written to the DB cites at least two specific profile elements by name (project from `profile/projects/`, technology from `skills.md`, preference from `preferences.toml`, visa fact from `visa.md`, etc.) |
 | 2 | **`references/grading-rubric.md`** (full file) | You can cite the four core questions, the calibration-anchored method, the specific failure mode from "Common Grading Errors" that applies to any marginal call you make, and the worked example you used as an anchor |
 | 3 | **`references/profile-context.md`** (full file) | You can name the profile file and field you pulled each piece of evidence from when writing `why_relevant` |
 
@@ -81,7 +81,7 @@ Each company gets the following fields written together — enrichment and gradi
 | `location` | Engineering office(s) relevant to the candidate | Examples: "London", "London, Bristol", "Remote-UK" |
 | `sector_tags` | Comma-separated tags | Example: "trading-systems, derivatives, market-making" |
 | `grade` | `S`, `A`, `B`, or `C` | Emerges from the rubric's four core questions + analytical dimensions + calibration-anchor comparison per `references/grading-rubric.md`. |
-| `grade_reasoning` | Paragraph explaining the grade | Must name at least two specific profile elements (project from `projects.md`, technology from `skills.md`, preference from `preferences.toml`, visa constraint, career target). Must explain why this grade and not the adjacent tier. Must acknowledge any ambiguity where signal is weak. |
+| `grade_reasoning` | Paragraph explaining the grade | Must name at least two specific profile elements (project from `profile/projects/`, technology from `skills.md`, preference from `preferences.toml`, visa constraint, career target). Must explain why this grade and not the adjacent tier. Must acknowledge any ambiguity where signal is weak. |
 | `why_relevant` | Paragraph connecting the company to the profile | Must name at least one specific flagship project or technology by name. Generic phrases like "good alignment" fail this bar. Example that passes: "Nyquestro's lock-free matching engine maps directly to their exchange infrastructure; Aurix's risk modelling connects to their derivatives pricing." |
 | `relevance_updated_at` | `datetime('now')` | Auto-set on grade write |
 | `graded_at` | `datetime('now')` | Auto-set on grade write |
@@ -153,7 +153,7 @@ Regrading uses the same SQL write format — `grade`, `grade_reasoning`, `releva
 **Mandatory-core — read at skill invocation every time:**
 
 - `references/grading-rubric.md` — the complete rubric: core questions, analytical dimensions (high / medium / low weight), grade definitions, calibration-anchored grading method, career-stage context, common grading errors, worked examples, evidence standards. 257 lines, includes TOC.
-- `references/profile-context.md` — how to read the profile for grading (not the profile itself): what to extract from each of the 15 profile files, what synthesis to build, what profile elements to cite in grade reasoning. Explicitly forbids embedding profile snapshots. 128 lines, includes TOC.
+- `references/profile-context.md` — how to read the profile for grading (not the profile itself): what to extract from each profile file (including every per-project file in `profile/projects/`), what synthesis to build, what profile elements to cite in grade reasoning. Explicitly forbids embedding profile snapshots. Includes TOC.
 
 Both files are read at invocation — not one or the other. The rubric without the profile-context produces rubric-correct grades with unspecific reasoning; the profile-context without the rubric produces specific reasoning against an ungrounded scale.
 
@@ -161,7 +161,7 @@ Both files are read at invocation — not one or the other. The rubric without t
 
 ## Inviolable Rules
 
-1. **Every grade reasoning cites at least two specific profile elements by name.** Project from `projects.md`, technology from `skills.md`, preference from `preferences.toml`, visa constraint from `visa.md`, career target — at least two named, no generic phrasing like "good alignment" or "strong match." The third-party verifier check is "can a reader point at the profile elements cited?"
+1. **Every grade reasoning cites at least two specific profile elements by name.** Project from `profile/projects/`, technology from `skills.md`, preference from `preferences.toml`, visa constraint from `visa.md`, career target — at least two named, no generic phrasing like "good alignment" or "strong match." The third-party verifier check is "can a reader point at the profile elements cited?"
 2. **The profile is read fresh every invocation.** No hardcoded profile values in this skill or its references. The profile is a living document and snapshots go stale silently.
 3. **Grades are calibrated against DB anchors, not against the current batch.** A batch of ten excellent companies produces ten high grades. Within-batch distribution enforcement is a grading error.
 4. **C-tier companies stay active.** Setting `status = 'archived'` on a C-grade write is a rule violation. Archival has separate triggers.

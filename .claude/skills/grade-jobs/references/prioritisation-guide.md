@@ -58,10 +58,10 @@ Title keywords carry signal about whether the role is likely to be a strong matc
 | Systems, System | Core alignment with profile identity. |
 | Platform | Infrastructure-adjacent, high ceiling. |
 | Rust | Primary language. Rare in job listings, strong signal when present. |
-| Low-latency, Performance | Direct alignment with performance-critical projects in profile. Check `projects.md` for relevant work. |
-| Trading, Quant, Quantitative | Domain alignment with financial/trading projects in profile. Check `projects.md`. |
-| ML, Machine Learning, AI | Domain alignment with ML/AI projects in profile. Check `projects.md` and `skills.md`. |
-| Compiler, Runtime | Direct alignment with compiler/runtime projects in profile. Check `projects.md`. |
+| Low-latency, Performance | Direct alignment with performance-critical projects in profile. Check `profile/projects/` for relevant work. |
+| Trading, Quant, Quantitative | Domain alignment with financial/trading projects in profile. Check `profile/projects/`. |
+| ML, Machine Learning, AI | Domain alignment with ML/AI projects in profile. Check `profile/projects/` and `skills.md`. |
+| Compiler, Runtime | Direct alignment with compiler/runtime projects in profile. Check `profile/projects/`. |
 | Backend, Back-end | Core engineering work, likely aligned. |
 
 **Moderate-promise keywords** (neutral priority):
@@ -135,13 +135,13 @@ Given 50 ungraded jobs, here's how to select and order the first 15 for grading:
 | Priority | Job | Reasoning |
 |----------|-----|-----------|
 | 1 | #4: Graduate SWE @ Palantir | S-company + explicit new grad + engineering. Guaranteed seniority match at a top company. |
-| 2 | #13: Graduate Engineer, Compilers @ Arm | S-company + explicit grad + compiler domain (check `projects.md` for compiler work). |
-| 3 | #19: Quantitative Developer @ XTX Markets | S-company + quant/trading domain (check `projects.md` for trading projects). Even without "grad" keyword, the domain fit is exceptional. |
+| 2 | #13: Graduate Engineer, Compilers @ Arm | S-company + explicit grad + compiler domain (check `profile/projects/` for compiler work). |
+| 3 | #19: Quantitative Developer @ XTX Markets | S-company + quant/trading domain (check `profile/projects/` for trading projects). Even without "grad" keyword, the domain fit is exceptional. |
 | 4 | #1: SWE Infrastructure @ Cloudflare | S-company + infrastructure keyword. No grad indicator but infrastructure at Cloudflare is very likely to have entry pathways. |
 | 5 | #10: SWE Rust, Trading @ small quant | Only B-company, but Rust + trading is a double-hit on the rarest, most aligned keywords. Worth immediate evaluation despite company grade. |
-| 6 | #6: ML Engineer, Model Serving @ Databricks | A-company + ML + model serving (check `projects.md` for inference/ML work). |
+| 6 | #6: ML Engineer, Model Serving @ Databricks | A-company + ML + model serving (check `profile/projects/` for inference/ML work). |
 | 7 | #15: Junior Infra Engineer @ Grafana Labs | A-company + junior + infrastructure. Triple positive signal. |
-| 8 | #7: Platform Engineer @ Wise | A-company + platform + fintech domain (check `projects.md` for fintech alignment). |
+| 8 | #7: Platform Engineer @ Wise | A-company + platform + fintech domain (check `profile/projects/` for fintech alignment). |
 | 9 | #17: Research Engineer @ DeepMind | S-company + research/ML. Might be unachievable (PhD often required) but S-company + ML alignment warrants early evaluation. |
 | 10 | #9: Senior Systems Engineer @ Bloomberg | S-company + systems. "Senior" is a risk but Bloomberg's title levels may be accessible. Worth checking early because if achievable, this is S-tier. |
 | 11 | #16: Senior SWE @ Google | S-company. "Senior at Google" is almost certainly unachievable, but it's fast to confirm and cross off. |

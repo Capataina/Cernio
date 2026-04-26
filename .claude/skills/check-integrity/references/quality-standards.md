@@ -76,7 +76,7 @@ When auditing existing grades and assessments:
 5. If it's borderline → flag with a note about what's missing
 
 The most common quality failures:
-- No specific project names from `profile/projects.md`
+- No specific project names from `profile/projects/`
 - No technology overlap analysis from `profile/skills.md`
 - No sponsorship evidence (just "probably sponsors")
 - No boundary reasoning (why this grade, not the adjacent one)

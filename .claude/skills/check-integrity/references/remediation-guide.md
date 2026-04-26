@@ -81,7 +81,7 @@ WHERE id = ?;
 1. Read ALL files in `profile/`.
 2. Research the company (website, engineering blog, careers page, funding).
 3. Rewrite `grade_reasoning` with:
-   - Specific projects from `profile/projects.md` that align (by name)
+   - Specific projects from `profile/projects/` that align (by name)
    - Specific technologies from `profile/skills.md` the company uses
    - Growth/funding signals if findable (but absence of data is not a negative — see evidence standards)
    - Sponsorship evidence (sponsor register check)
@@ -182,7 +182,7 @@ Invoke the grade-jobs workflow: read the profile, read the rubric, fetch the job
 **How to fix:**
 
 Rewrite to connect the company to specific profile elements:
-- Name at least one project from `projects.md` that aligns
+- Name at least one project from `profile/projects/` that aligns
 - Name at least one technology from `skills.md` the company uses
 - Explain what about their work maps to the candidate's technical identity
 

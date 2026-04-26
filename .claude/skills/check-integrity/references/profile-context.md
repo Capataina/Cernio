@@ -14,7 +14,7 @@ When checking for profile-driven staleness, focus on what has CHANGED since grad
 
 | Change type | Where to find it | Impact on existing grades |
 |-------------|-----------------|--------------------------|
-| New project added | `profile/projects.md` — check for entries not reflected in grade reasoning | Companies/jobs graded before this project may underestimate alignment |
+| New project added | `profile/projects/` — check for per-project files (or new entries in `profile/projects/index.md`) not reflected in grade reasoning | Companies/jobs graded before this project may underestimate alignment |
 | New skill acquired | `profile/skills.md` — check for new entries or upgraded proficiency levels | Companies dismissed for "lacking X skill" may now deserve higher grades |
 | Preference changes | `profile/preferences.toml` — check for changed sectors, locations, or constraints | Companies/jobs filtered by old preferences may need reassessment |
 | Visa status change | `profile/visa.md` — check expiry date, sponsorship requirements | Sponsorship weighting may need updating across all grades |
@@ -25,7 +25,7 @@ When checking for profile-driven staleness, focus on what has CHANGED since grad
 When auditing grade quality, check whether existing assessments reference these elements:
 
 **Must reference (for any grade):**
-- At least one project from `projects.md` by name
+- At least one project from `profile/projects/` by name
 - At least one technology from `skills.md`
 - Seniority assessment grounded in `experience.md`
 
