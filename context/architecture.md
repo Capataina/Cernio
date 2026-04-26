@@ -119,11 +119,18 @@ cernio/
 │   ├── pipeline_format.rs            # 5 tests
 │   ├── pipeline_import.rs            # 12 tests
 │   └── smoke.rs                      # Harness sanity
-├── profile/                          # Structured personal profile (read every startup)
-│   ├── personal.md, education.md, experience.md, projects.md, skills.md
-│   ├── preferences.toml              # Search filters, cleanup config, location patterns
-│   ├── visa.md, portfolio-gaps.md, resume.md, lifestyle-preferences.md
-│   └── …                             # certifications, languages, interests, etc.
+├── profile/                          # Structured personal profile (synced from LifeOS canonical source)
+│   ├── personal.md, education.md, experience.md, interests.md
+│   ├── visa.md, military.md, languages.md, certifications.md, lifestyle-preferences.md
+│   ├── resume.md, cover-letter.md    # Direct-copies from LifeOS Profile/Professional/
+│   ├── projects/                     # Per-project synthesis files (one per README-listed project)
+│   │   ├── index.md                  # Navigation index of all per-project files
+│   │   ├── <name>.md × N             # One file per active/other project from the GitHub README
+│   │   └── open-source-contributions.md  # Aggregated OSS record
+│   ├── skills.md                     # Derived from projects/ — six tables, four bands
+│   ├── preferences.toml              # Cernio-native: search filters, cleanup config, machine-read by Rust
+│   ├── portfolio-gaps.md             # Cernio-native: career-coaching output of check-integrity
+│   └── sync-summary.md               # Per-run audit artefact written by populate-from-lifeos
 ├── companies/potential.md            # Discovery landing zone (pre-DB)
 ├── .claude/skills/                   # Native Claude Code skills — 9 total
 │   ├── profile-scrape/
@@ -240,9 +247,10 @@ The canonical session flow:
    └─► Claude reads profile/, context/architecture.md, context/notes.md, README.md
    └─► User and Claude discuss what to do
 
-2. Profile update (when projects or skills have changed)
-   └─► profile-scrape skill reads repo context/ + README + code
-   └─► Updates projects.md, skills.md, portfolio-gaps.md
+2. Profile sync (when projects or skills have changed in LifeOS or the GitHub README)
+   └─► populate-from-lifeos skill reads LifeOS Profile/Professional/ + Projects/<README-listed>/
+   └─► Updates direct-copy files, generates per-project files in projects/, derives skills.md
+   └─► Writes sync-summary.md as the per-run audit artefact
 
 3. Discovery (when the universe needs expanding)
    └─► discover-companies skill dispatches parallel sector agents
@@ -344,7 +352,7 @@ A 10-agent location research pass (captured in `context/references/location-mast
 
 | Artefact | State |
 |----------|-------|
-| Profile (15 files) | Actively maintained; projects with honest tier labels (Flagship / Notable / Minor); portfolio-gaps.md actively updated |
+| Profile | Synced from LifeOS via populate-from-lifeos; per-project files in profile/projects/ with status frontmatter (no tier system); skills.md derived from projects with six-table / four-band rubric; portfolio-gaps.md actively maintained by check-integrity |
 | SQLite schema | 5 tables, 6 migrations, 29 inline tests (was 11 at session 7) |
 | ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet) |
 | Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug |
