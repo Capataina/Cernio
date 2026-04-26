@@ -54,19 +54,35 @@ This change addresses the pattern where session 3 grading produced technically c
 
 ---
 
-## Project tier system (session 5, 2026-04-09)
+## Project tier system — RETIRED, replaced by status-based weighting (session 10, 2026-04-26)
 
-Added a `Tier` field to every project in `projects.md`: Flagship, Notable, or Minor. Previously, grading agents treated all 16 projects as equal evidence — citing an abandoned particle sim website with the same weight as a lock-free matching engine. The tier system tells agents which projects represent the candidate's strongest, deepest work.
+The Tier system (Flagship / Notable / Minor) was retired alongside the schema migration that landed `populate-from-lifeos` (commit `d907ee8`). It has been replaced by **status-based weighting** that reads the per-project files directly.
 
-| Tier | Count | Examples | Evidence weight |
-|------|-------|----------|----------------|
-| **Flagship** | 5 | Nyquestro, NeuroDrive, Aurix, Cernio, Image Browser | Primary evidence — cite these by name in fit assessments |
-| **Notable** | 5 | Vynapse, Xyntra, Tectra, AsteroidsAI, Game Modding | Supporting evidence — cite when directly relevant |
-| **Minor** | 6 | Consilium, Zyphos, Chrona, Neuronika, Credit Card Fraud, Personal Website | Weak evidence — mention only if specifically relevant |
+**Why retired.** The Tier system was a quality marker baked into a single flat `projects.md` file. Once the profile was split into per-project files (each one a comprehensive, evidence-anchored synthesis of its own LifeOS source), every project file became its own canonical evidence — there is no longer a need to assign a tier label, because the file's depth, content, and `status` frontmatter already carry the same signal more honestly. Crucially, the README of `Capataina/Capataina` is now the gatekeeper for *which projects exist in the profile at all* — projects deliberately excluded by the README do not appear, so there is no longer a "Minor" category to demote.
 
-Both grading rubrics updated: the job rubric's Question 3 ("does the candidate's background give them an edge?") now instructs agents to weight projects by tier and status. The company rubric's technical alignment dimension now states that alignment with flagship projects is strong evidence while alignment only with minor/abandoned projects is weak. Both profile-context reference files updated to reflect tiers in technical identity synthesis and evidence standards.
+The hardcoded project-name list (Flagship 5 / Notable 5 / Minor 6) was also removed from `grade-companies/references/grading-rubric.md` in the same commit because it embedded a profile snapshot inside the skill, violating the Living System rule.
 
-Also fixed stale statuses: Xyntra and Tectra changed from "In Progress (not enough interest)" to "Abandoned". Vynapse status updated to reflect low ROI. Game Modding marked as historical.
+### Status weighting (current)
+
+Projects are weighted by their `status` frontmatter field:
+
+| Status | Evidence weight in grading |
+|--------|----------------------------|
+| **active** / **complete** | Primary evidence — cite by name in fit assessments. The bulk of skill claims should be grounded in these. |
+| **paused** / **dormant** | Secondary evidence — cite when directly relevant to the role. Demonstrates breadth and historical exposure but not current depth. |
+| **abandoned** | Background evidence — mention only when the role specifically requires what the project demonstrated, with the abandonment context attached so the grader can calibrate. |
+
+The full per-project file (Architecture, Technologies, Demonstrated skills, etc.) is the evidence. Status modulates how heavily that evidence weighs against role requirements. Status is set by the Phase 3 subagent in `populate-from-lifeos` from the LifeOS Overview of each project.
+
+### What this changes operationally
+
+- **Grading rubrics no longer name specific projects.** They describe how to weight evidence (status-based) and which dimensions matter (tech alignment, sponsorship, etc.). The actual list of projects is read from `profile/projects/index.md` and the per-project files at grading time.
+- **`grade-jobs/references/profile-context.md` and `grade-companies/references/profile-context.md`** describe the status weighting rather than naming tiers.
+- **Adding a new project** does not require updating any rubric file — a new file appears in `profile/projects/` after the next `populate-from-lifeos` run, and grading skills pick it up automatically.
+
+### Historical context (preserved for grading-decision continuity)
+
+The Tier-era assessments produced session 5–8 (the regrading run, the calibration anchors, the lifestyle modulator section below) all cited Flagship-class projects by name. When reading those decisions, mentally substitute "Flagship" → "active or complete with substantive depth"; the underlying evaluation still stands. Future re-grading runs should use the status-based framing.
 
 ---
 

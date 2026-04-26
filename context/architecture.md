@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated:** 2026-04-21, session 9 (current upkeep). Testing infrastructure is now mature — 316 tests across 6 phases cover all pure logic, ATS parsers, pipeline entry points, and the CLI. Skills migrated from `skills/` to `.claude/skills/` and are native Claude Code skills; legacy folder removed. Session 8 produced a 10-agent location research pass + evaluation rubric (`context/references/location-master.md`, `context/references/location-search/`, `context/notes/location-rubric.md`). Two silent data-loss bugs surfaced during the test pass and were fixed. Autofill remains scaffolded-but-broken (Chrome launches; React form filling unresolved).
+> **Last updated:** 2026-04-26, session 10 (current upkeep). Testing now 346 tests (273 inline + 73 integration), up from 316 — the new 21 are the `tests/preferences_integrity.rs` safety net guarding `profile/preferences.toml` against silent loader-fallback corruption (commit `86097a6`). Profile schema migration completed end-to-end: `profile-scrape` retired, `populate-from-lifeos` added and successfully ran for the first time, producing 12 per-project files in `profile/projects/`, an aggregated `open-source-contributions.md`, a derived `skills.md`, and the per-run audit artefact `sync-summary.md`. Skills count steady at 9. Autofill remains scaffolded-but-broken (Chrome launches; React form filling unresolved).
 
 ---
 
@@ -66,7 +66,7 @@ The conversation layer invokes scripts and skills. Rust scripts write to SQLite.
 | Config parsing | `toml = "0.8"` | In use — `preferences.toml` → typed structs |
 | TUI | Ratatui 0.29 + Crossterm backend | v5 implemented — 5 views, modular (26 source files) |
 | Browser automation | `chromiumoxide` (Chrome CDP) + `futures` | Scaffolded — Chrome launches; React form filling broken |
-| Testing | `cargo test`, `assert_cmd`, `proptest`, `tempfile`, `predicates` | 316 tests across 6 phases (inline + integration + CLI) |
+| Testing | `cargo test`, `assert_cmd`, `proptest`, `tempfile`, `predicates` | 346 tests across 6 phases + preferences integrity guard (273 inline + 73 integration) |
 | AI layer | Claude Code skills at `.claude/skills/` | 9 skills, all obligation-anchored via skill-creator |
 
 ---
@@ -112,12 +112,13 @@ cernio/
 │       ├── queries.rs                # DB read queries
 │       ├── views/                    # 5 views + chrome + overlays (8 files)
 │       └── widgets/                  # grade_bar, text_utils, toast, layout (5 files)
-├── tests/                            # Integration tests (Phase 5 + 6)
+├── tests/                            # Integration tests (Phase 5 + 6 + preferences guard)
 │   ├── common/mod.rs                 # CompanySeed, JobSeed, fixtures
 │   ├── cli.rs                        # 16 CLI tests via assert_cmd + CERNIO_DB_PATH
 │   ├── pipeline_clean.rs             # 11 tests
 │   ├── pipeline_format.rs            # 5 tests
 │   ├── pipeline_import.rs            # 12 tests
+│   ├── preferences_integrity.rs      # 21 tests — guards profile/preferences.toml against silent loader fallback
 │   └── smoke.rs                      # Harness sanity
 ├── profile/                          # Structured personal profile (synced from LifeOS canonical source)
 │   ├── personal.md, education.md, experience.md, interests.md
@@ -133,7 +134,7 @@ cernio/
 │   └── sync-summary.md               # Per-run audit artefact written by populate-from-lifeos
 ├── companies/potential.md            # Discovery landing zone (pre-DB)
 ├── .claude/skills/                   # Native Claude Code skills — 9 total
-│   ├── profile-scrape/
+│   ├── populate-from-lifeos/         # NEW — sync profile/ from LifeOS canonical source
 │   ├── discover-companies/
 │   ├── populate-db/
 │   ├── resolve-portals/
@@ -189,7 +190,7 @@ Skills are native Claude Code skills at `.claude/skills/` (migrated from the pro
 
 | Skill | Purpose |
 |-------|---------|
-| `profile-scrape` | Scrape a GitHub repo and update profile with evidence-based entries |
+| `populate-from-lifeos` | Sync `profile/` from LifeOS canonical source via the GitHub README allow-list (replaces `profile-scrape`) |
 | `discover-companies` | Parallel-agent company discovery with creative search strategies |
 | `populate-db` | Research companies from discovery, find ATS slugs, insert into SQLite |
 | `resolve-portals` | AI fallback for companies that failed script-based ATS resolution |
@@ -297,6 +298,8 @@ Five relationships matter for understanding cross-system behaviour — they are 
 | `pipeline/format` | `tui/mod::run_silent` | Called on TUI startup via subprocess; must be idempotent | If `format` were not idempotent, every TUI launch would further mangle already-cleaned descriptions. The property is guarded by an explicit test (`idempotency_on_realistic_payload`) |
 | `db` (`application_packages`) | `autofill/` | JSON answers written by `prepare-applications` skill, read by the autofill binary at launch | Schema contract: `job_id` → `answers` (JSON) → consumed by provider-specific field mapper. If the JSON key set drifts, autofill produces partial forms silently |
 | Skills in `.claude/skills/` | `profile/` (read fresh every invocation) | Skill SKILL.md bodies enforce a mandatory-read block; CLAUDE.md re-enforces it globally | Skills that silently embed profile snapshots (instead of reading fresh) go stale the moment the profile updates. Visa dates, project tiers, degree classification all drift. This was the discovery that led to the Living System Philosophy in CLAUDE.md |
+| `tests/preferences_integrity.rs` | `profile/preferences.toml` + `src/config.rs` + `src/ats/<provider>.rs` modules | Build-time assertions over file shape — required sections, valid grade letters, per-provider location subtables, UK pattern presence. The `every_supported_ats_provider_has_a_location_subtable` test drives off a `SUPPORTED_ATS_PROVIDERS` constant kept in sync with modules in `src/ats/` | The `config.rs` loader is intentionally lenient — typos silently fall back to defaults with only a stderr warning. Without these tests, a typo in `preferences.toml` would surface as the search pipeline running with default filters (thousands of off-target jobs reaching the AI grader). The Workday subtable was added in commit `86097a6` after the test would have flagged its absence — it had been silently bypassing the UK location filter |
+| `populate-from-lifeos` skill | `profile/` (writes synthesised + direct-copy files; never touches `preferences.toml` or `portfolio-gaps.md`) + `LifeOS` repo via `gh api` (read-only) + `Capataina/Capataina` README via `gh api` (read-only) | Skill orchestrator; one-way data flow LifeOS → Cernio. Phase 7 verifies Cernio-native preservation by pre/post-timestamp comparison; deviation aborts with explicit error. Phase 1 parses the README's Active + Other + OSS sections as the gatekeeper allow-list (Private section excluded by design) | If the GitHub README is unparseable, the skill aborts — the gatekeeper is unreachable and silent fallback would import private projects. If a Cernio-native file's timestamp changed during the run, the skill aborts with a bug indication. Without the README gatekeeper, every LifeOS project would be imported including private/in-flight ones that the user has chosen not to surface |
 
 ### Hidden coupling
 
@@ -348,18 +351,28 @@ A 10-agent location research pass (captured in `context/references/location-mast
 
 **CLAUDE.md:** migrated to the principal-engineer personality (commit `ce24790`). Teaches as it works, challenges weak reasoning, proactive improvement, obligation audit before declaring done. Incorporates the Cernio doctrine (Living System Philosophy, skill execution protocol, grade-quality standard, portfolio-gap tracking).
 
+### Session 10 — populate-from-lifeos shipped + preferences integrity guard (2026-04-26)
+
+Today's session completed the profile-schema migration and added a build-time safety net.
+
+**populate-from-lifeos shipped and ran end-to-end.** First-run output: 11 Professional/ files synced, 12 per-project files synthesised in parallel (203 LifeOS source files consumed across all subagents, 3,413 lines of synthesised content), 1 aggregated OSS file, derived `skills.md` (6 tables, 4 bands), navigation `index.md`, and the audit artefact `sync-summary.md`. Three LifeOS folders deliberately excluded by the README gatekeeper (Flat Browser, LifeOS, Claude Config). Two issues surfaced for skill iteration: Phase 5 evidence-block contract was loose (skills agent quoted internal table rows instead of literal last lines), and the schema's `status` enum is too narrow for LifeOS reality (LifeOS uses `scaffold`, `active-status-undecided`, `#dormant`, `#skeleton`).
+
+**`profile-scrape` retired** (commit `d907ee8`). Its responsibility — scraping individual GitHub repos for profile data — moved upstream into LifeOS's `extract-project` skill. Cernio is now strictly the consumer side. Five existing skills had their references to the old flat schema (`projects.md`, `volunteering.md`, Tier system) rewritten to the new schema (`projects/<name>.md` files, status weighting). Hardcoded project-name list removed from `grade-companies/grading-rubric.md` (it violated the Living System rule).
+
+**Preferences integrity guard added** (commit `86097a6`). 21 new integration tests in `tests/preferences_integrity.rs` assert structural properties of `profile/preferences.toml` at build time — required sections, valid grade letters in `[cleanup]`, UK-pattern presence in every `[search_filters.locations.<provider>]` subtable, and most importantly the `every_supported_ats_provider_has_a_location_subtable` invariant which drives off a `SUPPORTED_ATS_PROVIDERS` constant kept in sync with modules in `src/ats/`. The Workday `[search_filters.locations.workday]` subtable was added in the same commit — it had been silently bypassing the UK location filter on every Workday-portal job since the fetcher shipped. Total test suite now 346.
+
 ### Current project state
 
 | Artefact | State |
 |----------|-------|
-| Profile | Synced from LifeOS via populate-from-lifeos; per-project files in profile/projects/ with status frontmatter (no tier system); skills.md derived from projects with six-table / four-band rubric; portfolio-gaps.md actively maintained by check-integrity |
+| Profile | Synced from LifeOS via `populate-from-lifeos` (first end-to-end run completed 2026-04-26); per-project files in `profile/projects/` with status frontmatter (no tier system); `skills.md` derived from projects with six-table / four-band rubric; `portfolio-gaps.md` actively maintained by `check-integrity`; `sync-summary.md` is the per-run audit artefact |
 | SQLite schema | 5 tables, 6 migrations, 29 inline tests (was 11 at session 7) |
-| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet) |
+| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet); preferences-integrity test enforces per-provider location-filter coverage |
 | Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug |
-| Testing | 316 tests, zero failing, runs under a second once compiled |
+| Testing | 346 tests (273 inline + 73 integration including 21 preferences-integrity), zero failing, runs under a second once compiled |
 | TUI | v5, 5 views, modular (26 source files), dashboard overhaul applied |
 | Autofill | Scaffolded, broken on React forms; fix approach documented |
-| Skills | 9 skills at `.claude/skills/`, all skill-creator-audited |
+| Skills | 9 skills at `.claude/skills/`, all skill-creator-audited; `profile-scrape` retired, `populate-from-lifeos` added |
 | Skill-creator | Self-iterated in session 9; anti-compression + session-aware Pass 0 live |
 
 ### Next priorities
@@ -374,23 +387,24 @@ A 10-agent location research pass (captured in `context/references/location-mast
 
 ## Coverage
 
-This upkeep pass (2026-04-21) inspected:
+This upkeep pass (2026-04-26, session 10) inspected:
 
-- All files under `context/` end-to-end (architecture.md, notes.md, 16 notes files, 2 system files, 3 references).
-- `src/lib.rs`, `src/main.rs` (first 100 lines), `src/ats/mod.rs`, `src/ats/common.rs`, `src/pipeline/search.rs` (first 80 lines), `src/config.rs` (first 60 lines).
-- `git log --format=fuller --since='2026-04-09'` (18 commits since last upkeep).
-- Full-source grep for `WHY|NOTE|HACK|IMPORTANT|SAFETY|TODO|FIXME` annotations.
+- All files under `context/` end-to-end (architecture.md, notes.md, 16 notes files, 4 system files, 3 references touched at folder level).
+- `git log --format=fuller -8` plus `git show` body inspection of all four commits made today (`86097a6`, `3cd1910`, `d907ee8`, `9f19f73`) — these contain the design rationale for today's changes and were the primary source for the Inter-System Relationships additions and the new Structural Notes section.
+- Full-source grep for `WHY|HACK|IMPORTANT|SAFETY|FIXME` annotations across `src/` (none found; only 2 `// TODO` / `// NOTE` lines exist project-wide).
+- Connection-discovery probes against `src/`, `tests/`, `.claude/skills/`, and `profile/preferences.toml` for: provider-name string sharing across modules, `CERNIO_DB_PATH` env var (5 sites), skills referencing `profile/` (8 of 9 skills), `gh api` shared external dependency (only `populate-from-lifeos` uses it — new runtime requirement), TUI subprocess invocation of `cernio format`, and `preferences.toml` readers.
 - `scripts/scan_repo.py` output (repo inventory + import graph).
 
-Inferred from structure (not end-to-end read):
+Inferred from prior context, not freshly re-read this pass:
 
-- Detailed internals of `pipeline/resolve.rs`, `pipeline/clean.rs`, `pipeline/check.rs`, `pipeline/format.rs`, `pipeline/import.rs` — captured at the behaviour-contract level in `systems/pipeline.md` from recent commit bodies (phase 2–5 testing commits) + existing notes, not by re-reading each file this session.
-- Individual per-provider fetcher internals (`src/ats/{lever,greenhouse,ashby,workable,smartrecruiters,workday}.rs`) — captured from test file descriptions + `notes/populate-db-lessons.md` + external API reference files. Not re-read in this pass.
-- `src/tui/*` — `systems/tui.md` covers this subsystem at working-level depth; not re-verified against code in this pass.
-- `src/autofill/*` — captured through `notes/autofill-status.md`; status unchanged since it was last written.
+- Internals of `pipeline/resolve.rs`, `pipeline/clean.rs`, `pipeline/check.rs`, `pipeline/format.rs`, `pipeline/import.rs` — last verified end-to-end in session 9; today's changes did not touch them. Captured at behaviour-contract level in `systems/pipeline.md`.
+- Individual per-provider fetcher internals — unchanged since session 9 last re-read; no provider source touched today (Workday gained a `preferences.toml` subtable but no Rust change).
+- `src/tui/*` — unchanged today; `systems/tui.md` still current.
+- `src/autofill/*` — status unchanged since `notes/autofill-status.md` was last written.
 
 Deliberately not inspected:
 
-- Individual location-research agent files (`context/references/location-search/agent-*.md`) — treated as research artefacts, moved intact, and spot-checked only via `location-master.md`. Their 6,500-line content is the synthesis in `location-master.md`.
+- Individual location-research agent files (`context/references/location-search/agent-*.md`) — treated as research artefacts, the synthesis in `location-master.md` is the maintained surface.
+- The full content of every per-project file in `profile/projects/` just generated by `populate-from-lifeos` — file-list and frontmatter were verified, but the 3,413 lines of synthesised content were not re-read in this upkeep. The `sync-summary.md` audit artefact is the substitute. If drift is suspected, the agent-evidence-block reproductions in `sync-summary.md` are the spot-check surface.
 
-No subsystem was noted-but-not-read at the boundary level. The specific gap worth surfacing: pipeline and ATS internals were updated from commit history and existing notes rather than a fresh line-by-line re-read. If drift is suspected next upkeep, `pipeline/resolve.rs` and one provider fetcher should be the first re-verification targets.
+No subsystem was noted-but-not-read at the boundary level. The specific gap worth surfacing for the next upkeep: if a `notes/` file other than `profile-system.md` and `grading-rubric.md` (both updated today) is ever found to describe Tier-system or `profile-scrape` mechanics, it slipped past this pass — those two were the deliberate scope for the schema-migration cleanup.

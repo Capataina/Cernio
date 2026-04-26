@@ -8,7 +8,7 @@ How Cernio's skills are structured, invoked, and relate to the upstream framewor
 
 Cernio's skills (discovery, population, profile scraping) are specific to this project and live in `.claude/skills/` within the repo — native Claude Code skills migrated from the project-local `skills/` folder in commit `bebfbc5` (legacy folder removed in `d3e4e58`). They are tightly coupled to Cernio's data model, filesystem layout, and workflow.
 
-The upstream `agent-skills` repo (`Capataina/agent-skills`) contains universal, reusable skills (upkeep-context, code-health-audit, etc.) plus the principal-engineer personality template and 95KB of research on writing effective agent skills. Cernio's `CLAUDE.md` was derived from the principal-engineer personality but has been customised.
+Universal, reusable skills (upkeep-context, code-health-audit, project-research, project-enhancement, upkeep-learning, skill-creator, plus the principal-engineer personality template and the 95KB skill-authoring research corpus) live globally at `~/.claude/skills/` rather than in a project repo. The legacy `Capataina/agent-skills` staging repo was retired on 2026-04-19. Cernio's `CLAUDE.md` was derived from the principal-engineer personality but has been customised with the Living System Philosophy, the Skill Execution Protocol, the Grade Quality Standard, and the Portfolio Gap Tracking doctrine.
 
 **Why:** Project-specific skills don't generalise. Keeping them here means they evolve with the project and don't pollute the universal skill library.
 
