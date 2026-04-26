@@ -1,3 +1,10 @@
+---
+title: Resume
+tags:
+  - profile
+  - career
+---
+
 \documentclass[9.5pt,a4paper]{article}
 
 %-----------------------------------------------------------------------

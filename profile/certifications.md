@@ -1,3 +1,10 @@
+---
+title: Certifications
+tags:
+  - profile
+  - certifications
+---
+
 # Certifications and Qualifications
 
 ## Certification 1

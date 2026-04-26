@@ -1,3 +1,10 @@
+---
+title: Cover Letter
+tags:
+  - profile
+  - career
+---
+
 \documentclass[12pt,a4paper]{article}
 \usepackage[margin=1.5cm]{geometry}
 \usepackage{parskip}

@@ -1,15 +1,21 @@
+---
+title: Lifestyle Preferences
+tags:
+  - profile
+  - preferences
+---
+
 # Lifestyle and Environment Preferences
 
 > **What lives here:** the environment-specific preferences that don't fit naturally into any other profile file — urban aesthetic, nightlife, safety, climate, and the calibration anchors that tie everything together.
 >
 > **What lives elsewhere and should be cross-referenced, not duplicated:**
-> - `interests.md` — daily habits (café work, evening walks, gym, Third Space aspiration, thunderstorms, frontier-tech exposure as a user)
-> - `personal.md` — religion/worldview (agnostic atheist), height (170 cm), presentation notes
-> - `visa.md` — mobility mindset, language-learning flexibility
-> - `languages.md` — language portfolio and willingness to learn new ones
+> - [[Profile/Interests|Interests]] — daily habits (café work, evening walks, gym, Third Space aspiration, thunderstorms, frontier-tech exposure as a user)
+> - [[Profile/Personal|Personal]] — religion/worldview (agnostic atheist), height (170 cm), presentation notes
+> - [[Profile/Visa|Visa]] — mobility mindset, language-learning flexibility
+> - [[Profile/Languages|Languages]] — language portfolio and willingness to learn new ones
 > - `preferences.toml` — machine-readable positive/negative signals that the search pipeline consumes
-> - `portfolio-gaps.md` — geographic patterns and closure opportunities
-> - `context/notes/grading-rubric.md` — how these preferences modulate grades (low-to-medium weight)
+> - `Context/Notes/Grading Rubric.md` — how these preferences modulate grades (low-to-medium weight)
 >
 > **Do not duplicate content from the files above into this file.** Reference and link.
 
@@ -26,7 +32,7 @@ Caner wants to live where humanity is visibly building the future, with enough p
 **What the pattern implies in practice:**
 
 - "Modern" is proximity to frontier technology, not architectural preference. A beautiful historic city fails because the future doesn't arrive there first.
-- Café/walks/green integration are *personal operating infrastructure*, not lifestyle luxuries — this is how Caner actually works (see `interests.md`).
+- Café/walks/green integration are *personal operating infrastructure*, not lifestyle luxuries — this is how Caner actually works (see [[Profile/Interests|Interests]]).
 - Nightlife and social scene are *recreational access*, not identity. Cities should get credit for offering an active, vibrant after-hours scene, but they should not be penalised if the user isn't drawn into it every weekend. He's an engineer who wants the *option*, not a party-first lifestyle.
 - Secular + progressive + integration-minded are one bundle: the user will adapt to the local culture, but needs that culture to be building forward rather than preserving the past.
 - Safety is a precondition, not a separate axis — unsafe streets kill evening walks, night cafés, late-gym sessions, and weekend exploration simultaneously.
@@ -97,7 +103,7 @@ Second axis this file uniquely owns. Important to record because it differentiat
 | Amsterdam | Decent | More active than smaller European cities |
 | Singapore, Tokyo, Dubai, Munich, Zürich | Weak | Quieter overall or legally restricted |
 
-**Weighting:** this is a meaningful but not dominant factor. It's part of the overall lifestyle-fit picture the grader weaves into the assessment — not a standalone adjustment and not a reason to move a role across tier boundaries on its own. See `context/notes/grading-rubric.md`.
+**Weighting:** this is a meaningful but not dominant factor. It's part of the overall lifestyle-fit picture the grader weaves into the assessment — not a standalone adjustment and not a reason to move a role across tier boundaries on its own. See `Context/Notes/Grading Rubric.md`.
 
 ---
 
@@ -172,11 +178,11 @@ Summary of what would make Caner unhappy in a city, cross-referenced from the se
 1. **Low-rise historic-only districts** — Jordaan, most of Italy outside Milan, Vienna's old town, Kraków. No height, no modernity, no futuristic energy.
 2. **Pure skyscraper canyons with no greenery or walkability** — Canary Wharf, parts of Houston, parts of HK Central, parts of Frankfurt.
 3. **High ambient crime / unsafe after dark** — Johannesburg, Detroit, SF Tenderloin, most US cores without a specific safe enclave, current Croydon.
-4. **Religion in public life** — Gulf states, much of rural Turkey, parts of the US South. Agnostic atheist preference; see `personal.md`.
+4. **Religion in public life** — Gulf states, much of rural Turkey, parts of the US South. Agnostic atheist preference; see [[Profile/Personal|Personal]].
 5. **Extreme heat with poor AC infrastructure** — Cairo, Karachi, interior India, parts of SE Asia outside Singapore/modern-luxury enclaves.
-6. **Net-negative body-environment scaling** — Netherlands specifically, because the ~185cm male average makes daily physical environment uncomfortable at 170cm. See `personal.md`. This is NL-specific, not a general rule.
+6. **Net-negative body-environment scaling** — Netherlands specifically, because the ~185cm male average makes daily physical environment uncomfortable at 170cm. See [[Profile/Personal|Personal]]. This is NL-specific, not a general rule.
 7. **Weak café-as-workspace culture** — Paris ("no laptops" norm in many cafés), Tokyo (small counter cafés, limited outlets), parts of Germany where cafés are intimate and closing-time-strict.
-8. **Technologically lagging cities** — places where frontier tech (AVs, modern payments, modern medical AI) arrives years late. See `interests.md` on frontier-tech exposure as a user.
+8. **Technologically lagging cities** — places where frontier tech (AVs, modern payments, modern medical AI) arrives years late. See [[Profile/Interests|Interests]] on frontier-tech exposure as a user.
 
 ---
 
