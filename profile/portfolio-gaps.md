@@ -232,6 +232,85 @@ These are concrete steps that would unlock whole geographies rather than individ
 
 **No new portfolio gaps emerged.** Existing gaps (cloud/DevOps, C++ proficiency, CI/CD) were confirmed as barriers across multiple roles but no new technology or domain requirements surfaced beyond what previous batches identified.
 
+### Batch: 300 jobs across 74 S+A companies, post-clean-slate full re-grade under realism semantic — 2026-04-29
+
+**300 jobs graded across S+A companies. Distribution: 15 SS, 21 S, 62 A, 35 B, 51 C, 116 F.** 12% S+ density confirms calibration is sound (rubric warns of inflation if >20% S+). First batch under the 2026-04-29 realism semantic with reputation×selectivity decoupling.
+
+**Wide-funnel SS confirmed for the four worked-example anchors and their analogues.** Reputable AND realistic — the load-bearing distinction the realism semantic exists to make. The full SS list across this batch: Amazon SDE-I Intern UK (2741), Bloomberg 2026 SWE + Internship London (2744, 2745), Cloudflare Infra Deployment Intern + Research Engineer Intern + Security Engineer Intern + SWE Intern (2296, 2297, 2299, 2301), Microsoft UK Graduate SWE Full-Time + Fulltime University Graduates (2752, 2753), Squarepoint Graduate Software Developer (2617), Anthropic Fellows AI Safety + ML Systems & Performance + RL (2241, 2243, 2244), HRT 2026 Grad SWE (2447), Palantir SWE New Grad (2529). All pass the same two tests: explicit graduate-pipeline framing in the description AND a structured intake the candidate's profile clears. Apply with deep customisation; these are the primary application targets. **The strategic implication:** wide-funnel grad pipelines at reputable firms remain the realistic-S/SS pathway. Direct-apply to mid-level postings at the same firms generally caps A-stretch or below regardless of technical fit.
+
+**Jane Street prestige-trap pattern confirmed across 18 roles.** No SS, no S, 4 A-stretch (Linux Engineer 8061111002, Production Engineer, 2× SWE), 5 B (Data Engineer, Linux Engineer 5372886002, MLE, 2× ML Researcher), rest C/F. Every A-stretch assessment makes Q1 reasoning visible alongside Q2 — the worked example's load-bearing point held. Jane Street's London grad pipeline (single-digit intake, comp-programming pedigree filter, top-CS-programme concentration) is the canonical demonstration that "reputable" does not equal "realistic" for a BEng York 2:2 candidate without IOI/ICPC/Codeforces track record. **Application strategy:** apply with templated cover letters, lottery framing, save deep-customisation effort for the wide-funnel SS targets above.
+
+**Anthropic London engineering — Fellows-only entry confirmed.** All 4 Fellows tracks (AI Safety, AI Security, ML Systems & Performance, RL) graded SS or A — wide-funnel by design ("regardless of previous experience" + Bachelor's gate). Fellows visa requirement: "must have or independently obtain full-time work authorization in the UK, US, or Canada" — Caner's Graduate visa (Aug 2027) covers London-based Fellows. **Non-Fellows London engineering** (Anthropic SWE Safeguards Foundations, RE/Sci Alignment Science, RE ML RL, Cluster Deployment Engineer, DC Electrical Engineer): all B (lottery) or F (staff floor) on £260K-£630K comp band. Fellows AI Safety / ML Systems & Performance / RL deadline May 3 2026 for July 2026 cohort — **highest-priority application timing in the batch.**
+
+**HRT 2026 Grad SWE confirmed SS** (id 2447) — explicit graduate-accessible role with C/C++ OR Python framing (cleared by Caner's Python Comfortable + Nyquestro lock-free / market-microstructure depth). HRT's non-grad SWE postings now explicitly redirect new grads to the dedicated grad role and gate on "Previous experience at a top-tier finance or technology company" + USD 200-300K base — confirming the prior-batch S grade was an artefact and only the explicit grad role 2447 is wide-funnel. RE / SWE C++ / SWE Python all graded A (stretch) under the new framing. Linux Sysadmin Trading roles graded C (sysadmin shape, weaker CV signal than SWE).
+
+**Cloudflare wide-funnel intern pipeline anchors 4 SS in a single company** (Infra Deployment / Research / Security / SWE Summer 2026 Intern). Mid-level Cloudflare SWE roles cap A-or-below: 4 "Distributed Systems Engineer - Data Platform" titles (2290-2293) all graded C on explicit 3+ year floors. Pattern: at Cloudflare, only the Intern + Research-Engineer-Intern + Security-Engineer-Intern + Workers-Observability roles are clean SS/S anchors; everything else fails Q1.
+
+**Microsoft UK Graduate SWE pipeline confirmed wide-funnel.** 5 Microsoft postings → 2 SS (UK-explicit graduate roles, 2752/2753) + 3 S (multiple-region graduate roles where UK eligibility needs verification at apply time, 2754/2755/2756). MAIDAP (Microsoft AI Development Acceleration Program) is a confirmed S target combining graduate-accessibility with AI-domain alignment to Caner's NeuroDrive + AsteroidsAI + tinygrad portfolio.
+
+**Palantir clearance pattern confirmed categorical.** 5 Palantir UK roles required SC/DV clearance — all F per visa.md ineligibility (Turkish nationality categorical exclusion). Non-clearance Palantir roles split well: SWE New Grad (2529) SS, Backend SE Infrastructure (2519) S, Apollo Platform SWE (2527) S, FDRE B (FDRE 2522 borderline customer-facing). The "Forward Deployed" + "UK Government" + "Edge Infrastructure" titles all gate on clearance; everything else is open.
+
+**Tradeweb confirmed as a wide-funnel grad target** (revised from prior B-tier framing). 2026 Technology Graduate Programme (Python/C++/Java multi-track) graded S, alongside JS/UI Internship + C++/Python Internship + Junior Software Developer. The dejobs.org careers page is 403'd to WebFetch but the postings exist canonically on totaljobs / efinancialcareers / LinkedIn. Pattern: Tradeweb is one of the strongest unsung A-tier grad pipelines in fintech infrastructure (London, established sponsor, multi-track grad selection).
+
+**Vocalink (Mastercard subsidiary) confirmed S-tier wide-funnel grad target.** Launch Graduate Program 2026 (S) + SE Intern Summer 2026 (S) + SE II Golang (A — accessible mid-level). Mastercard parent gives global brand recognition; Vocalink's payments-rail role gives genuine fintech-infrastructure substance. London EC4R office = B-tier on lifestyle anchors (City historic mix, not Kings Cross gold-standard).
+
+**Point72/Cubist confirmed multi-track grad funnel** — 3 explicit intern roles graded S (2545 Data Engineer L/S Equities, 2550 QR Intern, 2551 Quant SWE Intern). Undergrad-explicit framing across all three. The Quant SWE Intern (2551) explicitly invites "systems programming (Linux kernel, compilers, embedded, networking, file systems, debuggers)" — direct alignment with Nyquestro/Tectra/Xyntra/Zyphos. Hedge-fund grad/intern programmes are the most accessible quant entry path.
+
+**QRT 2026 internship pipeline EXISTS** — counter to the prior-batch "QRT 74 jobs zero graduate-level" finding. 2562 (Data Engineering) + 2563 (Quant Developer Internship) graded S. Pattern correction: QRT regular full-time job listings are 2-10+ year roles; the 2026 internship cohort is genuinely open. The QR/Trading intern (2564) is the exception — requires "advanced degree" (Master's/PhD) so still inaccessible from BEng.
+
+**Hiverge Research Engineer Intern (2437) is the standout small-firm S** — Cambridge-based, RL/evolutionary alignment, founding-team pedigree (DeepMind / AlphaTensor / FunSearch / AlphaFold veterans). Caner's NeuroDrive + AsteroidsAI + Vynapse + Xyntra + tinygrad portfolio is unusually well-aligned with the role's exact stack (Python, PyTorch, evolutionary methods, RL, algorithm design).
+
+**WorldQuant pattern confirmed per-role, not firm-wide.** AI Software Developer (2694) + Quant Developer AI Implementation (2696) graded A — both with "intellectual horsepower over years" framing and no explicit years gate. WorldQuant Quant Developer (2695) graded F on explicit 5+ years floor. Read every WorldQuant description.
+
+**MCP certification + Consilium = unique alignment found.** WorldQuant Quant Developer AI Implementation (2696) is built around Model Context Protocol servers; certifications.md has the exact "MCP — Build Rich-Context AI Apps with Anthropic" credential. Most direct cert-to-role match in the batch — surface in cover letter.
+
+**Crypto institutional market-making is a viable A-tier corridor** distinct from consumer-crypto. Keyrock Quant Analyst Intern (A) + Keyrock Rust Engineer Trading (A) + Kbit Algorithmic Trading Engineer (A) all align with Aurix DeFi market-microstructure work. Sponsorship uncertain at smaller crypto firms — flag as Aug-2027 transition risk, but the corridor is real.
+
+**Confirmed strengths from this batch (cite by name + count when applying):**
+- **Nyquestro** (lock-free + matching engine + exchange-protocol thinking) — primary evidence for ~15 trading-systems A+/S/SS assessments
+- **Aurix** (Uniswap V3 sqrtPriceX96 + four-venue arbitrage + DeFi market microstructure) — primary evidence for ~10 quant/crypto/HFT-domain assessments
+- **NeuroDrive + AsteroidsAI + tinygrad triad** (PPO from-scratch + biological plasticity + SAC + ONNX LSTM contribution) — primary evidence for Anthropic Fellows ML+RL workstreams (3 SS), Hiverge intern (S), Cohere Internal Infra (A-stretch)
+- **Image Browser** (multi-encoder ML + dual-connection SQLite WAL + Tauri 26 commands) — primary evidence for Apple Pro Apps ML Ecosystem (B), Rerun (2× A), Wise Data Platform (A-stretch), Trace Machina (B)
+- **Cernio** (production-grade Rust 325-test suite + lib+bin split + Tokio async pipeline + 26-source TUI) — generalist evidence for Microsoft / Bloomberg / Palantir / Squarepoint Grad SWE assessments
+
+**Gaps reinforced (cite count + roles where they bit):**
+
+1. **C++ proficiency (Familiar → Proficient)** — primary blocker on 7+ roles in this batch (Apple JDK ×2, Apple Kafka, Citadel C++ SWE, Tower Quant Developer, QRT Low Latency Market Data, Wintermute family from prior batches, Wayve Robot Software). Highest-priority closure opportunity. **Most leveraged closure: take Tectra past the Clock-interface scaffold into a working feed-handler + matching loop, OR finish Chrona's commit DAG to a working `chrona init / commit / log` MVP.**
+
+2. **Cloud / Kubernetes / Docker / Terraform / CI-CD trio** — primary blocker on 12+ roles in this batch (Apple SRE/Infra/iCloud/Data Platforms ×8, Cohere Internal Infra, Synthesia Infrastructure, Wise Data Platform, Balyasny DB Platform, Zopa Platform DevX, Clear Street, Winton Cloud Engineer, Cloudflare 4× DSE-Data-Platform). Fourth+ batch confirming as #1 employability gap. **Most leveraged closure: a Cernio-deployment exercise — Dockerfile + GitHub Actions CI + AWS deployment via Terraform — would convert several B/C jobs into A/B at adjacent companies.**
+
+3. **OCaml** — Jane Street roles (4 A-stretch + 5 B) all teach OCaml; absence keeps Caner from building any specific Jane Street narrative. Gap not closed across batches. **Most leveraged closure: a small OCaml project (typed expression tree, small interpreter) or contribution to an OCaml OSS project would lift the Jane Street application from templated lottery to credible stretch.**
+
+4. **CUDA / GPU-systems / PTX / SASS / CUTLASS / Triton / NCCL / InfiniBand-RoCE / NVLink** — newly named gap from Jane Street ML Performance Engineer (F). Distinct from "production-scale ML" — this is GPU-kernel-engineering specifically. Currently absent from skills.md. **Closure: a CUDA kernel project (custom GEMM, attention kernel, matmul tiling) would unlock the ML-performance-engineering role family.**
+
+5. **Production-scale ML (petabyte / 10K-GPU / cloud-trained models)** — confirmed A-vs-S boundary at Apple AiDP (2716 → B), Jane Street ML Engineer + 2 ML Researchers (2463/2465/2466 → B), DRW ML (2313, 2318 → C/F). NeuroDrive is M2-MacBook-Air scale. **Closure: a one-time cloud-GPU experiment (Lambda Labs / Vast.ai) training a model on a substantive dataset would demonstrate scale awareness.**
+
+6. **Distributed-database tenure** (YugabyteDB / CockroachDB / TiDB / Cloud Spanner / Iceberg / Trino) — newly observed gap from Wise Data Platform + Balyasny DB Platform. Caner's SQLite-only DB work is single-node.
+
+7. **Linux systems administration** (low-leverage but recurring at HRT Trading Systems Engineer) — flagged but not prioritised.
+
+8. **JVM ecosystem** (Java + Kotlin + Spring + JIT + GC + Kafka + Spark) — confirmed at Apple JDK ×2 + Apple Kafka + Lendable PHP/JVM. Decision to not close this gap (per prior-batch portfolio-gaps note) holds; magnitude of opportunity-loss is now visible (3 Apple London SWE roles closed off).
+
+**New strategic observations:**
+
+1. **Anthropic Fellows pipeline is the canonical "wide-funnel exception" pattern.** The Fellows criteria explicitly state "regardless of previous experience" + Bachelor's gate + sponsorship-not-required (work auth via Graduate visa is sufficient). This is the structural shape any other AI-research-lab grad target should be evaluated against. Move from "noted exception" to "primary SS-tier target alongside Stripe London Intern and HRT 2026 Grad SWE."
+
+2. **Manchester is the silent killer for Anaplan and similar multi-office UK firms.** All 7 Anaplan postings in this batch were Manchester-only — fails preferences.toml hard locations [London, Cambridge, Remote-UK]. Anaplan's London office is the real entry point, not the Manchester engineering hub. Pattern: when a multi-office UK firm appears in search results, the specific posting location matters more than the company's London presence.
+
+3. **Application-window timing is a real artefact.** Quadrature Capital intern programme runs Sep–Jan only; current April submission is moot. Schonfeld express-interest opens August for Class of 2027. Some firms have closed-then-reopen cycles that should be tracked rather than graded as available.
+
+4. **Apple London pipeline pattern.** TWO distinct shapes: experienced-hire mid-to-senior SWE/SRE roles in Apple Services Engineering / iCloud / CoreOS / Data Platforms (the dominant majority — 13 of 19 in this batch, capping at B/C on cloud-ops gap) AND explicit Early Career hardware roles in HRDWR (3 of 19, graduate-accessible but silicon-discipline-mismatched with Caner's SWE portfolio). The Pro Apps ML Ecosystem Engineer (2711) and ML Engineer AiDP (2716) sit at B — domain-aligned but experienced-hire-framed. Apple London is currently a B-tier hiring target for this profile, not SS/S — same pattern as Anthropic London. The realistic Apple route is the (currently absent) Apple Graduate / Early Career SWE programme, not direct application to mid-level postings.
+
+5. **Microsoft empty-description grad postings** — all 5 Microsoft jobs (2752-2756) had empty raw_description in the source. Search-jobs likely captured the listing without scraping body text. Title-pattern grading was used (well-documented Microsoft graduate pipeline). Flag for integrity-check: a fresh fetch should run before final apply prep, since team-specific routing (Azure Core, MAIDAP) can shift the role-shape meaningfully.
+
+6. **DRW selectivity profile post-realism.** DRW non-grad-titled roles trend C-or-F (consistent with prestige-trap pattern); the only DRW role grading A in this batch is FICCO Research Engineer (2319) — Bachelor's degree only, no years floor. Pattern: at DRW, search specifically for "Research Engineer" or "Research" + Bachelor-degree-only listings; default-grade everything else as stretch.
+
+7. **DEShaw Quant Systems Developer (2732) graded S** — rare Rust-accepting quant systems role ("Proficiency in Python, Golang, Rust, or another similar language is required"). Rust acceptance is vanishingly rare in quant finance (per prior batch, Rust appeared once across 113 quant fund jobs). Surface DEShaw alongside GSR Markets and Rerun as confirmed Rust-accepting quant targets.
+
+8. **Palantir New Grad SWE (2529) is the sole Palantir SS** — explicitly "open to all levels of experience" + no clearance. Palantir Backend SE Infrastructure (2519) and Apollo Platform (2527) are both S — accessible-language framing ("Java, Golang, C++, or equivalent" includes Rust). Palantir clearance roles all F. The strategic action: target Palantir's New Grad + Apollo Platform + Backend Infrastructure cluster, avoid the clearance-gated Forward Deployed / UK Government / Edge Infrastructure cluster.
+
+---
+
 ### Batch: Graphcore (14), Helsing (19), Heron Data (3), Isomorphic Labs (13), Lemurian Labs (6), Linear (1), Marqeta (3), Nethermind (1), Nscale (24), Olix (12), PQShield (3), Paddle (5), Parity (5), Plumerai (2), Polar Signals (3), PolyAI (7), PostHog (4) — 2026-04-09
 
 **125 jobs graded. Breakdown: 0 SS, 0 S, 1 A, 13 B, 16 C, 95 F (76% F).**
