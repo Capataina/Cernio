@@ -20,7 +20,7 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 
 | File | What to extract for job grading |
 |------|--------------------------------|
-| `profile/projects/` (per-project files + `index.md`) | **Critical.** The project portfolio is the primary evidence of engineering capability. Read `profile/projects/index.md` for the inventory, then read every per-project file. For each project, extract: what it demonstrates, what technologies it uses, what domain knowledge it proves, and its **status** from the file's frontmatter (active/complete/paused/dormant/abandoned). Status determines evidence weight — active and complete projects are primary evidence, paused/dormant projects are secondary, abandoned projects are background context only. This is what you match against job requirements. |
+| `profile/projects/` (per-project files + `index.md`) | **Critical.** The project portfolio is the primary evidence of engineering capability. Read `profile/projects/index.md` for the inventory, then read every per-project file. For each project, extract: what it demonstrates, what technologies it uses, what domain knowledge it proves, and its **status** from the file's frontmatter (active/paused/dormant/abandoned). Status determines evidence weight — active projects are primary evidence; paused and dormant projects are secondary evidence (substantively-built dormant projects can carry strong evidential weight even though they are not currently the candidate's focus); abandoned projects are background context only. This is what you match against job requirements. |
 | `profile/projects/open-source-contributions.md` | OSS contributions and community involvement record. Strengthens narrative for mission-driven roles and demonstrates engagement with the broader ecosystem. |
 | `profile/skills.md` | **Critical.** Technical skills inventory across six tables (Programming Languages, Frameworks, Libraries, Engines and Runtimes, Tools and Platforms, Concepts and Domains) with four bands (Proficient/Comfortable/Familiar/Beginner). Use this to assess stack alignment — does the candidate know the languages, frameworks, and tools the job requires? The band is the proficiency signal. |
 | `profile/experience.md` | Formal work experience. Determines seniority assessment — how many years of professional experience exist, and what that means for roles requiring specific tenure. |
@@ -29,12 +29,17 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 | `profile/preferences.toml` | **Critical.** Hard constraints (excluded sectors, excluded role types, location requirements) and soft preferences. Any job that violates a hard constraint is an automatic F. |
 | `profile/portfolio-gaps.md` | Known skill gaps. If a job requires a skill listed here as a gap, note it — but also check whether the gap has been addressed since the file was last updated. Update this file with new patterns discovered during grading. |
 | `profile/personal.md` | Location, nationality, personal constraints. Affects commute assessment, relocation feasibility, and security clearance eligibility. |
+| `profile/lifestyle-preferences.md` | **Critical for office-area assessment.** Urban aesthetic anchors and neighbourhood-level grading examples (Kings Cross / Nine Elms / Paddington Basin as gold-standard, Canary Wharf as mixed-scale partial fit, Croydon and outer-ring areas as active negative signal), nightlife / safety / climate / secular-public-culture preferences, calibration-anchor table mapping cities to lifestyle fit. Lifestyle is a low-to-medium-weight modulator within tiers — it shifts grades within a tier and across boundary cases, but does not override hard constraints from `preferences.toml` or `visa.md`. SS / S / A fit assessments cite the office neighbourhood explicitly (e.g. "matches the Kings Cross gold standard," "fails the Canary Wharf mixed-scale test"); generic phrases like "good area" / "nice neighbourhood" do not meet the citation standard. |
 | `profile/resume.md` | The structured CV. Understand what the candidate presents on paper — this is what hiring managers and recruiters see first. |
 | `profile/cover-letter.md` | Application narrative. Understand how the candidate positions their strengths — useful for assessing whether a compelling application narrative exists for a given role. |
 | `profile/interests.md` | Domain interests. Jobs in domains the candidate finds genuinely motivating score higher on the "exciting vs. acceptable" spectrum. |
 | `profile/certifications.md` | Certifications held. Some roles require or prefer specific credentials. |
 | `profile/languages.md` | Spoken languages. Relevant for roles with language requirements or international teams. |
 | `profile/military.md` | Military status. Relevant for security clearance eligibility assessment. |
+
+### Files in profile/ that are NOT profile data — do not read for grading
+
+- `profile/sync-summary.md` — per-run audit artefact written by the `populate-from-lifeos` skill. Documents what changed during the most recent sync from LifeOS into the Cernio profile. Not profile data; reading it for grading purposes wastes tokens on operational metadata that does not describe the candidate. Skip during the mandatory-read sweep.
 
 ---
 
@@ -44,17 +49,17 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 
 Synthesise from the per-project files in `profile/projects/`, `skills.md`, and `experience.md`:
 
-- **Primary technical strengths** — The candidate's core competencies, ordered by depth. What are they strongest at? What evidence supports each strength? Build a table using **active or complete projects as primary evidence**:
+- **Primary technical strengths** — The candidate's core competencies, ordered by depth. What are they strongest at? What evidence supports each strength? Build a table using **active projects as primary evidence** (and substantively-built dormant projects as supporting evidence when the work demonstrates depth that's still relevant):
 
   | Strength | Evidence (from projects/experience) | Project status | What it means for job fit |
   |----------|-------------------------------------|----------------|---------------------------|
-  | (filled from profile) | (specific projects/roles) | active/complete/paused/dormant/abandoned | (which job types this maps to) |
+  | (filled from profile) | (specific projects/roles) | active/paused/dormant/abandoned | (which job types this maps to) |
 
 - **Secondary strengths** — Skills the candidate has but that are not the primary focus. Comfortable, not expert. Paused or dormant projects often demonstrate these.
 
 - **Known weaknesses / portfolio gaps** — Read `portfolio-gaps.md` and cross-reference with the per-project files in `profile/projects/` and `skills.md`. If a role requires one of these as a hard prerequisite, the candidate cannot credibly claim the skill. If it is a "nice to have," note the gap but do not force a grade reduction.
 
-**Status weighting determines evidence depth.** Each per-project file has a `status` frontmatter field (active, complete, paused, dormant, abandoned). Active and complete projects are the candidate's strongest evidence of capability — primary citations. Paused and dormant projects are secondary evidence — solid work but not currently invested in. Abandoned projects show breadth of interest but are background context only, not primary evidence. When a role requirement matches only an abandoned project, the candidate's evidence for that requirement is weak.
+**Status weighting determines evidence depth.** Each per-project file has a `status` frontmatter field (active, paused, dormant, abandoned). Active projects are the candidate's strongest evidence of capability — primary citations. Paused and dormant projects are secondary evidence — solid work but not the current investment focus; substantively-built dormant projects (real depth, finished or near-finished, just no longer worked on) carry stronger weight than paused projects with thinner artefacts. Abandoned projects show breadth of interest but are background context only, not primary evidence. When a role requirement matches only an abandoned project, the candidate's evidence for that requirement is weak.
 
 ### Career targets and what they mean for grading
 
@@ -146,12 +151,12 @@ Read `preferences.toml` for explicit dealbreakers, then also watch for:
 When writing fit assessments, you must connect jobs to the profile concretely. Here is a checklist of profile elements to reference:
 
 **For every job (minimum):**
-- At least one project from `profile/projects/` that demonstrates relevant capability, named explicitly — preferably an active or complete project. If the best match is an abandoned project, acknowledge that the evidence is weaker.
+- At least one project from `profile/projects/` that demonstrates relevant capability, named explicitly — preferably an active project (or a substantively-built dormant project when no active project covers the same territory). If the best match is an abandoned project, acknowledge that the evidence is weaker.
 - The candidate's proficiency level for the job's required technologies from `skills.md`
 - Seniority assessment grounded in `experience.md` and the per-project files in `profile/projects/`
 
 **For SS/S jobs (mandatory):**
-- All active and complete projects from `profile/projects/` that are relevant, with explanation of what each demonstrates. Paused or dormant projects should be included if directly relevant; abandoned projects should only appear if they add something the active/complete projects don't cover.
+- All active projects from `profile/projects/` that are relevant, with explanation of what each demonstrates. Substantively-built dormant projects should be included when directly relevant. Paused projects can be cited as supporting evidence; abandoned projects should only appear if they add something the active and dormant projects don't cover.
 - Full technology overlap analysis from `skills.md`
 - Gaps identified from `portfolio-gaps.md` with severity assessment
 - Visa timeline from `visa.md` and sponsorship viability
