@@ -40,9 +40,10 @@ SELECT id, name, careers_url, grade
 FROM companies
 WHERE status = 'bespoke'
   AND grade IN ('S', 'A', 'B')
-  AND status != 'archived'
 ORDER BY CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 END;
 ```
+
+(`status` is a single enum — `'bespoke'` and `'archived'` are mutually exclusive values per the `companies` table CHECK constraint, so a separate `status != 'archived'` clause would be dead code.)
 
 Priority: S-tier first (non-negotiable — these are the highest-signal employers in the universe). A-tier second (strong signal, worth the time). B-tier when time permits (lower yield per minute than the script-driven pipeline). C-tier bespoke companies are generally not worth manual search unless the user specifically requests them.
 

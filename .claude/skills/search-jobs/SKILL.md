@@ -1,16 +1,18 @@
 ---
 name: search-jobs
-description: "Orchestrates full Cernio job-search — runs `cernio search` across 287 resolved-ATS companies (seven ATS fetchers) AND dispatches subagents to search the 121 bespoke companies (Apple, Google, Meta, Amazon, Citadel, Bloomberg, Arm, Mastercard) whose jobs the automated pipeline cannot touch. Bespoke subagents visit careers pages + aggregators (LinkedIn, Indeed, Glassdoor, BuiltIn); orchestrator inserts every match via `INSERT OR IGNORE INTO jobs`. Does not grade — hands pending queue to `grade-jobs`. Invoke on 'search for jobs', 'scan everything', 'find me roles', 'run a job search', 'check openings', 'what's available at [company]', 'scan all S-tier', 'refresh the jobs'. Not for discovering companies (discover-companies), resolving ATS (populate-db / resolve-portals), grading jobs (grade-jobs), or preparing applications (prepare-applications). Use whenever fresh jobs are needed."
+description: "Orchestrates full Cernio job-search — runs `cernio search` across every resolved-ATS company (Greenhouse / Lever / Ashby / Workable / SmartRecruiters / Workday fetchers) AND dispatches subagents to search every bespoke company (FAANG, HFT, Bloomberg, Arm, Mastercard, plus everything on iCIMS / Taleo / Personio / Pinpoint HQ / Eightfold) whose jobs the automated pipeline cannot touch. Bespoke subagents visit careers pages + aggregators (LinkedIn, Indeed, Glassdoor, BuiltIn); orchestrator inserts every match via `INSERT OR IGNORE INTO jobs`. Does not grade — hands pending queue to `grade-jobs`. Invoke on 'search for jobs', 'scan everything', 'find me roles', 'run a job search', 'check openings', 'what's available at [company]', 'scan all S-tier', 'refresh the jobs'. Not for discovering companies (discover-companies), resolving ATS (populate-db / resolve-portals), grading jobs (grade-jobs), or preparing applications (prepare-applications). Use whenever fresh jobs are needed."
 ---
 
 # Search Jobs
 
 End-to-end job-search orchestration. The Cernio company universe contains two structurally different classes of companies, and a complete job search covers both:
 
-1. **287 resolved-ATS companies** — companies with Greenhouse / Lever / Ashby / Workable / SmartRecruiters / Workday / Eightfold portals. These are handled by `cernio search`, the Rust pipeline's bulk fetcher. Mechanical: 9,000+ raw jobs fetched, filtered, deduplicated, inserted — in seconds.
-2. **121 bespoke companies** — companies on unsupported ATS platforms (iCIMS, Taleo, Personio, Pinpoint HQ) or running custom portals (most FAANG, most HFT, many large public companies). These are invisible to `cernio search`. Finding their jobs requires visiting careers pages, searching aggregators, and inserting roles manually.
+1. **Resolved-ATS companies** (`status = 'resolved'` in the `companies` table) — companies with Greenhouse / Lever / Ashby / Workable / SmartRecruiters / Workday portals. These are handled by `cernio search`, the Rust pipeline's bulk fetcher. Mechanical: thousands of raw jobs fetched, filtered, deduplicated, inserted — in seconds.
+2. **Bespoke companies** (`status = 'bespoke'`) — companies on unsupported ATS platforms (iCIMS, Taleo, Personio, Pinpoint HQ, Eightfold — the last is recognised by Cernio but has no working fetcher and is treated as bespoke) or running custom portals (most FAANG, most HFT, many large public companies). These are invisible to `cernio search`. Finding their jobs requires visiting careers pages, searching aggregators, and inserting roles manually.
 
-**Bespoke search is not an afterthought.** The 121 bespoke companies include the highest-signal employers in the universe — Apple, Google, Meta, Amazon, Microsoft, Citadel, Bloomberg, Jane Street, Arm, Mastercard. Running `cernio search` without a bespoke pass is a partial search. A session-7 audit found ~13 strong leads missed because bespoke search was skipped. The two halves carry roughly equal weight; the script is faster per company, but the bespoke pass covers the brand names that open doors.
+Run `SELECT status, COUNT(*) FROM companies GROUP BY status` at the top of the search to record current counts in the run output — counts shift as `discover-companies` and `resolve-portals` run between sessions.
+
+**Bespoke search is not an afterthought.** The bespoke list includes the highest-signal employers in the universe — Apple, Google, Meta, Amazon, Microsoft, Citadel, Bloomberg, Jane Street, Arm, Mastercard. Running `cernio search` without a bespoke pass is a partial search. A session-7 audit found ~13 strong leads missed because bespoke search was skipped. The two halves carry roughly equal weight; the script is faster per company, but the bespoke pass covers the brand names that open doors.
 
 This skill stops at insertion. Grading is `grade-jobs`'s job — this skill hands off the pending queue.
 
@@ -20,7 +22,7 @@ This skill stops at insertion. Grading is `grade-jobs`'s job — this skill hand
 
 | # | What | Evidence |
 |---|---|---|
-| 1 | **Every file in `profile/`** | The bespoke-search title-matching decisions (which roles to insert, which to skip as obvious senior-only) are grounded in profile target areas from `profile/preferences.toml` + technologies from `profile/skills.md` |
+| 1 | **Every file in `profile/`** including the per-project files under `profile/projects/` (each carries an `active` / `paused` / `dormant` / `abandoned` status in its frontmatter; `index.md` is the inventory). Skip `profile/sync-summary.md` — it is operational metadata written by `populate-from-lifeos`, not profile data, and reading it for grading purposes wastes tokens. | The bespoke-search title-matching decisions (which roles to insert, which to skip as obvious senior-only) are grounded in profile target areas from `profile/preferences.toml`, technologies from `profile/skills.md`, and area sensitivities from `profile/lifestyle-preferences.md` (informational — formal lifestyle assessment lives in `grade-jobs`, not here) |
 | 2 | **`references/bespoke-search-playbook.md`** | The bespoke-search workflow, which aggregators to try in which order, the INSERT-OR-IGNORE contract, the session-7 failure mode that drove the "results must be inserted, not just reported" rule |
 
 The profile is not cached. Every invocation reads `profile/` fresh.
@@ -63,14 +65,15 @@ SELECT id, name, careers_url, grade
 FROM companies
 WHERE status = 'bespoke'
   AND grade IN ('S', 'A', 'B')
-  AND status != 'archived'
 ORDER BY CASE grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 END;
 ```
+
+(`status` is a single enum where `'bespoke'` and `'archived'` are mutually exclusive, so no separate archived filter is needed — the `companies` schema enforces this via CHECK constraint.)
 
 Dispatch parallel subagents — one per batch of 3–5 bespoke companies. Each subagent prompt embeds verbatim:
 
 - The **full text of `references/bespoke-search-playbook.md`** — subagents cannot read the skill's references
-- The **relevant profile slice** — target role types, technologies, location preferences, visa status — all pulled from `profile/` by the orchestrator
+- The **relevant profile slice** — target role types, technologies, location preferences, visa status, plus the full text of `profile/lifestyle-preferences.md` (informational area awareness, not a filter — subagents do not skip roles for area reasons; `grade-jobs` performs the formal lifestyle assessment) — all pulled from `profile/` by the orchestrator
 - The **list of assigned companies** (name + careers_url + grade)
 - **Explicit instruction** to use `WebFetch` on the careers URL first, fall through to `WebSearch` on aggregators (LinkedIn, Indeed, Glassdoor, BuiltIn) per the playbook's priority order
 - **Output-format obligation** — per-company structured findings (title, URL, location for each match), not narrative summaries
