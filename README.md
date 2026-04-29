@@ -8,10 +8,9 @@ A local-first job discovery, evaluation, and career preparation engine built in 
 
 A short walkthrough of Cernio in action — the conversational session shape, the pipeline stages, and the terminal dashboard.
 
-<video src="cernio-demo.mp4" controls width="800">
-  Your browser does not render embedded video.
-  <a href="cernio-demo.mp4">Watch the demo (cernio-demo.mp4)</a>.
-</video>
+[![Cernio demo — click to play](cernio-demo-poster.jpg)](cernio-demo.mp4)
+
+> GitHub strips inline `<video>` tags from READMEs, so the embed above is a poster frame. Click it to open the MP4 in GitHub's media viewer, or [download the demo directly](cernio-demo.mp4).
 
 ---
 
