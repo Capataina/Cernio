@@ -4,25 +4,37 @@ A local-first job discovery, evaluation, and career preparation engine built in 
 
 ---
 
+## Demo
+
+A short walkthrough of Cernio in action — the conversational session shape, the pipeline stages, and the terminal dashboard.
+
+<video src="cernio-demo.mp4" controls width="800">
+  Your browser does not render embedded video.
+  <a href="cernio-demo.mp4">Watch the demo (cernio-demo.mp4)</a>.
+</video>
+
+---
+
 ## Table of Contents
 
-1. [The Problem](#the-problem)
-2. [How Cernio Thinks About Job Search](#how-cernio-thinks-about-job-search)
-3. [The Pipeline](#the-pipeline)
+1. [Demo](#demo)
+2. [The Problem](#the-problem)
+3. [How Cernio Thinks About Job Search](#how-cernio-thinks-about-job-search)
+4. [The Pipeline](#the-pipeline)
    - [Your Profile](#1-your-profile)
    - [Company Discovery](#2-company-discovery)
    - [Portal Resolution](#3-portal-resolution)
    - [Job Search](#4-job-search)
    - [Evaluation](#5-evaluation)
    - [Curation and Decisions](#6-curation-and-decisions)
-4. [The Terminal Dashboard](#the-terminal-dashboard)
-5. [The Skill System](#the-skill-system)
-6. [Design Philosophy](#design-philosophy)
-7. [What Makes This Different](#what-makes-this-different)
-8. [Where This Is Going](#where-this-is-going)
-9. [Architecture](#architecture)
-10. [Technology](#technology)
-11. [Current State](#current-state)
+5. [The Terminal Dashboard](#the-terminal-dashboard)
+6. [The Skill System](#the-skill-system)
+7. [Design Philosophy](#design-philosophy)
+8. [What Makes This Different](#what-makes-this-different)
+9. [Where This Is Going](#where-this-is-going)
+10. [Architecture](#architecture)
+11. [Technology](#technology)
+12. [Current State](#current-state)
 
 ---
 
