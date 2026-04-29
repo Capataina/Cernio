@@ -311,6 +311,66 @@ These are concrete steps that would unlock whole geographies rather than individ
 
 ---
 
+### Batch: 283 jobs across B/C-tier remainder of pending queue, second-half re-grade — 2026-04-29
+
+**283 jobs graded across the remainder of the post-clean-slate queue. Distribution: 0 SS, 2 S, 28 A, 36 B, 45 C, 172 F (61% F-rate).** Combined with the morning's 300-job batch the day total is 583 jobs graded; combined non-archived pipeline now stands at 15 SS / 23 S / 90 A / 71 B / 214 C / 773 F = 1186 graded. The asymmetric F-rate (61% here vs 39% in the morning batch) is explained by alphabetical-position effect — this batch sits in the P-Z band where B-graded companies (Spotify ×11, Wiz ×10, Snowflake ×7, Dexory ×6, Phasecraft ×3) cluster, and B-companies overwhelmingly post mid-senior roles with no graduate pathway. The realism-semantic calibration is holding — F-tier here is dominated by categorical exclusions (clearance, location, seniority gates) rather than borderline judgements.
+
+**Two new S-tier confirmations.** B2C2 Graduate Quant Developer London (id 2260) and Graphcore Cambridge Graduate SWE - Drivers (id 2413). B2C2 is the first institutional-digital-asset-liquidity-provider grad programme to confirm — distinct from consumer-crypto (`exclude_sectors`) because it serves OTC trading desks, sponsor-capable, London — and Caner's Aurix DeFi market-microstructure work is directly cited evidence. Graphcore Cambridge Drivers is the structurally cleanest S in the batch — graduate-explicit + Cambridge (hard-list anchor) + kernel/user-space drivers maps onto Nyquestro lock-free + Zyphos low-level networking + "personal/university project explicitly accepted as evidence." Both are primary apply-with-deep-customisation targets for the next 48 hours.
+
+**Graphcore graduate cohort opens nine A-tier targets at Bristol.** All nine 2026 Graduate SWE Bristol tracks (Applied AI 2409, Test Systems 2410, Analysis Tools 2411, DevOps 2412, Drivers 2414, ML Kernels & Runtime 2415, Neuro Engine Modelling 2416, PyTorch 2417, Triton 2418) graded A — capped from S only because Bristol fails the London/Cambridge hard location list. Technical fit on ML Kernels (2415) and Drivers (2414) would be S if relocated to Cambridge. **Strategic action:** the Bristol cluster is the largest single-company A-tier opportunity in the entire pipeline; apply to the 2-3 highest-fit tracks (ML Kernels, Drivers, Triton) with deep customisation citing Nyquestro + AsteroidsAI + tinygrad triad. The Graphcore "2026 Summer Intern" sibling postings (2419/2420/2421) capped at C — graduation-timing-sensitive, Caner's BEng-finished-summer-2025 status fails the "current undergrad enrolled 2026/2027" gate.
+
+**The new realism-semantic intern-eligibility guard worked.** Five intern postings caught categorically as F where they would have been over-graded under the old semantic: Perplexity AI Programme (Master's/PhD students enrolled 2025-2026 + no visa sponsorship), Perplexity Search ML Engineer Internship, Snowflake London 2026 AI/ML Intern (must be actively enrolled), and the three Graphcore Summer Intern siblings capped at C with route-to-grad-track guidance. This is the failure-mode I flagged at the end of the morning batch — closure confirmed.
+
+**Defence / clearance saturation is the single largest F-driver.** 17 separate roles F'd on the Turkish-nationality SC/DV blocker per visa.md: Helsing UK ×8 (RL/ML/Foundation Models/Backend Rust at Bundeswehr/DGSE-adjacent firm), Faculty AI Defence team ×2 (UK SC), Anduril London ×3 (US/UK clearance equivalents), Arondite ×2 (multi-domain secure UK-government environments), and several smaller defence postings. Severity: this is not a per-role artefact — it's a company-tier filter. **Strategic action:** at the next `discover-companies` pass, mark UK-defence-prime companies (Helsing, Anduril, Faculty Defence, Arondite, Improbable Defence) as visa-friction-flagged at the company tier so the search filter can suppress them at source rather than burning grading cycles on guaranteed-F output.
+
+**"Forward Deployed Engineer" / "Deployed Engineer" / "Solutions Architect" titles disguise customer-facing roles.** Six F's: Cognition Special Projects + Cognition Deployed UK + Cognition AI Enablement + Cognition Partner Deployed (2307-2310), Dash0 Forward Deployed ×2 (2330/2331), Databricks Professional Services (2333). Caner's preferences.toml explicitly excludes customer-facing roles. **Strategic action:** add "Forward Deployed", "Deployed Engineer", "Solutions Architect", "Solutions Engineer" as title-pattern hard-excludes at the search-jobs filter level, OR auto-grade F. AI-labs increasingly use "Engineer" framing for what are pre-sales / partner-success / enterprise-delivery roles, and the title alone is reliable signal.
+
+**The 2:2-degree-class filter starts to bite.** Luminance Cambridge (5 graduate-friendly roles, 2480-2484) all hard-gate on "Top 200 Global University with First or 2:1." Caner's 2:2 from York fails categorically — opaque credential filter independent of technical fit. This is the first batch where the 2:2 ceiling is observable as a recurring boundary at smaller AI-tooling companies (where HR has bandwidth for credential pre-screens). **Strategic action:** track the 2:2-vs-2:1 cutoff as a discrete portfolio gap (alongside C++ proficiency and cloud-trio); the only closure path is either masters-conversion or substantial post-degree open-source / industry signal that overwhelms the credential pre-screen.
+
+**Cybersecurity / cloud-security domain confirmed as a hard ceiling.** All 10 Wiz postings (UK + 5 visa-blocked non-UK remotes) capped C-or-below. The two UK-eligible Wiz roles (London + Remote-UK) failed not on visa but on portfolio absence — Caner has zero security-research evidence (no CTF, no CVE, no security-tooling project). Wiz titles ("AI Security Researcher", "Cloud Security Research Engineer") imply senior-IC pedigree that the portfolio cannot match. **Closure: either explicitly accept that cybersecurity is a non-target sector and update preferences.toml, OR build a defensible security project (a small CVE PoC, a fuzzer for an OSS target, or a CTF write-up portfolio) — currently the absence costs ~10 jobs per discovery batch.**
+
+**Database integrity flags surfaced for next `check-integrity` run:**
+- **Smarkets** is mis-graded at company level — three Smarkets roles in this batch (1535/1537/1539) F'd on hard sector exclusion (gambling). Smarkets self-describes as "the future of betting" with £29bn betting volume. The company should be archived as gambling-sector, not held at C.
+- **Wintermute** is consumer-crypto-borderline — agent graded the Python Core Developer at B and C++ Quant roles at B/C, judging Wintermute as wholesale-not-consumer market-making (OTC, exchange liquidity). Cross-batch consistency check needed: if any prior batch F'd Wintermute on consumer-crypto, the database has split treatment that needs reconciliation. Flag at next integrity pass.
+
+**Confirmed strengths from this batch (cite by name + count when applying):**
+- **Aurix** (DeFi market-microstructure) — primary evidence for B2C2 Graduate Quant Developer S and GSR Markets Quant A
+- **Cernio** (Rust + Tokio + 325-test suite + skill orchestration) — primary evidence for Trainline Gen AI ML A (LLM-powered Travel Assistant + agentic systems map onto Cernio's skill ecosystem) and Elliptic AI Infrastructure A (model serving + prompt pipelines + evaluation harnesses + observability)
+- **Consilium** (multi-LLM orchestration with structured-state JSON debate, LangChain provider adapters) — primary evidence for the Trainline LLM-Travel-Assistant role (rare specific portfolio match worth deep-customisation)
+- **Nyquestro lock-free + Zyphos low-level networking** — primary evidence for Graphcore Cambridge Drivers S and the entire Bristol grad cluster
+- **NeuroDrive PPO + AsteroidsAI SAC** — production-ML evidence for Starling Bank ML Projects A and the ML-track Graphcore Bristol roles
+- **8-Rust-project portfolio** (Cernio + Aurix + Tectra + Nyquestro + Zyphos + Xyntra + Tarus + others) — Proton Rust SWE A explicitly accepts "complex Rust pet projects" as a substitute for professional Rust experience
+
+**Gaps reinforced (cite count + roles where they bit):**
+
+1. **Cloud / Kubernetes / Docker / Terraform / CI-CD** — fifth+ consecutive batch confirming as #1 employability gap. Spotify Java/GCP/K8s ×11 (capped at B), Granola Backend (Aug-2027 sponsorship cliff + cloud gap), Northflank Cloud Infra (3y experience floor + K8s/Terraform absence), GitLab Cloud Cost SRE (FinOps cloud-ops shape). **Closure remains: a Cernio-deployment exercise (Dockerfile + GitHub Actions CI + AWS deployment via Terraform) would convert several B/C jobs into A/B at adjacent companies.** Highest leverage closure of any single gap in the portfolio.
+
+2. **C++ proficiency (Familiar → Proficient)** — Wintermute C++ Quant Trading Platform roles capped at B (PhD-uncommon framing) but the C++ ceiling is what prevents the standard Quant Dev application. Closure unchanged: Tectra past Clock-interface scaffold OR finish Chrona MVP.
+
+3. **Cybersecurity / cloud-security portfolio bridge** — newly confirmed, ~10 Wiz roles per batch, no closure currently in scope.
+
+4. **2:2-degree-class credential filter** — newly observed, 5 Luminance roles hard-gated. No technical closure — this is a credential pre-screen. Track as risk for smaller-firm applications.
+
+5. **JVM ecosystem (Java + Scala + Spring + Kafka)** — Spotify ×11 capped at B confirms prior decision-not-to-close holds; magnitude visible as ~10 Spotify London roles per batch.
+
+6. **Distributed-database tenure** — confirmed at Spotify Data Platform / Spotify Analytics roles capped B on Spanner/Bigtable/Iceberg gap.
+
+**New strategic observations:**
+
+1. **Bristol vs Cambridge as a binary location boundary observable within a single firm.** The same Graphcore Drivers role grades S in Cambridge (2413) and A in Bristol (2414) purely on `preferences.toml`'s hard location list. Worth flagging as the cleanest demonstration of how location preferences shape grade distribution — and as a check on whether the Bristol exclusion is still load-bearing (Bristol is a Skilled Worker sponsor, established grad pipelines, but structurally one tier below the gold-standard London/Cambridge anchors). If Caner reconsiders Bristol, the Graphcore Bristol cluster + GoCardless + Ovo + Just Eat all open up.
+
+2. **Dexory is a near-miss employer.** Six Dexory roles (2342-2347) including a structurally attractive Graduate SWE rotation programme (Autonomy/AI-Perception/Platform tracks, ship production code early). All F'd on (a) Wallingford Oxfordshire outside hard locations, (b) explicit no-sponsor + no-relocate. If Dexory ever opens a London office, the Graduate SWE alone re-grades to A.
+
+3. **The 2026-04-29 realism semantic generalises beyond Jane Street to Anthropic Fellows / DeepMind Research Fellows / OpenAI Residency / HRT / Citadel quant-trading / D.E. Shaw quant.** This batch confirmed the prestige-trap-by-analogy guard worked — no SS awards on hyper-selective firms outside their explicit grad-pipeline routes. The morning batch's Anthropic Fellows ×3 SS were correctly placed (Fellows IS the explicit grad route per Anthropic's public framing); the new guard prevents non-Fellows Anthropic London roles from inheriting the SS.
+
+4. **GitLab pattern reproduces from prior batch: 8 GitLab roles, 7 fail UK location filter, 1 only B/C-tier.** GitLab's "remote-everywhere" posting policy creates ~50 F-noise per discovery — the company-grade is correct (B) but the filter integration is wasteful. **Strategic action:** at next `discover-companies` pass, mark GitLab as "skip until UK-explicit posting" rather than pulling all postings.
+
+5. **Empty-description grad postings still appear.** Cisco x3, Darktrace, FNZ, plus the morning batch's Microsoft x5. Across both batches the description-integrity flag has triggered on ~10 jobs total — `search-jobs` reliably captures the listing but misses body text on certain ATS shapes. **Strategic action:** add a `search-jobs` post-step that reports any job inserted with `LENGTH(raw_description) < 200` and prompts a re-fetch before grading.
+
+6. **Application-window tally for next 48 hours.** Across both 2026-04-29 batches, the ranked apply-today list is: (1) Anthropic Fellows AI Safety / ML Systems & Performance / RL — May 3 deadline, highest-priority — apply today; (2) HRT 2026 Grad SWE; (3) Microsoft UK Graduate SWE Full-Time; (4) Bloomberg 2026 SWE; (5) Cloudflare grad-track interns ×4; (6) B2C2 Graduate Quant Developer; (7) Graphcore Cambridge Drivers + 2-3 Bristol picks (ML Kernels, Drivers, Triton); (8) Proton Rust SWE; (9) Trainline Gen AI ML; (10) Starling ML Projects; (11) Elliptic AI Infrastructure. That's ~15 deep-customisation targets and ~50+ templated-cover-letter B-tier backups.
+
+---
+
 ### Batch: Graphcore (14), Helsing (19), Heron Data (3), Isomorphic Labs (13), Lemurian Labs (6), Linear (1), Marqeta (3), Nethermind (1), Nscale (24), Olix (12), PQShield (3), Paddle (5), Parity (5), Plumerai (2), Polar Signals (3), PolyAI (7), PostHog (4) — 2026-04-09
 
 **125 jobs graded. Breakdown: 0 SS, 0 S, 1 A, 13 B, 16 C, 95 F (76% F).**
