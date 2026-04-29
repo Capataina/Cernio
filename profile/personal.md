@@ -20,7 +20,7 @@ atacanercetinkaya@gmail.com
 +44 7391 904514
 
 ## Location
-London, UK (East Croydon — Ten Degrees, operated by Greystar). Tenancy ending ~24 May 2026; actively relocating. See [[Housing/Overview]] for the full situation.
+London, UK (East Croydon — Ten Degrees, operated by Greystar). Tenancy ending ~24 May 2026; actively relocating. See [[Housing/_Overview]] for the full situation.
 
 ## Family
 Both parents are independent self-employed lawyers based in Turkey. Father specialises in tax law; mother in family law. They fund Caner's UK living expenses — see [[Housing/Financial Model]] for how this works.

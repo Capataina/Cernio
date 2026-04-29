@@ -3,163 +3,180 @@ name: Open Source Contributions
 status: active
 source_repo: null
 lifeos_folder: Projects/Open Source Contributions
-last_synced: 2026-04-26
-sources_read: 2
+last_synced: 2026-04-29
+sources_read: 3
 ---
 
 # Open Source Contributions
 
-Working record of contributions to external open-source projects. Each subsection covers one upstream repo, the contribution itself, the cultural context that shaped it, and the lessons that transfer to future contributions. Sourced from the corresponding `LifeOS/Projects/Open Source Contributions/<upstream>.md` working notes — anti-puffing applies: outcomes and statuses reflect what the upstream record states, not what the GitHub README would prefer.
+## One-line summary
+
+Per-upstream notes on Caner's external open-source engagement — `tinygrad/tinygrad` ONNX LSTM operator (PR #15453, closed on `sz.py` line-budget despite technical correctness) and `tracel-ai/burn` A-FINE no-reference image-quality metric (issue #4312, claim re-engaged 2026-04-24 after 25-day silence with maintainer-confirmed inlined-CLIP-ViT implementation in progress).
+
+## What it is
+
+This file aggregates Caner's external open-source engagement across multiple upstream repositories. It captures repo culture, review protocols, contribution history, what landed and what was rejected. Source: every file in `Projects/Open Source Contributions/` in LifeOS, including `_Overview.md`, `Tinygrad.md`, and `Burn.md`. Two upstreams currently tracked. The resume's Open Source Contributions section anchors here.
 
 ---
 
-## tinygrad — ONNX LSTM operator (closed)
+## tinygrad (tinygrad/tinygrad) — closed
 
-### Upstream context
+### Repo culture
 
-[tinygrad/tinygrad](https://github.com/tinygrad/tinygrad) is a minimalist deep learning framework built by George Hotz / tiny corp. It is governed by an aggressive **line-budget philosophy** — low total line count is treated as a first-class metric for the core `tinygrad/` folder (tests don't count against it). Enforcement mechanisms include a `sz.py` bot that comments on every PR with a tokenised line-count delta (excluding docstrings) and reviewers who close PRs on diff size alone, regardless of technical correctness. The README's "Contributing" section codifies this:
+tinygrad is a minimalist deep-learning framework built by George Hotz / tiny corp. It is governed by an aggressive **line-budget philosophy** — low total line count is treated as a first-class metric for the core `tinygrad/` folder (tests don't count against it). Enforced by:
 
-> "If your PR looks complex, is a big diff, or adds lots of lines, it won't be reviewed or merged."
-> "If it's 3 lines, there's less of a bar of usefulness it has to meet over something that's 30 or 300 lines."
+- A bot comment on every PR reporting line-count delta via `sz.py` (tokenised, excluding docstrings).
+- Reviewers who close PRs on diff size alone regardless of technical correctness.
+- Written policy in the README "Contributing" section: *"If your PR looks complex, is a big diff, or adds lots of lines, it won't be reviewed or merged."*
 
-Reviewer dynamics observed: **chenyuxyz** (core collaborator) closes large-diff PRs with one-line comments enforcing the line budget strictly and quickly. What gets merged: 3-line features, prerequisite refactors before new features (refactor so the feature itself is a trivial addition), tests and fuzzers, dead-code removal. What gets closed: code golf for line-count cheesing, large diffs without prerequisite refactors, unbenchmarked "speedups", and changes outside `tinygrad/` core unless fixing something broken.
+### Review dynamics
 
-### The contribution
+| Reviewer | Role | Signal |
+|---|---|---|
+| **chenyuxyz** | Core collaborator, prolific reviewer | Closes large-diff PRs with one-line comments ("+78 lines is too much"). Enforces line budget strictly and quickly. |
 
-- **PR:** [tinygrad/tinygrad#15453](https://github.com/tinygrad/tinygrad/pull/15453) — "Add ONNX LSTM support"
-- **Linked issue:** [#10897 "onnx lstm op not implemented"](https://github.com/tinygrad/tinygrad/issues/10897)
-- **Branch:** `feat/onnx-lstm-support` → `master`
-- **Commit:** [`437de5a`](https://github.com/tinygrad/tinygrad/commit/437de5aa5b935fca41e66841114554b41d3379a6)
-- **Lifecycle:** Opened 2026-03-24 18:10 UTC, closed 2026-03-25 00:38 UTC by chenyuxyz with stated reason *"+78 lines is too much"* (~6h 28m alive)
-- **Diff:** +146 / −0 across 2 files; `sz.py` bot reported +78 tokenised core lines (tests not counted)
+### Contribution: ONNX LSTM operator (PR #15453)
 
-### What the implementation covered
+| Field | Value |
+|---|---|
+| PR | tinygrad/tinygrad#15453 |
+| Linked issue | #10897 ("onnx lstm op not implemented") |
+| Branch | `feat/onnx-lstm-support` → `master` |
+| Commit | `437de5a` ("Add ONNX LSTM support") |
+| Opened | 2026-03-24 18:10 UTC |
+| Closed | 2026-03-25 00:38 UTC (~6h 28m alive) |
+| Closed by | chenyuxyz |
+| Stated reason | "+78 lines is too much" |
+| Diff | +146 / −0 across 2 files |
+
+**Diff composition:**
 
 | File | Added | What |
-|------|-------|------|
+|---|---|---|
 | `tinygrad/nn/onnx.py` | +90 | `LSTM(...)` op + `_apply_rnn_activation(...)` helper |
 | `test/external/external_test_onnx_ops.py` | +56 | `helper_test_lstm` + 4 test cases |
 
-Substantive scope:
+The `sz.py` bot reported **+78 tokenised core lines** — tests are not counted against the core budget.
 
-- **Directions:** forward, reverse, bidirectional (concatenating along `num_directions` dim)
-- **Gate decomposition:** proper i/o/f/c split of `W`, `R`, `Wb`, `Rb` per direction
-- **Optional inputs** defaulted to zero tensors when absent (`B`, `initial_h`, `initial_c`)
-- **Explicit `NotImplementedError`** for unsupported features: `sequence_lens`, peephole weights `P`
-- **Attributes handled:** `activation_alpha`, `activation_beta`, `activations`, `clip`, `direction`, `hidden_size`, `input_forget`, `layout` (0 / 1 with permute)
-- **`input_forget=1`** → `f_t = 1.0 - i_t` coupled-input-forget-gate shortcut
-- **Gate clipping** applied to all four pre-activations before activation
-- **Outputs:** `Y` (full sequence), `Y_h`, `Y_c`, with layout permutation when `layout=1`
-- **`_apply_rnn_activation` helper** supporting all 11 ONNX RNN activations (Sigmoid, Tanh, Relu, ThresholdedRelu, ScaledTanh, Softsign, Softplus, Elu, HardSigmoid, Affine, etc.)
+### What the implementation covered
 
-Test coverage: forward basic, forward with initial state and all outputs, reverse, bidirectional.
+- **Directions**: forward, reverse, bidirectional (concatenating along `num_directions` dim).
+- **Gate decomposition**: proper i/o/f/c split of `W`, `R`, `Wb`, `Rb` per direction.
+- **Optional inputs defaulted to zero tensors** when absent (`B`, `initial_h`, `initial_c`).
+- **Explicit `NotImplementedError`** for unsupported features: `sequence_lens`, peephole weights `P`.
+- **Attributes handled**: `activation_alpha`, `activation_beta`, `activations`, `clip`, `direction`, `hidden_size`, `input_forget`, `layout` (0 / 1 with permute).
+- **`input_forget=1` → `f_t = 1.0 - i_t`** coupled-input-forget-gate shortcut.
+- **Gate clipping** applied to all four pre-activations before activation.
+- **Outputs**: `Y` (full sequence), `Y_h`, `Y_c`, with layout permutation when `layout=1`.
+- **`_apply_rnn_activation` helper** supporting all 11 ONNX RNN activations.
+
+**Test coverage**: forward basic, forward with initial state and all outputs, reverse, bidirectional.
 
 ### Issue context
 
-The issue was originally opened 2025-06-20 by **Quantizr (Jimmy)** with a `NotImplementedError: op='LSTM' not supported` stack trace from loading [Silero VAD v5](https://github.com/snakers4/silero-vad) through tinygrad's ONNX frontend. chenyuxyz responded with conditional approval. Caner commented "can I try this?" on 2025-07-28. The PR was submitted ~8 months later on 2026-03-24. The issue remains **open** — the PR body said *"This is a fix for the issue #10897"* (prose) but did not use `Fixes #10897` syntax, so GitHub would not have auto-closed the issue on merge anyway.
+Originally opened 2025-06-20 by Quantizr (Jimmy) with a `NotImplementedError: op='LSTM' not supported` from loading Silero VAD v5 through tinygrad's ONNX frontend. chenyuxyz responded: *"probably fine to add. can you link an onnx model that has LSTM op that we can test?"* Caner commented "can I try this?" on 2025-07-28. PR submitted ~8 months later.
 
-### Outcome and lessons
+### Lessons learned (tinygrad)
 
-The PR was closed on **diff size alone**, not on technical grounds. Specific lessons captured in LifeOS:
+- **Line budget is the first-order filter** — a technically correct +90-line core change will be closed.
+- **Prerequisite-refactor pattern is the cultural norm** — *"If you can (cleanly) refactor to the point that the feature is a 3 line change, this is great."*
+- **Use `Fixes #N` syntax** in PR body so linked issues auto-close.
+- **Features must have regression tests, but test lines don't count against the budget.**
+- **Eight months between claim and submission is too long** — chenyuxyz had moved on; nobody was holding the issue.
 
-- **Line budget is the first-order filter.** A technically correct +90-line core change will be closed. Writing for tinygrad means designing around the line budget from the start, not optimising after.
-- **Prerequisite-refactor pattern is the cultural norm.** Land the refactor first; then the feature is a 3-line addition.
-- **Use `Fixes #N` syntax** in the PR body so linked issues auto-close on merge. Prose mentions don't count.
-- **Tests are free** — feature-required regression tests don't count against the core line budget, so use that allowance generously.
-- **Eight months between claim and submission is too long.** Unassigned claims on GitHub are soft commitments at best.
+### Path to re-submission
 
-A re-submission playbook is captured in LifeOS as four sequential PRs (primitive refactor → activation dispatch table → forward-only LSTM → reverse + bidirectional) — each small, each individually a clear win, each easier to review than a single +146 monolith.
+If re-attempting LSTM, the playbook that matches tinygrad's culture:
+
+1. **PR 1 — primitive refactor**: extract shared helper patterns (gate splitting, per-direction dispatch). Small, 3–10 lines, clear-win refactor.
+2. **PR 2 — `_apply_rnn_activation` as a dict lookup**: collapse the 15-line if/elif chain to ~6 lines via dispatch table.
+3. **PR 3 — forward-only LSTM using the helpers**: minimal LSTM, forward mode only, 3 canonical activations (Sigmoid, Tanh, Relu).
+4. **PR 4 — reverse + bidirectional**: add reverse and bidirectional modes on top.
+
+Each PR individually small, individually a clear win, individually easier to review than a single +146 monolith.
 
 ---
 
-## burn — A-FINE image quality metric (active implementation)
+## tracel-ai/burn — active implementation
 
-### Upstream context
+### Repo culture
 
-[tracel-ai/burn](https://github.com/tracel-ai/burn) is tracel-ai's Rust-first deep learning framework. It has a visible, **active meta-issue culture** — maintainers post checklists of feature items, community contributors pick them off one by one, each merge gets linked back into the checklist. Review cadence is fast and friendly; most items on the image-quality metrics meta-issue have been claimed, implemented, and merged within a fortnight.
+`burn` is tracel-ai's Rust-first deep-learning framework. It has a visible, **active meta-issue culture** — maintainers post checklists of feature items, community contributors pick them off one by one, each merge gets linked back into the checklist. Review cadence is fast and friendly; most items on the image-quality metrics checklist (#4312) have been claimed, implemented, and merged within a fortnight.
 
-Maintainers and regular reviewers observed:
+### Maintainers and reviewers
 
 | Login | Role | Signal |
-|-------|------|--------|
-| **laggui** | MEMBER (tracel-ai core) | Triages meta-issues; confirms claims within hours; gives implementation hints. Friendly, low-ceremony tone. |
-| **torsteingrindvik** | CONTRIBUTOR | Curates [#4312 "Image quality metrics"](https://github.com/tracel-ai/burn/issues/4312); proposes new metrics with paper citations and benchmark evidence. |
-| **softmaximalist, koreaygj, cong-or, kvthr** | CONTRIBUTORs | Active metrics-checklist implementers. Cadence of 1–2 metrics per fortnight per person. |
+|---|---|---|
+| **laggui** | MEMBER (tracel-ai core) | Triages meta-issues; confirms claims within hours; gives implementation hints (LPIPS / DISTS / Gram matrix loss as precedents; PyTorch weight import is supported pattern). Friendly, low-ceremony tone. |
+| torsteingrindvik | CONTRIBUTOR | Opens and curates #4312 ("Image quality metrics"); proposes new metrics with paper citations and benchmark evidence. |
+| softmaximalist, koreaygj, cong-or, kvthr | CONTRIBUTORs | Active checklist implementers (1–2 metrics per fortnight per person during active periods). |
 
-Community norms:
+### Community norms
 
-- **Claim-then-implement pattern:** comment "I'll take on X" on the meta-issue, wait for MEMBER confirmation, then open the PR.
-- **Precedent-driven implementation:** the meta-issue links merged PRs for every closed item — they are templates for follow-on work.
-- **PyTorch weight import is a recurring pattern** for perceptual metrics (LPIPS, DISTS, Gram Matrix, FID all load pretrained PyTorch weights into Rust).
-- **Short, direct confirmations** with minimal process and high trust.
-- **Long silences get re-engaged gracefully** if you come back with substantive technical questions rather than apologies.
+- **Claim-then-implement pattern**: comment "I'll take on X" on the meta-issue, wait for MEMBER confirmation, then open the PR.
+- **Precedent-driven implementation**: the meta-issue links merged PRs for every closed item. Pattern-matching from prior PRs is the dominant style.
+- **PyTorch weight import is a supported, recurring pattern** — perceptual metrics (LPIPS, DISTS, Gram Matrix, FID) all load pretrained PyTorch weights into Rust.
+- **Short, direct confirmations** — laggui's response to Caner's claim was *"Yeah it should be up for graps!"* [sic] — minimal process, high trust.
+- **Long silences get re-engaged gracefully** — Caner broke a 25-day silence with an open, detailed technical message and laggui replied within ~4 days with substantive guidance.
 
-### The contribution
+### Contribution: A-FINE image-quality metric (issue #4312)
 
-- **Issue:** [#4312 "Image quality metrics"](https://github.com/tracel-ai/burn/issues/4312)
-- **Claim comment:** [#4128062726](https://github.com/tracel-ai/burn/issues/4312#issuecomment-4128062726) — *"Can I tackle A-FINE? seems like its proposed but not being worked on?"*
-- **Confirmation:** [laggui MEMBER](https://github.com/tracel-ai/burn/issues/4312#issuecomment-4128993499) — *"Yeah it should be up for graps!"* [sic]
-- **Lifecycle:** Claimed and confirmed 2026-03-25; re-engaged 2026-04-19 with detailed technical questions after studying LPIPS / DISTS / FID / Gram PRs, `burn-store`, and the PyIQA reference implementation; maintainer guidance received 2026-04-23 confirming the one-PR strategy with inlined backbone; implementation in progress 2026-04-24 onward.
-- **Status:** **Active** — implementation in progress under the agreed approach (single PR with inlined CLIP ViT backbone).
+| Field | Value |
+|---|---|
+| Issue | tracel-ai/burn#4312 ("Image quality metrics") |
+| Claim comment | comment #4128062726 — *"Can I tackle A-FINE?"* |
+| Confirmation | laggui MEMBER — *"Yeah it should be up for graps!"* |
+| Claimed | 2026-03-25 |
+| Confirmed | 2026-03-25 |
+| Re-engaged | 2026-04-19 — detailed technical questions after studying LPIPS / DISTS / FID / Gram precedent PRs, `burn-store`, PyIQA reference impl |
+| Maintainer response | 2026-04-23 — laggui confirmed one-PR strategy matching the inlined-backbone pattern used by LPIPS / DISTS / FID |
+| Implementation status | 2026-04-24 — Caner confirmed: *"Perfect, I've already started the implementation and everything seems to align well. I'll change the vit implementation to inline as well"* |
+| Status | **Active — implementation in progress under the agreed approach (single PR with inlined CLIP ViT backbone)** |
 
-**A-FINE** = Adaptive Fidelity-Naturalness Evaluator — a no-reference (blind) image quality metric. Proposed on the meta-issue by torsteingrindvik on 2026-03-02.
+**A-FINE** = Adaptive Fidelity-Naturalness Evaluator — a no-reference (blind) image-quality metric. Proposed on the meta-issue by torsteingrindvik on 2026-03-02.
 
-Upstream references:
-- Paper: [arXiv 2503.11221](https://arxiv.org/pdf/2503.11221)
-- Project page: [tianhewu.github.io/A-FINE-page.github.io](https://tianhewu.github.io/A-FINE-page.github.io/)
-- Reference implementation: [ChrisDud0257/AFINE](https://github.com/ChrisDud0257/AFINE/tree/master) (Apache 2.0, compatible with burn's dual MIT / Apache-2.0)
+**Upstream references:**
 
-### Implementation strategy (locked 2026-04-23)
+- Paper: arXiv 2503.11221.
+- Project page: tianhewu.github.io/A-FINE-page.github.io/.
+- Reference implementation: ChrisDud0257/AFINE — Apache 2.0 (compatible with burn's dual MIT / Apache-2.0).
 
-Per laggui's guidance, the implementation approach is:
+### Scope and implementation strategy (locked 2026-04-23)
 
-- **Single PR**, not a backbone-first PR followed by A-FINE. Matches the inlined-backbone pattern already used for LPIPS (#4403), DISTS (#4574), and FID (#4644).
-- **CLIP ViT inlined** into the A-FINE module rather than carved out as a reusable component. A future CLIP-based metric can refactor it out.
-- **Port target:** `crates/burn-train/src/metric/vision/afine/` following the existing perceptual-metrics directory convention.
+Per laggui's guidance:
+
+- **Single PR**, not a backbone-first PR followed by A-FINE. Matches the inlined-backbone pattern used for LPIPS (#4403), DISTS (#4574), FID (#4644).
+- **CLIP ViT inlined** into the A-FINE module rather than carved out as a reusable component. Future CLIP-based metric can refactor it out.
+- **Port target**: `crates/burn-train/src/metric/vision/afine/` following the existing perceptual-metrics directory convention.
 - Five A-FINE heads + loader + tests all ship together in the one PR.
 
-### Precedent PRs (the implementation template)
-
-A-FINE uses pretrained perceptual features, so these merged burn PRs are the implementation template:
+### Precedent PRs relevant to A-FINE
 
 | PR | Metric | Relevance |
-|----|--------|-----------|
-| [#4403](https://github.com/tracel-ai/burn/pull/4403) | LPIPS | Closest analogue — perceptual metric using pretrained features, inlined backbone pattern |
-| [#4574](https://github.com/tracel-ai/burn/pull/4574) | DISTS | Perceptual metric with PyTorch-weight import pattern |
-| [#4595](https://github.com/tracel-ai/burn/pull/4595) | Gram Matrix | PyTorch-weight import pattern for a style/perceptual metric |
-| [#4644](https://github.com/tracel-ai/burn/pull/4644) | FID | Uses InceptionV3 pretrained weights — largest precedent for heavyweight pretrained dependency |
+|---|---|---|
+| #4403 | LPIPS | Closest analogue — perceptual metric using pretrained features, inlined backbone pattern |
+| #4574 | DISTS | Perceptual metric with PyTorch-weight import pattern |
+| #4595 | Gram Matrix | PyTorch-weight import pattern for style/perceptual metric |
+| #4644 | FID | Uses InceptionV3 pretrained weights — largest precedent for heavyweight pretrained dependency |
 
-Lighter-weight precedents for overall metric-crate structure: PSNR (#4379), SSIM (#4396), L1/MAE + L2/MSE (#4341), Smooth L1 (#4547), MS-SSIM (#4555).
+Lighter precedents for overall metric-crate structure: #4341 (L1/L2), #4379 (PSNR), #4396 (SSIM), #4547 (Smooth L1), #4555 (MS-SSIM).
 
-### The 25-day silence and how it resolved
+### Lessons learned (burn)
 
-Twenty-five days passed between claim (2026-03-25) and re-engagement (2026-04-19) with no PR, draft, or status update — notable because other implementers on this meta-issue were shipping at 1–2 metrics per fortnight. What resolved the silence cleanly was that Caner came back with a substantive message showing the silence had been spent on due diligence (studying four precedent PRs, reading `burn-store`, reading the PyIQA reference implementation). The message was questions, not apologies — asking about PR size strategy and CLIP ViT inlining. That framing turned what could have been a credibility hit into an engineering conversation, and laggui responded with directional guidance.
-
-Lesson for similar claims: a long silence survives if the comeback is technical depth rather than process apology. But the less costly path is still an interim status comment within the first two weeks.
+- **A long silence survives if the comeback is technical depth rather than process apology** — Caner's 25-day-silence message showed the silence had been spent on due diligence (4 precedent PRs studied, `burn-store` read, PyIQA reference implementation read).
+- **The less-costly path is still an interim status comment within the first 2 weeks** — silence-then-substance recovered cleanly here, but is not the default playbook.
+- **Pattern-matching from precedent PRs is the dominant burn style** — the LPIPS / DISTS / FID inlined-backbone pattern is the template.
 
 ### Timing note
 
-The A-FINE claim was posted ~16 hours after the tinygrad LSTM PR was closed overnight — the move from tinygrad to burn was direct and deliberate. burn is a better cultural match: Rust is a primary language, the maintainers are friendly and active, and the precedent checklist gives clear templates.
-
-### Next actions (in flight)
-
-- Write the inlined CLIP ViT in burn's conventions (ported from the PyIQA reference)
-- Implement the five A-FINE heads
-- Port the loader (PyTorch-weight import path mirroring LPIPS / DISTS / FID)
-- Write regression tests against reference outputs from the upstream AFINE repo
-- Open a draft PR when CLIP ViT + at least one head compile and pass tests
-- Ask for review once the full pipeline runs end-to-end
+The A-FINE claim was posted ~16 hours after the tinygrad LSTM PR was closed overnight — the move from tinygrad to burn was direct and deliberate. burn is a better cultural match for Caner (Rust is a primary language, maintainers are active and friendly, the precedent checklist gives clear templates).
 
 ---
 
-## What this evidences for grading
+## Cross-Vault Connections
 
-Two contrasting upstream cultures successfully navigated:
-
-- **tinygrad** — a strict, line-budget-driven framework where the contribution failed *because of the culture, not the code*. Documented retrospective with a concrete re-submission playbook shows the user can read review culture explicitly and adapt.
-- **burn** — a friendly, precedent-driven Rust framework where the contribution is on its agreed approach with maintainer buy-in. Demonstrates ability to re-engage cleanly after a silence with technical depth, and to land scope-locking conversations with maintainers before writing code.
-
-Both contributions involved substantive deep-learning operator / metric work (LSTM / A-FINE), evidencing comfort with ONNX operator semantics, perceptual-metric architecture, and pretrained-weight import patterns across both Python and Rust ML ecosystems.
+- The `Resume.md` Open Source Contributions section anchors here — every resume claim about external OSS work traces to one of the per-upstream files.
+- Source-of-truth hierarchy: per-contribution files canonical for repo culture and contribution history; the repos themselves are external authority on PR/issue status; this aggregation is the durable narrative + lessons-learned synthesis.
 
 ---
 
@@ -167,5 +184,6 @@ Both contributions involved substantive deep-learning operator / metric work (LS
 
 | Path | Lines | Verbatim last line |
 |---|---|---|
-| Projects/Open Source Contributions/Tinygrad.md | 130 | "- [[Projects/Open Source Contributions/Burn|Burn]] — sister contribution notes" |
+| Projects/Open Source Contributions/_Overview.md | 40 | "- [[Profile/Professional/Interests]] — OSS as an interest territory" |
 | Projects/Open Source Contributions/Burn.md | 124 | "- [[Profile/Professional/Experience]] — counts as external open-source engagement with a Rust deep-learning framework maintainer team" |
+| Projects/Open Source Contributions/Tinygrad.md | 130 | "- [[Projects/Open Source Contributions/Burn|Burn]] — sister contribution notes" |

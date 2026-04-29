@@ -3,6 +3,7 @@ title: Resume
 tags:
   - profile
   - career
+last_verified: 2026-04-28
 ---
 
 \documentclass[9.5pt,a4paper]{article}
@@ -12,14 +13,12 @@ tags:
 %-----------------------------------------------------------------------
 \usepackage[margin=0.3in]{geometry}
 \usepackage{parskip}
-\setlength{\parskip}{0.15em}
+\setlength{\parskip}{0.05em}
 \usepackage[compact]{titlesec}
 \usepackage{enumitem}
-\usepackage{newpxtext}
-\usepackage{newpxmath}
 \usepackage[T1]{fontenc}
+\usepackage{mathpazo}
 \usepackage{textcomp}
-\usepackage{fontawesome5}
 \usepackage{xcolor}
 \usepackage{ragged2e}
 \usepackage{microtype}
@@ -49,20 +48,20 @@ tags:
   \fi
 }
 
-% Project Environment
+% Project Environment — project name itself links to repo
 \newenvironment{project}[3]{%
   \noindent
-  {\fontsize{12}{12}\selectfont\textbf{#1}} \href{#2}{[ \faGithub\ ]} \hfill \textit{#3}\par
+  {\fontsize{12}{12}\selectfont\textbf{\href{#2}{#1}}} \hfill \textit{#3}\par
   \vspace{0.1em}
   \begin{itemize}
 }{%
   \end{itemize}
 }
 
-% Open Source Contribution Environment
+% Open Source Contribution Environment — name itself links to repo
 \newenvironment{osscontrib}[3]{%
   \noindent
-  {\fontsize{12}{12}\selectfont\textbf{#1}} \href{#2}{[ \faCodeBranch\ ]} \hfill \textit{#3}\par
+  {\fontsize{12}{12}\selectfont\textbf{\href{#2}{#1}}} \hfill \textit{#3}\par
   \vspace{0.1em}
   \begin{itemize}
 }{%
@@ -83,12 +82,8 @@ tags:
 \begin{center}
     {\LARGE \textbf{Ata Caner Cetinkaya}}\\[0.4em]
     \normalsize
-    Address: London, UK \\[0.15em]
-    \begin{tabular}{r c l}
-    Phone: +44 7391 904514 & \textbf{|} & Email: \href{mailto:atacanercetinkaya@gmail.com}{atacanercetinkaya@gmail.com}\\
-    LinkedIn: \href{https://www.linkedin.com/in/atacanercetinkaya}{linkedin.com/in/atacanercetinkaya} & \textbf{|} &
-    GitHub: \href{https://github.com/Capataina}{github.com/Capataina}
-    \end{tabular}
+    London, UK \textbf{\,|\,} +44 7391 904514 \textbf{\,|\,} \href{mailto:atacanercetinkaya@gmail.com}{atacanercetinkaya@gmail.com}\\[0.15em]
+    \href{https://www.linkedin.com/in/atacanercetinkaya}{linkedin.com/in/atacanercetinkaya} \textbf{\,|\,} \href{https://github.com/Capataina}{github.com/Capataina}
 \end{center}
 
 %-----------------------------------------------------------------------
@@ -96,8 +91,12 @@ tags:
 %-----------------------------------------------------------------------
 \section{Open Source Contributions}
 
-\begin{osscontrib}{tinygrad — Deep Learning Framework}{https://github.com/tinygrad/tinygrad}{Python}
-  \item Implemented the ONNX \texttt{LSTM} operator supporting forward, reverse, and bidirectional modes with optional initial states, a shared activation helper covering all RNN activation types per the ONNX spec, and a full regression test suite verified against ONNX Runtime; submitted as \href{https://github.com/tinygrad/tinygrad/pull/15453}{PR \#15453}.
+\begin{osscontrib}{tinygrad, Deep Learning Framework}{https://github.com/tinygrad/tinygrad}{Python}
+  \item Implemented the ONNX LSTM operator supporting forward, reverse, and bidirectional modes with optional initial states, a shared activation helper covering all RNN activation types per the ONNX spec, and a full regression suite verified against ONNX Runtime; submitted as \href{https://github.com/tinygrad/tinygrad/pull/15453}{PR \#15453}.
+\end{osscontrib}
+
+\begin{osscontrib}{burn, Rust Deep Learning Framework}{https://github.com/tracel-ai/burn}{Rust}
+  \item Claimed and currently implementing the A-FINE no-reference image-quality metric (\href{https://github.com/tracel-ai/burn/issues/4312}{issue \#4312}, arXiv 2503.11221) into burn-train with an inlined CLIP ViT backbone, five evaluator heads, PyTorch-weight loader, and reference-output regression tests, following maintainer-confirmed precedent.
 \end{osscontrib}
 
 %-----------------------------------------------------------------------
@@ -105,29 +104,29 @@ tags:
 %-----------------------------------------------------------------------
 \section{Projects}
 
-\begin{project}{Cernio: AI-Powered Job Discovery Engine}{https://github.com/Capataina/cernio}{Rust, Tokio, Ratatui, SQLite}
-  \item Built async Rust pipeline scanning 408 companies across 7 ATS provider APIs, applying configurable filter chains (location, exclusion, inclusion), deduplicating against SQLite in WAL mode, and orchestrating parallel AI agents to evaluate 900+ jobs with multi-dimensional fit assessments grounded in a structured candidate profile.
-  \item Built 4-view interactive Ratatui terminal dashboard with vim-style search, grade-based sorting, pipeline kanban, multi-select bulk operations, markdown export, responsive layout across three breakpoints, and real-time auto-refresh from SQLite.
+\begin{project}{Cernio: Local-First Job Discovery and Curation Engine}{https://github.com/Capataina/cernio}{Rust, Tokio, Ratatui, SQLite}
+  \item Built a local-first job-discovery and curation engine that treats job search as a systems problem, scanning hundreds of companies across the major ATS providers, deduplicating against SQLite, and orchestrating AI agents grading every opportunity against a structured candidate profile on multiple fit dimensions through 9 native Claude Code skills installed at .claude/skills/.
+  \item Built an interactive Ratatui terminal dashboard with vim-style search, grade-based sorting, pipeline kanban, multi-select bulk operations, markdown export, responsive layout, and real-time database refresh.
 \end{project}
 
-\begin{project}{NeuroDrive: RL Training Environment \& Agent}{https://github.com/Capataina/NeuroDrive}{Rust, Bevy}
-  \item Built complete RL training environment from scratch across 8 Bevy subsystems (393 KB, 67 source files) with no ML framework dependencies: deterministic 60 Hz multi-car simulation, 43-dimensional observation space, and handwritten PPO with clipped surrogate objective, asymmetric actor-critic, orthogonal init, and AdamW optimiser.
-  \item Built analytics pipeline capturing 16 tick-level fields and 25 episode-level aggregates with crash classification and automated diagnostic reports. Feature-gated profiling across all 17 FixedUpdate systems. Fixed a 43x regression by switching from nested Vec to flat contiguous row-major weight storage.
+\begin{project}{NeuroDrive: Biology-First RL Driving Simulator}{https://github.com/Capataina/NeuroDrive}{Rust, Bevy}
+  \item Built a reinforcement-learning environment in Rust + Bevy with no external ML framework, deterministic 60 Hz multi-car simulation, custom observation space, and a handwritten PPO with clipped surrogate, asymmetric actor-critic, and AdamW. Cars learn end-to-end; fixed a 43x regression by flattening nested-Vec weights to row-major.
+  \item Shipped a biologically-inspired learner running alongside PPO: a sparse graph network with three-factor plasticity, eligibility traces, reward neuromodulation, homeostatic regulation, and continual-backprop structural growth, a single agent that learns continuously across its entire lifetime, with no weight resets and no backpropagation.
 \end{project}
 
-\begin{project}{Image Browser: Local-First Semantic Image Manager}{https://github.com/Capataina/PinterestStyleImageBrowser}{Rust, Tauri, React, ONNX}
-  \item Built CLIP-powered image search running entirely offline: images encoded to 512-dimensional vectors via ONNX Runtime (CUDA fallback), and a pure-Rust WordPiece tokenizer encoding text queries through a multilingual CLIP model into the same vector space for cross-modal semantic search. Three cosine similarity modes: diversity-sampled, strict-ranked, and Pinterest-style tiered.
-  \item Built Tauri 2 desktop app with Pinterest-style masonry layout, manual tagging, batch CLIP embedding on startup, thumbnail pipeline with on-disk caching, and SQLite persistence for metadata, tags, and embeddings.
+\begin{project}{Image Browser: Multi-Encoder Local-First Image Manager}{https://github.com/Capataina/PinterestStyleImageBrowser}{Rust, Tauri, React, ONNX}
+  \item Built a desktop app for browsing, tagging, and semantically searching personal image libraries entirely offline. Three image-embedding models (CLIP, DINOv2, SigLIP-2) run via ONNX Runtime; per-encoder rankings are combined with Reciprocal Rank Fusion (Cormack 2009) to surface conceptual, structural, and descriptive similarity at once.
+  \item Built in Tauri 2 + React 19: Pinterest-style masonry, multi-folder library with filesystem watcher and orphan detection, AND/OR tag filtering, per-image annotations, typed IPC error envelopes, and SQLite in WAL mode with separate read/write connections so the UI stays responsive during indexing.
 \end{project}
 
 \begin{project}{Aurix: Local-First DeFi Analytics Platform}{https://github.com/Capataina/Aurix}{Rust, Tauri, React, TypeScript}
-  \item Building on-device Ethereum analytics platform targeting cross-DEX arbitrage, Uniswap V3 LP backtesting, wallet tracking, gas prediction, and risk modelling. Currently implements the arbitrage scanner using raw JSON-RPC with hand-crafted ABI encoding (no ethers-rs), decoding Uniswap V3 sqrtPriceX96 via BigUint arithmetic and V2 reserve ratios across 4 venues concurrently.
-  \item Built React dashboard with hand-rolled SVG charting (4 analytical modes, per-venue colour coding) and a TypeScript insight engine computing rolling statistics, trailing run detection, and severity-graded notifications.
+  \item Building an on-device Ethereum analytics app targeting cross-DEX arbitrage, Uniswap V3 LP backtesting, wallet tracking, gas prediction, and risk modelling. The arbitrage scanner uses raw JSON-RPC with hand-crafted ABI encoding (no ethers-rs), decoding Uniswap V3 sqrtPriceX96 and V2 reserve ratios via BigUint across multiple DEXs.
+  \item Built a React dashboard with hand-rolled SVG charting (per-venue colour coding, multiple analytical modes) and a TypeScript insight engine computing rolling statistics, trailing run detection, and severity-graded notifications.
 \end{project}
 
 \begin{project}{Nyquestro: High-Performance Order Matching Engine}{https://github.com/Capataina/Nyquestro}{Rust}
-  \item Building a from-scratch exchange simulation in safe Rust targeting a lock-free order book with price-time priority matching, a binary UDP wire protocol, a real-time risk layer (fat-finger protection, rolling VaR circuit breaking), and a market-making strategy agent with order flow imbalance signals and inventory-aware quote placement.
-  \item Currently implementing the foundational type layer: fixed-point price representation in cents, nanosecond timestamps, order state machine with saturating fill logic, zero-allocation Copy event frames, structured error taxonomy, and \textasciitilde50 integration tests.
+  \item Building a from-scratch exchange simulation in safe Rust targeting a lock-free order book with price-time priority matching, a binary UDP wire protocol, a real-time risk layer (fat-finger protection, rolling VaR circuit breaking), and a market-making agent with order-flow-imbalance signals and inventory-aware quote placement.
+  \item Currently implementing the foundational type layer: fixed-point cents pricing, nanosecond timestamps, an order state machine with saturating fill logic, zero-allocation Copy event frames, and a structured error taxonomy.
 \end{project}
 
 %-----------------------------------------------------------------------
@@ -142,8 +141,8 @@ tags:
   {September 2022 -- June 2025}
   {
     \begin{itemize}
-        \item Built CNN, MLP, and RNN models for image classification, predictive analytics, and cryptographic attack simulation, demonstrating proficiency across supervised learning architectures.
-        \item Led development of a simulation game in Java/libGDX as lead developer in an 8-person team, coordinating architecture, feature implementation, and automated cross-platform testing pipelines.
+        \item Built CNN, MLP, and RNN models for image classification, predictive analytics, and cryptographic attack simulation.
+        \item Led an 8-person team developing a Java/libGDX simulation game; owned architecture, features, and CI testing.
     \end{itemize}
   }
 
