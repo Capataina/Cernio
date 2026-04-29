@@ -407,7 +407,7 @@ fn job_exists(conn: &Connection, url: &str) -> bool {
 }
 
 fn insert_job(conn: &Connection, company_id: i64, portal_id: i64, job: &AtsJob) {
-    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let _ = conn.execute(
         "INSERT OR IGNORE INTO jobs (company_id, portal_id, title, url, location, remote_policy, posted_date, raw_description, evaluation_status, discovered_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9)",

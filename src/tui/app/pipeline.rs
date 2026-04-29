@@ -77,7 +77,7 @@ impl App {
         };
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
             let _ = conn.execute(
                 "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
                 rusqlite::params![job_id, target, now],

@@ -359,16 +359,16 @@ pub fn fetch_pipeline_cards(
 pub fn fetch_activity_data(conn: &Connection) -> Vec<(String, String)> {
     let sql = "
         SELECT DATE(decided_at) AS d, decision FROM user_decisions
-        WHERE decided_at >= datetime('now', '-84 days')
+        WHERE datetime(decided_at) >= datetime('now', '-84 days')
         UNION ALL
         SELECT DATE(last_searched_at), 'searched' FROM companies
-        WHERE last_searched_at IS NOT NULL AND last_searched_at >= datetime('now', '-84 days')
+        WHERE last_searched_at IS NOT NULL AND datetime(last_searched_at) >= datetime('now', '-84 days')
         UNION ALL
         SELECT DATE(graded_at), 'graded' FROM companies
-        WHERE graded_at IS NOT NULL AND graded_at >= datetime('now', '-84 days')
+        WHERE graded_at IS NOT NULL AND datetime(graded_at) >= datetime('now', '-84 days')
         UNION ALL
         SELECT DATE(discovered_at), 'discovered' FROM jobs
-        WHERE discovered_at IS NOT NULL AND discovered_at >= datetime('now', '-84 days')
+        WHERE discovered_at IS NOT NULL AND datetime(discovered_at) >= datetime('now', '-84 days')
     ";
 
     conn.prepare(sql)
@@ -492,14 +492,14 @@ pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
 pub fn fetch_new_since_session(conn: &Connection) -> (i64, i64, i64) {
     let jobs: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM jobs WHERE discovered_at >= datetime('now', '-12 hours')",
+            "SELECT COUNT(*) FROM jobs WHERE datetime(discovered_at) >= datetime('now', '-12 hours')",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let companies: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM companies WHERE discovered_at >= datetime('now', '-12 hours')",
+            "SELECT COUNT(*) FROM companies WHERE datetime(discovered_at) >= datetime('now', '-12 hours')",
             [],
             |r| r.get(0),
         )

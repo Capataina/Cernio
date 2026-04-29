@@ -13,7 +13,7 @@ impl App {
                     "UPDATE jobs SET evaluation_status = 'archived', archived_at = datetime('now')
                      WHERE grade = ?1
                      AND evaluation_status != 'archived'
-                     AND discovered_at < datetime('now', ?2)
+                     AND datetime(discovered_at) < datetime('now', ?2)
                      AND id NOT IN (SELECT job_id FROM user_decisions)",
                     rusqlite::params![grade, format!("-{days} days")],
                 );
@@ -24,8 +24,8 @@ impl App {
                 "DELETE FROM jobs
                  WHERE evaluation_status = 'archived'
                  AND (
-                     (archived_at IS NOT NULL AND archived_at < datetime('now', '-14 days'))
-                     OR (archived_at IS NULL AND discovered_at < datetime('now', '-42 days'))
+                     (archived_at IS NOT NULL AND datetime(archived_at) < datetime('now', '-14 days'))
+                     OR (archived_at IS NULL AND datetime(discovered_at) < datetime('now', '-42 days'))
                  )
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 [],

@@ -42,7 +42,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
                 "SELECT COUNT(*) FROM jobs
                  WHERE grade = ?1
                  AND evaluation_status != 'archived'
-                 AND discovered_at < datetime('now', ?2)
+                 AND datetime(discovered_at) < datetime('now', ?2)
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 params![grade, format!("-{days} days")],
                 |row| row.get(0),
@@ -61,8 +61,8 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
             "SELECT COUNT(*) FROM jobs
              WHERE evaluation_status = 'archived'
              AND (
-                 (archived_at IS NOT NULL AND archived_at < datetime('now', '-14 days'))
-                 OR (archived_at IS NULL AND discovered_at < datetime('now', '-42 days'))
+                 (archived_at IS NOT NULL AND datetime(archived_at) < datetime('now', '-14 days'))
+                 OR (archived_at IS NULL AND datetime(discovered_at) < datetime('now', '-42 days'))
              )
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             [],
@@ -76,7 +76,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
             "SELECT COUNT(DISTINCT j.id) FROM jobs j
              JOIN user_decisions ud ON ud.job_id = j.id
              WHERE j.grade IN (SELECT value FROM json_each(?1))
-             OR j.discovered_at < datetime('now', ?2)",
+             OR datetime(j.discovered_at) < datetime('now', ?2)",
             params![
                 serde_json::to_string(&config.remove_job_grades).unwrap_or_default(),
                 format!("-{} days", config.stale_days)
@@ -127,7 +127,7 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
                 "UPDATE jobs SET evaluation_status = 'archived', archived_at = datetime('now')
                  WHERE grade = ?1
                  AND evaluation_status != 'archived'
-                 AND discovered_at < datetime('now', ?2)
+                 AND datetime(discovered_at) < datetime('now', ?2)
                  AND id NOT IN (SELECT job_id FROM user_decisions)",
                 params![grade, format!("-{days} days")],
             )
@@ -147,8 +147,8 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
             "DELETE FROM jobs
              WHERE evaluation_status = 'archived'
              AND (
-                 (archived_at IS NOT NULL AND archived_at < datetime('now', '-14 days'))
-                 OR (archived_at IS NULL AND discovered_at < datetime('now', '-42 days'))
+                 (archived_at IS NOT NULL AND datetime(archived_at) < datetime('now', '-14 days'))
+                 OR (archived_at IS NULL AND datetime(discovered_at) < datetime('now', '-42 days'))
              )
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             [],

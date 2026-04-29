@@ -207,7 +207,7 @@ async fn run_full(conn: &Connection) -> IntegrityReport {
         .query_row(
             "SELECT COUNT(*) FROM companies
              WHERE graded_at IS NOT NULL
-             AND graded_at < datetime('now', '-30 days')",
+             AND datetime(graded_at) < datetime('now', '-30 days')",
             [],
             |row| row.get(0),
         )
@@ -228,7 +228,7 @@ async fn run_full(conn: &Connection) -> IntegrityReport {
     let stale_jobs: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM jobs
-             WHERE discovered_at < datetime('now', '-14 days')
+             WHERE datetime(discovered_at) < datetime('now', '-14 days')
              AND grade NOT IN ('SS', 'S')
              AND id NOT IN (SELECT job_id FROM user_decisions)",
             [],
