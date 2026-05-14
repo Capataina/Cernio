@@ -156,12 +156,13 @@ When writing fit assessments, you must connect jobs to the profile concretely. H
 - Seniority assessment grounded in `experience.md` and the per-project files in `profile/projects/`
 
 **For SS/S jobs (mandatory):**
+- **Q1 hiring-pattern signal cited first.** Before any project / tech / trajectory citation, the assessment names the firm's actual entry-level hiring pattern (graduate intake volume, university-acceptance breadth, screening shape, conversion-rate signal) AND the candidate's position relative to that pattern. Cite specific elements from `profile/education.md` (degree class, institution), `profile/experience.md` (formal years), and `profile/projects/` (portfolio depth as Q3 evidence within the Q1-cleared band). The grade letter is consistent with this Q1 verdict; an SS / S grade requires Q1 to read as cleared decisively (the candidate is in the realistic primary-target pool), not merely "nominally eligible". See `references/grading-rubric.md` §Evidence Standards §"Aggregation verification".
 - All active projects from `profile/projects/` that are relevant, with explanation of what each demonstrates. Substantively-built dormant projects should be included when directly relevant. Paused projects can be cited as supporting evidence; abandoned projects should only appear if they add something the active and dormant projects don't cover.
-- Full technology overlap analysis from `skills.md`
+- Full technology overlap analysis from `skills.md`, with explicit weighting if the candidate's portfolio is concentrated in the role's primary stack (≥3 active or substantively-built-dormant projects in the same language — see `references/grading-rubric.md` §"Common Grading Errors / Over-weighting tech stack — with one important asymmetry").
 - Gaps identified from `portfolio-gaps.md` with severity assessment
 - Visa timeline from `visa.md` and sponsorship viability
 - Career trajectory fit against targets in `preferences.toml`
-- At least one specific element from the candidate's background that makes them a standout applicant
+- At least one specific element from the candidate's background that makes them a standout applicant *within the Q1-cleared applicant pool* (not in the absolute frame — "standout among generic CS graduates" is the wrong frame; "standout among the firm's actual realistic-target applicants" is the right frame).
 
 **For A/B jobs:**
 - Primary project alignment (at least one named project)
