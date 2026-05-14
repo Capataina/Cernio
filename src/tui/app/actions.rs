@@ -139,15 +139,29 @@ impl App {
                 (None, None, None)
             };
 
-        let has_package = package_answers.is_some();
-
-        // For unsupported providers, fall back to regular open.
-        if ats_provider.as_deref() != Some("greenhouse") {
-            let _ = std::process::Command::new("open").arg(&job_url).spawn();
-            self.add_toast("Autofill not supported — opened in browser");
-            self.record_decision_multi("applied");
+        // ── Gate: provider must support autofill ──
+        // Anything not currently autofillable is inert under `p` — no browser
+        // launch, no "applied" decision. Use `o` to open the URL manually.
+        let provider_str = ats_provider.as_deref();
+        if provider_str != Some("greenhouse") {
+            let msg = match provider_str {
+                None => "Autofill unavailable: no ATS portal recorded — use `o` to open".to_string(),
+                Some(p) => format!("Autofill not supported for {p} — use `o` to open"),
+            };
+            self.add_toast(msg);
             return;
         }
+
+        // ── Gate: an application package must be prepared ──
+        // Without prepared answers the autofill can only do standard fields,
+        // which isn't the experience the user wants under `p`. Use the
+        // prepare-applications skill first.
+        let Some(package_answers) = package_answers else {
+            self.add_toast(
+                "No application package for this job — run prepare-applications first".to_string(),
+            );
+            return;
+        };
 
         // Spawn the autofill on the Tokio runtime (no stderr output — TUI is in raw mode).
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -160,16 +174,14 @@ impl App {
                     Some("greenhouse"),
                     ats_slug.as_deref(),
                     &profile,
-                    package_answers.as_deref(),
+                    Some(package_answers.as_str()),
                 )
                 .await;
             });
         }
 
         // Mark as applied and show toast.
-        let provider_name = ats_provider.as_deref().unwrap_or("unknown");
-        let pkg_status = if has_package { " + answers" } else { "" };
-        self.add_toast(format!("Autofilling ({provider_name}{pkg_status})..."));
+        self.add_toast("Autofilling Greenhouse (with answers)...".to_string());
         self.record_decision_multi("applied");
     }
 
