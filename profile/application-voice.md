@@ -1,305 +1,297 @@
 # Application Voice: Idea Sheet
 
-This file is an **inspiration source**, not a hard rule book. When generating
-essays or factual answers for a job application, draw from it. Use the bits
-that fit the role and the question. Skip the bits that don't. A specific
-suggestion below absent from the final answer is fine; a specific suggestion
-mechanically inserted everywhere defeats the point.
+> [!note] What this file is
+> **Reasoning for agents, not rules.** Every observation explains *what a skimming reader actually experiences* when they hit a particular shape of prose, and names the *variables* that shape the right call in any given application. The agent reads the profile, the role, the company, and the form, then decides. The patterns here are inputs to that judgment, not constraints on it.
 
-This file is deliberately **portfolio-agnostic**. It does not name specific
-projects, technologies, or OSS contributions, because the portfolio evolves.
-The agent reading this file alongside `profile/projects/`, `profile/skills.md`,
-and `profile/experience.md` is responsible for choosing which projects, which
-contributions, and which skills best match the role being applied to. The
-guidance here is about *how to apply that judgment*, not about *which project
-to pick* for a given role.
-
-Three things to keep in mind while reading this file:
-
-1. The "narrative hooks" below are screenshot-worthy moves a recruiter might
-   actually mention to a teammate. Use one per application at most. Two hooks
-   in one essay reads as ornament rather than substance.
-2. The "common phrasings" are defaults. Per-job context can override any of
-   them; when the form or the company calls for a different shape, prefer
-   the shape that fits.
-3. The "style notes" are preferences, not constraints. The Answer Generation
-   Standard in `prepare-applications/SKILL.md` is the constraint layer; this
-   file is the texture layer that runs on top.
+> [!important] Portfolio-agnostic by design
+> This file names **zero** specific projects, technologies, or contributions, because the portfolio evolves. The agent picks from the live state of `profile/projects/`, `profile/skills.md`, and `profile/experience.md` using the reasoning here. As projects change, this file stays accurate.
 
 ---
 
-## Conciseness
+## 1. Length, Density, and How Many Projects
 
-A recruiter skimming 20 applications an hour will not read a four-paragraph
-"why our company" answer. Aim short. The discipline is not "fewer words for
-the sake of fewer words"; it is "every word load-bearing, no filler, no
-jargon-stretching".
+Two forces compete in every essay:
 
-Heuristics that produce concise prose without losing information:
-
-- **One project per essay, not a list.** Pick the strongest project for this
-  role (see "How to Pick What to Lead With") and describe it in depth. Three
-  half-described projects read weaker than one fully-described one.
-- **Specifics replace adjectives.** "Highly performant" becomes a latency
-  number. "Robust" becomes a test count. "Extensive experience" becomes a
-  named project with a named outcome. The specifics are usually shorter than
-  the adjectives they replace.
-- **Cut warm-up sentences.** Every essay's first draft has a sentence that
-  introduces what the next sentence will say. Delete it. Start at the point.
-- **No jargon padding.** Naming an architectural decision in plain words is
-  shorter than stacking buzzwords. The reader is technical; they don't need
-  the buzzword scaffolding.
-- **Resist the urge to oversell impressive things.** An impressive project
-  becomes less impressive when surrounded by superlatives. Let the facts
-  carry the weight. If the work is strong, naming it plainly is enough.
-- **Trust the reader.** If a sentence explains what the previous sentence
-  already implied, cut it. The reader filled in the connection faster than
-  the explaining sentence reaches them.
-
-Target lengths as a rough guide (per essay, not per paragraph):
-
-| Essay | Default target | When to go longer |
+| Dimension | What it gives the reader | What it costs |
 |---|---|---|
-| `why_interested` | 100-150 words | Job description has multiple distinct hooks worth tying to specific projects |
-| `why_company` | 100-150 words | The company's product or culture is unusually specific and the alignment deserves more room |
-| `technical_project` | 200-300 words | The project has multiple notable architectural decisions and a measurable outcome worth detailing |
-| `cover_letter` | 250-350 words | Rarely; a long cover letter is almost always a sign the prose can be cut |
+| **Breadth** | Signal of range, versatility, multiple proof points | Each item less vividly rendered |
+| **Depth** | Vivid evidence the reader can quote back | Less ground covered |
 
-These are guides, not limits. The bar is "every word load-bearing"; if the
-essay is at the bar and still longer than the guide, that's fine. If the
-essay is at the guide but full of filler, it is too long.
+Neither is the default. The right answer is contextual, and four variables determine it:
 
----
+### 1.1 Alignment density
 
-## Style Notes
+The single biggest driver. How densely the profile maps onto the role being applied to:
 
-| Preference | Why | What to do instead |
+| Alignment shape | Strongest move | Why |
 |---|---|---|
-| Avoid em-dashes (—) | Recognisable AI tell; reads as machine cadence even when the prose is otherwise good | Commas, semicolons, sentence breaks, or parentheses |
-| British English | Caner's spoken voice; CVs and prior cover letters use it | "organisation", "behaviour", "analyse", "centre" |
-| Avoid "passionate about", "excited to", "thrilled" | Generic enthusiasm phrases that recruiters skim past | Lead with the technical hook; let the alignment speak |
-| Avoid "Dear Hiring Manager" boilerplate | Form-filler tell | Open with the company name or the team name when known |
-| Concrete over abstract | Numbers, project names, specific techniques | Replace "extensive experience" with a count, a project name, a measurable outcome |
-| Active verbs for solo projects | Avoids overclaiming "led" / "managed" on solo work | Use "built", "designed", "shipped", "maintained" |
-| Honest, not modest | Don't fabricate; don't undersell | If a project hit a measurable outcome, name the number |
-| No filler or jargon padding | Recruiters skim; padding hides the substance | See the Conciseness section above for the discipline |
+| Many portfolio items each map to different role responsibilities | **Breadth at moderate depth** (3-4 projects, tight) | The range itself is the evidence; covering ground demonstrates versatility one deep project can't |
+| One project hits the heart, others are adjacent | **Depth on the one project** | A bull's-eye is more memorable than a constellation; pad it with one or two supporting names at the close |
+| Plausible fit, no single project on target | **Shorter and more concise overall** | Reduces the risk of reading as overclaim; honesty about partial fit beats forced enthusiasm |
+| The role is a genuinely perfect fit, multiple projects all hit it | **Boast deliberately** | Specificity-stacked confidence is appropriate when earned; the reader can feel when an applicant is genuinely the candidate vs. fishing |
+
+### 1.2 Role framing
+
+The job description usually telegraphs what it wants the candidate to show:
+
+- **Senior-track wording** ("ownership", "drives initiatives", "across the stack") rewards **range**. Show breadth.
+- **Entry-level specialist wording** ("strong Rust", "deep familiarity with X") rewards **depth in one thing**. Show focus.
+- **Generalist wording** ("comfortable across", "polyglot mindset") rewards **breadth shown lightly**. Touch several things briefly.
+
+### 1.3 Essay's natural length
+
+The form's slot shape itself shapes the answer:
+
+| Slot | Natural fit |
+|---|---|
+| One-paragraph textarea | One project, in depth |
+| Two-or-three paragraph essay | One project deep, one supporting |
+| Full cover-letter body | Two or three projects, varied depth |
+| Multi-section answer set | Different projects can carry different essays |
+
+Forcing four projects into a one-paragraph slot makes each shallow. Stretching one project across four paragraphs makes the prose feel padded.
+
+### 1.4 Headline strength of each project
+
+Some projects carry an essay on a single fact (a sharp latency number, a striking architectural decision, a measurable outcome stated plainly). Others are individually solid without being individually striking; those projects work better in concert than in isolation.
+
+### 1.5 Sanity-reference word counts
+
+Strong essays in this voice tend to land in the ranges below. The right essay can sit outside them when the content earns it:
+
+| Essay | Typical range | When longer is right | When shorter is right |
+|---|---|---|---|
+| `why_interested` | 100-200 words | Multiple distinct hooks in the role each tie to different projects | One specific hook does most of the work cleanly |
+| `why_company` | 100-200 words | Company has unusually specific commitments worth engaging with | "Good company doing good work" is honestly most of what there is to say |
+| `technical_project` | 150-350 words | Project genuinely has multiple architectural decisions and a measurable outcome worth detailing | Padded depth reads worse than honest brevity |
+| `cover_letter` | 200-400 words | Multiple projects each load-bearing on different parts of the role | Recruiters skim cover letters fastest; the case for length has to be earned |
 
 ---
 
-## Common Factual Phrasings
+## 2. What Makes Prose Land or Slide Off
 
-These are the defaults the prepare-applications skill should reach for when
-filling factual answers. Per-job overrides at invocation time supersede them.
-Where a phrasing depends on a fact that lives in `profile/` (visa expiry,
-graduation year, current employment status), source the fact fresh from those
-files; the phrasings below show the *shape*, not the values.
+A skimming reader's eye moves through an essay scanning for friction points: places where the prose stops feeling like a specific person saying a specific thing. Each observation below names the friction point, explains the mechanism, and notes when the friction matters most.
 
-| Question class | Default phrasing pattern | Notes |
+### 2.1 Em-dashes
+
+> [!warning] Recognisable AI cadence
+> Models produce a particular rhythm (short clause, dash, longer clarifying clause) often enough that human readers register it as a tell, even without consciously naming it.
+
+| Mechanism | When it matters most | When it matters least |
 |---|---|---|
-| Start date | "As soon as possible" | Default while job-hunting full-time with no notice to serve. If a calendar date is required, use today's date or the next Monday. |
-| Notice period | "N/A (no current employment)" when independent; the actual notice when employed | Match `profile/experience.md` and `profile/applications.md` |
-| Current employer | "Independent" or a fuller form like "Independent; full-time on portfolio engineering and OSS contributions" | Depending on whether the form wants a short or long answer |
-| Relocation | "Yes, open to relocation for the right role and city" when open | Lifestyle constraints (city criteria, public-culture preferences, walkability, etc.) live in `profile/lifestyle-preferences.md`; don't repeat them in the answer |
-| Sponsorship (now) | Cite the current visa and the date it expires | The "now" framing matters; some forms ask about "now" separately from "in the future" |
-| Sponsorship (future) | Cite the specific date sponsorship becomes necessary | Opaque "eventually" reads as evasive |
-| Visa status (free text) | Visa name plus the date the visa expires, in a single phrase | Specificity is the load-bearing detail |
-| Visa status (dropdown) | Match the form's option exactly | Common variants surface during the autofill schema fetch |
-| GPA / degree class | Class plus degree and institution, all in one phrase | Honest; the portfolio is the load-bearing evidence, not the class |
-| How heard | "LinkedIn" or "Company careers page" | Pick whichever the form's options list includes |
-| US work auth | "Yes" or "No" based on `profile/visa.md` | Only ever asked on US-HQ company forms |
-| Interviewed at company before | "No" by default; "Yes" only if explicitly tracked | |
-| Data protection / GDPR consent | "Yes" / "Acknowledge" | Always; no exceptions |
+| Statistical signature of model-generated text | AI-suspicious audiences, application portals at AI-adjacent companies, anywhere recruiters have screening fatigue | Internal-team-written form where the reader knows the candidate already |
+
+The substitute is usually commas, semicolons, or sentence breaks. The information rarely depends on the dash; the cadence does.
+
+### 2.2 Generic enthusiasm phrases
+
+> [!warning] Filler that pushes evidence out
+> "Passionate about", "excited to", "thrilled to be considered". These convey only the writer's emotional posture, which the reader assumes anyway from the fact that the application exists.
+
+**The real cost is what they push out.** A sentence about emotion is a sentence that didn't make the case. The reader's eye lands on it, gets nothing actionable, and moves on slightly more sceptical.
+
+### 2.3 Boilerplate openings
+
+"Dear Hiring Manager" and similar generic salutations signal that the same opening went out to every other application. The cost is small but real: the reader unconsciously categorises the application as templated and reads the rest with that frame.
+
+### 2.4 Adjectives without evidence
+
+"Highly performant", "robust", "production-grade", "extensive experience". These are claims the reader has to take on trust. The same information is usually shorter expressed as evidence:
+
+| Adjective | Evidence equivalent |
+|---|---|
+| "Highly performant" | A latency or throughput number |
+| "Robust" | A test count, an uptime number, a failure-mode handled |
+| "Production-grade" | The named users, the named scale, the named system |
+| "Extensive experience" | A named project, a named contribution, a named outcome |
+
+Evidence is shorter than the adjective it replaces, and harder to disbelieve.
+
+### 2.5 Solo-work overclaim verbs
+
+"Led", "managed", "directed" applied to a project the candidate built alone can read as overstatement once the rest of the application makes the solo nature clear. Active building verbs ("built", "designed", "shipped", "maintained") read as accurate and stronger for it.
+
+### 2.6 British vs American English
+
+Consistency matters more than the specific choice. Caner's spoken voice and CV are British English; mixing within a single application reads as careless or templated.
+
+### 2.7 Honest, not modest
+
+> [!tip] The asymmetry
+> Underselling a real achievement reads as **hedging**. A measurable outcome stated plainly reads as **confidence**. Claiming something that isn't there reads as **fabrication**, and the reader can spot it faster than the writer thinks.
 
 ---
 
-## Narrative Hooks
+## 3. What a Skimming Reader Actually Does
 
-Use **one** per application at most. These are designed to land hard once;
-repetition dilutes them. Each hook below is a *pattern*, not a script;
-instantiate it against the specific role and the current portfolio state.
+> [!important] The bedrock observation
+> A recruiter reading the twentieth application of the morning has finite attention. They start each essay looking for a reason to keep reading. They abandon the moment the prose stops earning that.
 
-### The loop-closure hook
+```
+        ┌──────────────────────────────────────────────┐
+        │  Application N of 20 this morning            │
+        │  ~8 seconds on the opening                   │
+        │  ~30 seconds total if the opening lands      │
+        │  Either way: filler costs more than length   │
+        └──────────────────────────────────────────────┘
+```
 
-When the tool used to find or curate the application is itself a portfolio
-project, close the loop explicitly: the agent that discovered this role, the
-grader that scored the company, and the system that drafted this answer are
-the same artefact. One concrete pointer to the project is enough; the
-reader's recognition that "the thing you're reading about is the thing that
-surfaced its own application" carries the rest.
+What this implies:
 
-When it lands hardest:
-
-- The role is at a privacy, infra, dev-tools, or systems-software company
-  where "I built a tool that solves a real problem in my own life" reads
-  as cultural fit, not as ornament.
-- The cover letter or `technical_project` already has room for one
-  long-form project description, and the looped-back tool is the strongest
-  match.
-- The application form has a "tell us about a time you built something
-  for yourself" question.
-
-When **not** to use it:
-
-- The role is at a non-engineering-led firm where the meta-narrative reads
-  as showing off rather than as proof.
-- The looped-back tool is being mentioned only in passing. The hook needs
-  space to land; a half-mention with no follow-through reads as
-  name-dropping.
-- The essay already includes another strong hook. One per application.
-
-### The architectural-alignment hook
-
-When the company's product commitments (privacy by construction, local-first,
-on-prem, deterministic execution, zero-telemetry-by-default, end-to-end
-encryption, etc.) match an architectural commitment made in a portfolio
-project for reasons of personal discipline rather than external requirement,
-name the match directly. The hook is "I made the same commitment without
-anyone asking me to". This reads as cultural alignment, not as paid-job
-experience, which is often what entry-level applications need to do.
-
-### The "rebuild the legacy app" hook
-
-When the role is explicitly a rewrite-in-Rust (or rewrite-in-Go, rewrite-in-X)
-play, lead with a project whose architectural shape ports cleanly to the
-migration. The hook is: "I have the discipline that produced [project], and
-I have it without the constraint of an existing codebase to migrate; that
-discipline ports to the migration, with the added rigour of behavioural-parity
-checks against the existing implementation."
-
-### The "I solved this for myself" hook
-
-When the role involves observability, internal tooling, or developer
-experience, lead with a project built for personal use. The hook is the
-authenticity of the motivation: built because the builder needed it, used
-daily, evolves with the user's actual workflow. The story should be tight:
-the problem, the build, the daily use.
-
-### The OSS-as-credibility hook
-
-When the role asks for "open-source experience" or names specific upstream
-projects, surface the relevant OSS engagements with specifics: the project
-name, the PR number, the LOC, the merged status, the verification artefact.
-The hook lands when the contribution is non-trivial; a one-line typo fix
-weakens the signal rather than strengthens it.
+- **The first sentence has to land.** Naming the specific role, pulling a verbatim phrase from the description and tying it to evidence, or opening on a concrete detail that signals "this is not templated" all work.
+- **Filler costs more than length.** A 400-word essay where every sentence is load-bearing reads faster than a 250-word essay padded with warm-up sentences. The reader's experience is "the prose got me through it", not "the word count was low".
+- **Specifics teach faster than generalities.** One specific fact (a number, a PR with merged status, a named architectural decision) teaches the reader more than a paragraph of capability claims.
+- **Trust the reader.** If a sentence explains what the previous sentence already implied, the reader felt the explanation coming. Cut it; they filled in the connection faster than the explaining sentence could reach them.
 
 ---
 
-## How to Pick What to Lead With
+## 4. Common Factual Phrasings
 
-The Answer Generation Standard requires every essay to be profile-grounded;
-this section is the *judgment layer* on top, on how to choose which element of
-the profile carries the weight in a given essay.
+Defaults for the factual half of the application. Values are sourced fresh from `profile/` files; the phrasings below are *shapes* that tend to land cleanly. Per-job context can override any of them.
 
-The agent picks projects, contributions, and skills using these tests:
-
-1. **Architectural-shape match.** Find the project whose architectural
-   commitments most directly mirror what the role asks for. If the role
-   requires concurrency primitives, find the project that solved a problem
-   with custom concurrency. If the role requires data-pipeline work, find
-   the project that ingests and processes meaningful volumes of data.
-   Architectural-shape match beats stack match: identical languages with
-   misaligned problem shapes are weaker than divergent stacks tackling the
-   same problem.
-
-2. **Stack overlap.** Once architectural-shape candidates are identified,
-   prefer the project whose stack overlaps most with the role's stack. A
-   role that names specific technologies (a specific framework, a specific
-   database, a specific runtime) gets a project that uses those specific
-   technologies wherever the profile has one.
-
-3. **Measurable outcome.** Among shape-matched, stack-matched candidates,
-   prefer the project with the strongest measurable outcome (a latency
-   number, a throughput number, a memory-footprint number, a test-count
-   number, a freeze-eliminated number). Measurable outcomes survive
-   skimming; adjective-driven outcomes don't.
-
-4. **Recency.** Prefer the most recently-updated project among shape-matched
-   candidates. Recency signals current craft; the same architecture written
-   18 months ago and not maintained reads as a one-off rather than as
-   evidence of standing practice.
-
-5. **Honest depth.** Discard candidates the agent cannot speak about in
-   depth from `profile/projects/`. A project named without the supporting
-   architectural detail reads as a CV bullet rather than as evidence; if
-   the project file doesn't have the depth to support a paragraph, lead
-   with a different project.
-
-Run these tests against the current state of `profile/projects/`,
-`profile/skills.md`, and `profile/experience.md`. The selection naturally
-changes as the portfolio evolves; the tests don't.
+| Question class | Phrasing shape | What's underneath |
+|---|---|---|
+| **Start date** | "As soon as possible" (or a calendar date when required) | Reads as available and motivated |
+| **Notice period** | "N/A (no current employment)" when independent | Exact-match to the form's expected shape; vagueness reads as hiding something |
+| **Current employer** | "Independent" or a fuller form when the role values self-direction | Match the field's tone; one-word fields don't want a paragraph |
+| **Relocation** | Direct yes/no with a brief qualifier | "Yes, for the right role and city" reads as deliberate; bare "yes" can read as desperate |
+| **Sponsorship (now)** | Visa name plus exact expiry date | Specificity is what the reader needs to do hiring math |
+| **Sponsorship (future)** | The exact date sponsorship becomes necessary | Opaque "eventually" reads as evasive even when it isn't |
+| **Visa status (free text)** | Visa name plus expiry date in one phrase | The visa name is load-bearing; the date confirms specificity |
+| **Visa status (dropdown)** | Exact match to the form's option | Custom phrasing in a dropdown breaks downstream filters |
+| **GPA / degree class** | Class, degree, and institution in one phrase | The portfolio is the evidence; the class is the receipt |
+| **How heard** | "LinkedIn" or "Company careers page" | Match the form's option list |
+| **US work auth** | "Yes" or "No" from `profile/visa.md` | Only asked on US-HQ company forms |
+| **Interviewed at this company before** | "No" by default | Honest by construction |
+| **Data protection / GDPR** | "Yes" / "Acknowledge" | Always; downstream logic depends on it |
 
 ---
 
-## Honest Gap Framing
+## 5. Narrative Hooks
 
-How to handle questions where the role asks for something the profile
-doesn't have. The goal is honest, not modest: name the adjacent experience,
-don't claim what isn't there.
+> [!tip] One per application, at most
+> A narrative hook is a screenshot-worthy line, something a recruiter might quote back in the first conversation. **Hooks land hard once and dilute fast.** Two hooks in the same application make each one feel less earned.
 
-The pattern for every gap:
+Each pattern below is a *shape*, not a script. Whether to use it, where to land it, and what specific portfolio item to instantiate it against are all judgment calls.
 
-1. **Name the gap directly.** "I have not done X in a paid role."
-2. **Cite the closest adjacent experience.** Find the project or
-   contribution whose work touches the same concepts even if it doesn't
-   touch the same tooling.
-3. **Frame the gap as small and specific.** Quantify what you do have so
-   the gap is contained. The reader should finish the paragraph thinking
-   "this person has the foundation to learn this", not "this person is
-   missing the foundation".
-4. **Name the closure plan if relevant.** Sometimes "I would treat this as
-   a focused first-month learning target" reads as honest planning rather
-   than as evasion. Use sparingly.
+### 5.1 The loop-closure hook
 
-Apply this pattern to whatever the gap actually is, against the current
-profile state. Cloud experience, framework-specific experience, team-size
-experience, production on-call experience, years-of-experience: the
-framing pattern is the same; the specific adjacent experience is whatever
-`profile/projects/` and `profile/experience.md` actually contain.
+**The move.** When the tool used to discover or curate the application is itself a portfolio project, naming the loop explicitly turns the project from a CV bullet into demonstrated problem-solving.
 
-The boundary: do not invent experience. If the role asks for a technology
-the profile genuinely has zero exposure to, say so plainly and lead with a
-different strength. A fabricated claim that gets probed in an interview is
-catastrophic; an honest gap is normal.
+**Why it lands.** The reader's recognition does the work: *"the thing you're reading about is the thing that surfaced its own application"*. Satisfying in a way a normal project description isn't.
 
----
+**When it dilutes.** When the looped-back tool is mentioned only in passing, or when the audience values traditional credentials over self-built tooling.
 
-## Cover-Letter Rhythm
+### 5.2 The architectural-alignment hook
 
-Defaults for structuring the cover-letter body. Per-job context can break
-any of these when the role calls for a different shape.
+**The move.** When the company's product commitments (privacy by construction, local-first, deterministic execution, zero telemetry, end-to-end encryption) match a commitment made in a portfolio project for *personal* reasons rather than for any external requirement, the alignment itself is the hook.
 
-- **Opening**: technical hook tied to the specific role. The first sentence
-  should make it clear *why this role specifically*, not a generic opener.
-  Pull a verbatim phrase from the job description and tie it to whatever
-  element of the profile best matches.
-- **Second paragraph**: the strongest project for this role (chosen via the
-  tests in "How to Pick What to Lead With"), described with specific
-  architectural decisions and a measurable outcome. Name the project. Name
-  the number.
-- **Third paragraph**: why this company specifically. Cite what the company
-  builds (from `companies.what_they_do`), not generic praise. If a narrative
-  hook applies, this is usually where it lands.
-- **Closing**: short. Visa / availability if relevant in one sentence. No
-  "thank you for your consideration" filler; a clean sign-off is stronger.
+**Why it lands.** Reads as *"I made the same choice without anyone asking me to"*, which is harder for an entry-level candidate to fake than paid experience.
 
-Three to four paragraphs total. Dense beats long.
+**When it dilutes.** When the alignment is loose; when the personal-reason framing has to be invented rather than honestly named.
+
+### 5.3 The legacy-rewrite hook
+
+**The move.** When a role is explicitly a rewrite-in-X play, lead with a project whose architectural shape ports cleanly to the migration.
+
+**Why it lands.** Positions the candidate as already at the destination: *"I have the discipline that produced this, without the constraint of an existing codebase to migrate"*.
+
+**When it dilutes.** When the rewrite framing is incidental rather than central to the role.
+
+### 5.4 The "I solved this for myself" hook
+
+**The move.** When the role is in observability, internal tooling, or developer experience, lead with a project built for personal use and lived with daily.
+
+**Why it lands.** Carries authenticity that nothing else does. The reader can feel whether the prose is describing a tool the writer actually uses or one they once shipped and forgot.
+
+**When it dilutes.** When the personal-use framing is fabricated; the reader's authenticity-detector is sharper for this hook than for any other.
+
+### 5.5 The OSS-as-credibility hook
+
+**The move.** When the role names specific upstream projects or asks for "open-source experience", surface relevant OSS engagements with specifics: PR number, LOC, merged status, verification artefact.
+
+**Why it lands.** Specifics turn claim into evidence the reader can verify in 30 seconds.
+
+**When it dilutes.** When the contribution is small enough that naming it feels strained.
 
 ---
 
-## Things Not Covered Here
+## 6. How to Pick What to Lead With
 
-These are deliberately not in this file:
+> [!note] Five inputs the agent weighs together
+> None of these tests is a rule on its own. The right project (or set of projects) emerges from holding them in tension.
 
-- **Salary expectations.** Live decision per-job; never written into a
-  template or autofilled.
-- **Custom answers to one-off questions.** When a form asks something
-  genuinely unique ("describe a time you had to fire a customer"), generate
-  the answer fresh against the profile; this file's defaults won't help.
-- **References.** Handled separately when needed.
-- **Project-specific deep-dives.** The per-project content lives in
-  `profile/projects/`. This file references the *patterns* of how projects
-  get used in applications; the project content itself is sourced fresh
-  from `profile/projects/` on every invocation.
-- **Specific project names.** By design. Any project named here would go
-  stale; the agent picks projects from the live portfolio using the tests
-  in "How to Pick What to Lead With".
+| # | Test | What it asks | Why it matters |
+|---|---|---|---|
+| 1 | **Architectural-shape match** | Which project's commitments most directly mirror the role's? | The reader is hiring for the kind of thinking the project required, not for line-by-line tool overlap |
+| 2 | **Stack overlap** | Which project's stack overlaps most with the role's? | Useful when the description leans heavily on specific technologies; weaker signal than shape match |
+| 3 | **Measurable outcome** | Which project has the strongest number to anchor on? | Numbers survive skimming; adjectives don't |
+| 4 | **Recency** | Which project is most recently maintained? | Recent work signals current craft; year-old projects with no updates read as one-offs |
+| 5 | **Honest depth** | Which projects can the agent actually describe in paragraph-depth from `profile/projects/`? | A project named without supporting architectural detail reads as a CV bullet, not as evidence |
+
+The selection naturally changes as the portfolio evolves; the reasoning doesn't.
+
+---
+
+## 7. Honest Gap Framing
+
+> [!warning] The asymmetry of approaches
+> The way a gap is handled matters more than the gap itself.
+
+| Approach | Reader's reaction | Upside | Downside |
+|---|---|---|---|
+| **Named directly + adjacent experience cited** | "Self-aware and grounded" | Small but real | Small |
+| **Hedged behind soft language** ("familiar with", "exposure to") | "Evasive, probably worse than they're saying" | Small | Moderate |
+| **Fabricated as filled** | "...until probed in interview" | Small | Career-ending |
+
+The variables that shape *how* to frame a particular gap:
+
+| Variable | When the gap is small | When the gap is large |
+|---|---|---|
+| **Closeness of adjacent experience** | Cite the adjacent work; frame the gap as specific | Honesty has to carry it alone |
+| **Importance of the gap to the role** | Acknowledge in passing | Pair with a closure plan ("a focused first-month learning target") |
+| **How honestly the role asked** | Wish-list role: gaps weigh light | Tight role asking only what they need: each gap weighs heavier |
+
+---
+
+## 8. Cover-Letter Rhythm
+
+A strong cover letter has a recognisable shape, not because the shape is mandatory but because each beat does specific work the reader processes faster than other arrangements:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  Beat 1: Opening                                              │
+│  Why this role specifically, in the first sentence            │
+│  ─────────────────────────────────────────────────────────    │
+│  Beat 2: The technical middle                                 │
+│  Project(s) at depth chosen via §1 reasoning                  │
+│  ─────────────────────────────────────────────────────────    │
+│  Beat 3: Why this company specifically                        │
+│  Cite what they actually build; hook lands here if at all     │
+│  ─────────────────────────────────────────────────────────    │
+│  Beat 4: The close                                            │
+│  Visa / availability in one sentence; clean signoff           │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Beat 1 (Opening).** Has to make clear *why this role specifically* within the first line. Generic openings signal templated origin; the reader's investment in the rest drops. Pulling a verbatim phrase from the description and tying it to evidence is one strong move; opening on a concrete detail that signals substantive body is another.
+
+**Beat 2 (Technical middle).** Where projects and the strongest evidence land. §1 determines whether this is one project deep, two at moderate depth, or three or four covered lightly.
+
+**Beat 3 (Why this company).** Often shorter inside the cover letter than as a standalone essay, because the letter has already spent space on evidence. Citing what the company actually builds (from `companies.what_they_do`) carries weight; generic praise doesn't. Narrative hooks usually land here.
+
+**Beat 4 (Close).** Visa or availability or location specifics in one sentence when relevant. Filler thank-yous subtract more than they add; a clean name signoff reads stronger.
+
+The letter is doing its job when the reader finishes it knowing one or two specific things they could quote back, rather than a vague sense of *"competent application"*.
+
+---
+
+## 9. What This File Doesn't Cover
+
+| Out of scope | Why | Where it lives |
+|---|---|---|
+| Salary expectations | Live decision per-job, not templated | Owned by Caner at apply-time |
+| Custom one-off form questions | Generate fresh against the profile | Not predictable in advance |
+| References | Handled separately when needed | Out-of-band |
+| Project architectural detail | Goes stale fast; lives where the truth is | `profile/projects/` (sourced fresh) |
+| Specific project / tech / contribution names | Would go stale as the portfolio evolves | The agent picks from `profile/` using §6 |
