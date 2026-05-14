@@ -135,6 +135,8 @@ When the user names a job-specific override for a factual key during invocation,
 
 ### 6. Write the package to the database
 
+`application_packages.answers` is the **only** place a generated package lives. Do not write a copy to `state/`, `profile/`, or anywhere else in the repo. Re-preparing a job is an in-place update of the DB row; the same `INSERT OR REPLACE` overwrites the previous version.
+
 ```sql
 INSERT OR REPLACE INTO application_packages (job_id, answers, created_at)
 VALUES (?1, ?2, datetime('now'));
@@ -142,8 +144,26 @@ VALUES (?1, ?2, datetime('now'));
 
 `answers` is a JSON object containing the four essay keys (step 3), the factual keys with values successfully sourced from `profile/` (step 4), any per-job overrides (step 5), and any job-specific essay-set extensions. `INSERT OR REPLACE` makes the operation idempotent: rerunning the skill on the same job updates the package rather than erroring.
 
-> [!warning] BLOB-vs-TEXT trap when inserting via the `sqlite3` shell
-> If invoking via the `sqlite3` CLI with `readfile('path.json')`, the column will be written as BLOB even though the schema declares TEXT. The TUI autofill rejects BLOB. Use `CAST(readfile('path.json') AS TEXT)` to force TEXT affinity.
+**Concrete invocation pattern via the Bash tool** (the agent typically runs the skill from the project root):
+
+```bash
+# 1. Write the JSON to a /tmp path (ephemeral, deleted in step 3).
+#    /tmp/ is the right home because the file's only purpose is to
+#    survive the sqlite3 invocation; it is not durable state.
+Write tool → /tmp/cernio-pkg-<job_id>.json
+
+# 2. Insert into the DB, casting to TEXT.
+sqlite3 state/cernio.db "INSERT OR REPLACE INTO application_packages (job_id, answers, created_at) VALUES (<job_id>, CAST(readfile('/tmp/cernio-pkg-<job_id>.json') AS TEXT), datetime('now'))"
+
+# 3. Delete the temp file.
+rm /tmp/cernio-pkg-<job_id>.json
+```
+
+> [!warning] BLOB-vs-TEXT trap with `readfile()`
+> `readfile('path.json')` returns a BLOB, and SQLite's type affinity will store BLOB in a TEXT-declared column without complaint. The TUI autofill then rejects the BLOB and silently treats the package as missing. **Always wrap `readfile()` in `CAST(... AS TEXT)`** so the row is stored with TEXT affinity. Verify post-insert with `sqlite3 state/cernio.db "SELECT typeof(answers) FROM application_packages WHERE job_id = <id>"` — must return `text`, not `blob`.
+
+> [!important] No persistent package files on disk
+> Do not write the package JSON to `state/<slug>-<id>-package.json`, `profile/applications/<id>.json`, or any other persistent path. The DB row is the canonical location; on-disk copies create a drift surface ("is the file or the DB authoritative?") and accumulate in the repo. The only acceptable on-disk artefact is the ephemeral `/tmp/` file from the pattern above, which is deleted before the run finishes.
 
 ### 7. Report the outcome
 
@@ -245,6 +265,7 @@ Each item is an obligation with concrete evidence, not a subjective self-rating.
 - [ ] **JSON key contract**: every package contains the four essay keys (`why_interested`, `why_company`, `technical_project`, `cover_letter`), plus every factual key from step 4 whose source profile file contained the information, plus any per-job overrides, plus any job-specific essay-set extensions. Missing essay keys fail autofill; missing factual keys are silently tolerated by the autofill but must be surfaced in step 7.
 - [ ] **`INSERT OR REPLACE` used**: cite the actual SQL statement executed. `INSERT` without `OR REPLACE` risks erroring on rerun.
 - [ ] **Package column is TEXT, not BLOB**: when inserting via the `sqlite3` CLI, `readfile()` is wrapped in `CAST(... AS TEXT)`. `sqlite3 ... "SELECT typeof(answers) FROM application_packages WHERE job_id = ?"` returns `text`.
+- [ ] **No persistent package JSON on disk**: the package lives only in `application_packages.answers`. The `/tmp/cernio-pkg-<job_id>.json` ephemeral file is deleted before run completion. `ls state/*.json profile/applications/*.json 2>/dev/null` returns nothing (or only files that pre-existed and are unrelated to packages).
 - [ ] **Only `application_packages` modified**: no writes to `jobs`, `user_decisions`, or `companies`. Cite the set of tables written to this invocation.
 - [ ] **Skipped-jobs list emitted**: step 7 report contains the explicit skipped-jobs list with per-job reasons, or an explicit "no jobs skipped" line. Absence of the list fails this item.
 - [ ] **Skipped-factual-fields list emitted**: step 7 report enumerates every factual key omitted because the source profile file lacked the information, per job. If every factual key was filled for every job, that is stated explicitly.
