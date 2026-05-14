@@ -115,11 +115,13 @@ Write factual answers to the canonical question set below. Each value is sourced
 | `interviewed_before` | Agent default ("No") unless the user has explicitly tracked a prior interview at this exact company | "No" / "Yes" |
 | `relocation_open` | `profile/preferences.toml` and `profile/lifestyle-preferences.md` | Direct yes/no with a brief qualifier |
 | `data_protection_consent` | Always "Yes" | Constant; the form's downstream logic depends on it |
+| `salary_expectation` | £35,000 by default; a sensible figure anchored at £35k as the floor when the role's description signals a higher band; never priced too high | Most salary fields are optional and the autofill leaves them blank by default. When the form makes the field mandatory, a concrete figure beats a blank. The £35k floor is the entry-level reference point Caner is comfortable with. Pricing too high risks automated-screen rejection |
 
 Fields explicitly NOT in this skill's output:
 
-- **Salary expectations.** Live decision the user owns per-job; never autofilled. The autofill leaves these blank for the user to fill manually before submission.
 - **Free-form text the profile cannot answer.** When a form asks something genuinely novel ("What's the most interesting bug you've debugged?") that no profile file covers and that is not one of the four essay keys, omit that key. The autofill UI surfaces the unfilled fields.
+
+Salary expectations note: `salary_expectation` is included in the package by default at £35,000. The autofill module is responsible for deciding whether to fill the form's salary field with this value (when the field is mandatory) or leave it blank (when the field is optional and the user prefers to negotiate later). When the role's description signals a posted salary band, the agent may pick a sensible figure within that band anchored at £35k as the personal floor, never priced too high (automated screens often filter out figures above a band's midpoint).
 
 The 13 factual keys listed above are the minimum durable-fact surface. If a specific job's form asks a 14th factual question that all 13 keys collectively do not cover (e.g. a security-cleared role asks "Do you hold an active SC clearance?"), add a new key with a descriptive name and source its value from the appropriate profile file (or omit it if the profile file does not contain that information).
 

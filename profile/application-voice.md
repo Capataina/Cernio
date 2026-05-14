@@ -164,6 +164,7 @@ Defaults for the factual half of the application. Values are sourced fresh from 
 | **US work auth** | "Yes" or "No" from `profile/visa.md` | Only asked on US-HQ company forms |
 | **Interviewed at this company before** | "No" by default | Honest by construction |
 | **Data protection / GDPR** | "Yes" / "Acknowledge" | Always; downstream logic depends on it |
+| **Salary expectation** | £35,000 by default; a sensible figure anchored at £35k as the floor when the JD signals a higher band; never priced too high | Most salary fields are optional; when the form makes the field mandatory, a concrete figure beats a blank. The £35k floor is the entry-level reference point Caner is comfortable with; pricing too high risks being filtered out by automated screens |
 
 ---
 
@@ -290,7 +291,6 @@ The letter is doing its job when the reader finishes it knowing one or two speci
 
 | Out of scope | Why | Where it lives |
 |---|---|---|
-| Salary expectations | Live decision per-job, not templated | Owned by Caner at apply-time |
 | Custom one-off form questions | Generate fresh against the profile | Not predictable in advance |
 | References | Handled separately when needed | Out-of-band |
 | Project architectural detail | Goes stale fast; lives where the truth is | `profile/projects/` (sourced fresh) |
