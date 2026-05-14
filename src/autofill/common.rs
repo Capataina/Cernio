@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::dom::SetFileInputFilesParams;
+use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 
@@ -149,24 +150,87 @@ pub async fn wait_for_selector(page: &Page, selector: &str, timeout: Duration) -
     false
 }
 
-/// Type real keystrokes into the focused element identified by selector.
+/// Reason a `type_into` call failed, for telemetry.
+#[derive(Debug, Clone, Copy)]
+pub enum TypeIntoFailure {
+    /// `text` was empty — nothing to do.
+    EmptyText,
+    /// The selector didn't resolve to any element in the DOM.
+    SelectorNotFound,
+    /// The element exists but couldn't be focused.
+    FocusFailed,
+    /// CDP `Input.insertText` returned an error mid-write. The element may
+    /// have lost focus, be hidden, or the page may have navigated away.
+    InsertTextFailed,
+}
+
+/// Write text into the focused element identified by `selector`.
 ///
-/// Uses CDP `Input.dispatchKeyEvent` (via chromiumoxide's `Element::type_str`)
-/// which fires through React's synthetic event system natively — no
-/// `nativeInputValueSetter` workaround needed.
+/// Uses CDP `Input.insertText`, which writes the whole string atomically and
+/// dispatches the React-friendly `input` event. We previously used
+/// `Element::type_str` (per-character `Input.dispatchKeyEvent`), but that path
+/// bails on the first character not in chromiumoxide's keys table — notably
+/// `\n` — leaving a partial write in the field while reporting overall
+/// failure. `Input.insertText` does not interpret the string as a keystroke
+/// sequence, so newlines, em-dashes, and IME-style characters are inserted
+/// verbatim.
 ///
-/// Returns true if the element was found and the input was dispatched.
-pub async fn type_into(page: &Page, selector: &str, text: &str) -> bool {
+/// Returns `Ok(())` on success, `Err(TypeIntoFailure)` with the specific
+/// failure reason. The reason flows into telemetry so we can distinguish
+/// "selector missing" from "focus broke" from "Chrome rejected the insert".
+pub async fn type_into_v2(
+    page: &Page,
+    selector: &str,
+    text: &str,
+) -> Result<(), TypeIntoFailure> {
     if text.is_empty() {
-        return false;
+        return Err(TypeIntoFailure::EmptyText);
     }
-    let Ok(element) = page.find_element(selector).await else {
-        return false;
-    };
-    if element.focus().await.is_err() {
-        return false;
-    }
-    element.type_str(text).await.is_ok()
+    let element = page
+        .find_element(selector)
+        .await
+        .map_err(|_| TypeIntoFailure::SelectorNotFound)?;
+    element.focus().await.map_err(|_| TypeIntoFailure::FocusFailed)?;
+    page.execute(InsertTextParams::new(text.to_string()))
+        .await
+        .map(|_| ())
+        .map_err(|_| TypeIntoFailure::InsertTextFailed)
+}
+
+/// Legacy boolean wrapper around `type_into_v2`. Kept for the existing call
+/// sites in greenhouse.rs that don't yet distinguish failure reasons.
+pub async fn type_into(page: &Page, selector: &str, text: &str) -> bool {
+    type_into_v2(page, selector, text).await.is_ok()
+}
+
+/// Click a `<button>` whose visible text equals (case-insensitive) `label`.
+/// Used to drive Greenhouse's "Enter manually" / "Attach" dual-button widget
+/// on file-input fields where we have text, not a PDF.
+pub async fn click_button_with_text(page: &Page, container_selector: &str, label: &str) -> bool {
+    let js = format!(
+        r#"
+        (() => {{
+            const root = document.querySelector({container_json}) || document;
+            const wanted = ({label_json}).toLowerCase().trim();
+            const btns = root.querySelectorAll('button, [role="button"]');
+            for (const b of btns) {{
+                const t = (b.textContent || '').toLowerCase().trim();
+                if (t === wanted) {{
+                    b.click();
+                    return true;
+                }}
+            }}
+            return false;
+        }})()
+        "#,
+        container_json = serde_json::to_string(container_selector).unwrap_or("\"\"".to_string()),
+        label_json = serde_json::to_string(label).unwrap_or("\"\"".to_string()),
+    );
+    page.evaluate(js.as_str())
+        .await
+        .ok()
+        .and_then(|v| v.into_value::<bool>().ok())
+        .unwrap_or(false)
 }
 
 /// Upload a file to `<input type="file">` matching selector.

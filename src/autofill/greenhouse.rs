@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use super::common;
-use super::greenhouse_api::{self, FieldKind, JobSchema, Question};
+use super::greenhouse_api::{self, Field, FieldKind, JobSchema, Question};
 use super::{ApplicantProfile, AutofillResult};
 
 /// Decline-to-answer option labels seen across surveyed forms. Used to
@@ -272,13 +272,23 @@ async fn fill_question(
         }
     }
 
+    let normalised = normalise_label(&question.label);
+
+    // ── InputFile fields short-circuit before the answer-required guard ──
+    // File inputs don't need a string answer; they need a filesystem path
+    // (resume) or a "switch to manual entry" click (cover letter as text).
+    // The old code hit the `let Some(answer) = answer else { Skipped }`
+    // guard and returned Skipped before reaching the InputFile branch.
+    if matches!(field.kind(), FieldKind::InputFile) {
+        return fill_file_field(page, field, &question.label, profile, answer_index).await;
+    }
+
     // Resolve answer in priority order:
     //   1. Standard field name (e.g. `first_name` → profile.first_name)
     //   2. Exact match of normalised label against package keys
     //   3. Semantic-key fallback (prepare-applications writes domain-aware
     //      keys like `why_company`, `cover_letter`; we map those to common
     //      Greenhouse label patterns at fill time)
-    let normalised = normalise_label(&question.label);
     let answer = profile_field(profile, &field.name)
         .map(str::to_string)
         .or_else(|| answer_index.get(&normalised).cloned())
@@ -292,7 +302,21 @@ async fn fill_question(
     };
 
     match field.kind() {
-        FieldKind::InputText | FieldKind::Textarea => {
+        FieldKind::InputText => {
+            // Greenhouse uses `input_text` for some questions whose answers
+            // are essay-length (e.g. Proton's "Why is this role a good fit"
+            // is input_text, not textarea). The browser silently caps these
+            // at the field's maxlength (often 255). Trim to 250 chars at
+            // the last sentence boundary so we don't ship a mid-word cut.
+            let trimmed = trim_for_input_text(&answer);
+            let selector = format!("#{}", css_escape_id(&field.name));
+            if common::type_into(page, &selector, &trimmed).await {
+                FillOutcome::Filled(Some(trimmed))
+            } else {
+                FillOutcome::Skipped
+            }
+        }
+        FieldKind::Textarea => {
             let selector = format!("#{}", css_escape_id(&field.name));
             if common::type_into(page, &selector, &answer).await {
                 FillOutcome::Filled(Some(answer))
@@ -300,17 +324,7 @@ async fn fill_question(
                 FillOutcome::Skipped
             }
         }
-        FieldKind::InputFile => {
-            // Files are filled only if the answer is a filesystem path.
-            // For now, only resume_path on the profile is supported.
-            if let Some(path) = profile.resume_path.as_deref() {
-                let selector = format!("#{}", css_escape_id(&field.name));
-                if common::set_file(page, &selector, path).await {
-                    return FillOutcome::Filled(None);
-                }
-            }
-            FillOutcome::Skipped
-        }
+        FieldKind::InputFile => unreachable!("handled in fill_file_field above"),
         FieldKind::MultiValueSingleSelect => {
             // Resolve which option label to click.
             let target_label = pick_option_label(&field.values, &answer);
@@ -449,9 +463,105 @@ fn is_optout_label(label: &str) -> bool {
     OPT_OUT_LABELS.iter().any(|opt| l.contains(opt))
 }
 
+/// Handle a `<input type="file">` field.
+///
+/// Two modes:
+///   1. Resume / CV: upload `profile.resume_path` via CDP `DOM.setFileInputFiles`.
+///   2. Cover Letter: Greenhouse renders BOTH an `Attach` button and an
+///      `Enter manually` button next to the file input. We don't have a
+///      cover-letter PDF on disk — we have `cover_letter` essay text from
+///      the package — so click "Enter manually" and type the text into the
+///      revealed textarea.
+async fn fill_file_field(
+    page: &chromiumoxide::page::Page,
+    field: &Field,
+    label: &str,
+    profile: &ApplicantProfile,
+    answer_index: &HashMap<String, String>,
+) -> FillOutcome {
+    let label_lower = label.to_lowercase();
+    let is_resume = label_lower.contains("resume")
+        || label_lower.contains("cv")
+        || field.name == "resume";
+    let is_cover_letter = label_lower.contains("cover letter")
+        || field.name == "cover_letter";
+
+    if is_resume {
+        if let Some(path) = profile.resume_path.as_deref() {
+            let selector = format!("#{}", css_escape_id(&field.name));
+            if common::set_file(page, &selector, path).await {
+                return FillOutcome::Filled(None);
+            }
+        }
+        return FillOutcome::Skipped;
+    }
+
+    if is_cover_letter {
+        // We have text, not a PDF. Greenhouse exposes "Enter manually" near
+        // the file input — clicking it swaps in a textarea named
+        // `cover_letter_text` (or similar). Try the manual-entry flow.
+        let Some(answer) = answer_index.get("cover_letter").cloned() else {
+            return FillOutcome::Skipped;
+        };
+        // The Enter manually button lives in the same form group as the
+        // file input. Greenhouse doesn't expose a stable container id, so
+        // pass an empty container_selector — common::click_button_with_text
+        // falls back to `document` in that case.
+        if !common::click_button_with_text(page, "", "Enter manually").await {
+            return FillOutcome::Skipped;
+        }
+        // Wait a beat for the textarea to render after the button click.
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        // Greenhouse's manual-entry textarea is conventionally named
+        // `<field_name>_text` (e.g. `cover_letter_text`).
+        let textarea_selector = format!("#{}_text", css_escape_id(&field.name));
+        if common::type_into(page, &textarea_selector, &answer).await {
+            return FillOutcome::Filled(Some(answer));
+        }
+        // Fallback: some Greenhouse variants use a textarea matched by the
+        // field's name with a different suffix or no suffix.
+        let alt_selector = format!("textarea#{}", css_escape_id(&field.name));
+        if common::type_into(page, &alt_selector, &answer).await {
+            return FillOutcome::Filled(Some(answer));
+        }
+        return FillOutcome::Skipped;
+    }
+
+    FillOutcome::Skipped
+}
+
+/// Trim a long answer to fit a typical `input_text` field. Cuts at the
+/// last sentence boundary (or punctuation) ≤ 250 chars so we don't ship a
+/// mid-word truncation, then appends an ellipsis if truncated.
+fn trim_for_input_text(answer: &str) -> String {
+    const TARGET: usize = 250;
+    if answer.chars().count() <= TARGET {
+        return answer.to_string();
+    }
+    // Find the last sentence-ending punctuation within the limit.
+    let prefix: String = answer.chars().take(TARGET).collect();
+    let cut_at = prefix
+        .rfind(|c: char| matches!(c, '.' | '!' | '?' | ';'))
+        .or_else(|| prefix.rfind(','))
+        .or_else(|| prefix.rfind(' '))
+        .unwrap_or(prefix.len());
+    let head = &prefix[..=cut_at.min(prefix.len() - 1)];
+    head.trim().to_string()
+}
+
 fn is_soft_conditional(label: &str) -> bool {
-    let l = label.trim_start_matches(|c: char| !c.is_alphabetic())
-        .to_lowercase();
+    // Strip both non-alphabetic leading chars and quote characters from
+    // anywhere in the prefix region. Proton's label
+    //   `If "yes" can you specify ...`
+    // would otherwise miss because lowercase becomes `if "yes" ...` and
+    // `starts_with("if yes")` is false (the quote is in the middle).
+    // We normalise by removing ASCII double/single quotes before matching.
+    let l: String = label
+        .trim_start_matches(|c: char| !c.is_alphabetic())
+        .to_lowercase()
+        .chars()
+        .filter(|&c| c != '"' && c != '\'' && c != '\u{201C}' && c != '\u{201D}')
+        .collect();
     SOFT_CONDITIONAL_PREFIXES.iter().any(|p| l.starts_with(p))
 }
 
@@ -532,6 +642,112 @@ fn match_semantic_key(normalised_label: &str, company_name: &str) -> Option<&'st
         || normalised_label == "anything else you want to share"
     {
         return Some("cover_letter");
+    }
+
+    // ── years_of_<technology> experience ──
+    // "How many years of professional experience do you have with Rust?"
+    // We map to a single `years_of_rust` key for now; future tech-specific
+    // expansions can add more keys (years_of_python, years_of_cpp, etc.).
+    if (normalised_label.contains("years")
+        || normalised_label.contains("how many years"))
+        && (normalised_label.contains("experience") || normalised_label.contains("rust"))
+    {
+        return Some("years_of_rust");
+    }
+
+    // ── links / socials (LinkedIn / GitHub / Portfolio) ──
+    // "Please share your LinkedIn profile / GitHub / Portfolio"
+    if normalised_label.contains("linkedin")
+        || normalised_label.contains("github")
+        || normalised_label.contains("portfolio")
+        || normalised_label.contains("personal website")
+        || (normalised_label.contains("share") && normalised_label.contains("profile"))
+    {
+        return Some("links");
+    }
+
+    // ── salary_expectation (the number) ──
+    // "What are your salary expectations? (number only)"
+    if normalised_label.contains("salary")
+        && (normalised_label.contains("expectation")
+            || normalised_label.contains("expected")
+            || normalised_label.contains("compensation"))
+        && !normalised_label.contains("currency")
+        && !normalised_label.contains("choice between")
+    {
+        return Some("salary_expectation");
+    }
+
+    // ── salary_unit (gross annual / monthly / net …) ──
+    if normalised_label.contains("salary")
+        && (normalised_label.contains("choice between")
+            || normalised_label.contains("annual")
+            || normalised_label.contains("monthly"))
+    {
+        return Some("salary_unit");
+    }
+
+    // ── salary_currency ──
+    if normalised_label.contains("salary") && normalised_label.contains("currency") {
+        return Some("salary_currency");
+    }
+    if normalised_label.contains("currency")
+        && (normalised_label.contains("number above")
+            || normalised_label.contains("for the number"))
+    {
+        return Some("salary_currency");
+    }
+
+    // ── start_date ──
+    // "When can you start working with us?" / "Earliest start date"
+    if (normalised_label.contains("when") && normalised_label.contains("start"))
+        || normalised_label.contains("earliest start")
+        || normalised_label.contains("start date")
+    {
+        return Some("start_date");
+    }
+
+    // ── preferred_office ──
+    // "From what Proton's office location you'd like to work …"
+    // "Preferred office location"
+    if normalised_label.contains("office location")
+        || normalised_label.contains("preferred office")
+        || (normalised_label.contains("office") && normalised_label.contains("location"))
+        || (normalised_label.contains("which location"))
+        || (normalised_label.contains("office")
+            && (normalised_label.contains("which")
+                || normalised_label.contains("where")
+                || normalised_label.contains("from what")
+                || normalised_label.contains("like to work")))
+    {
+        return Some("preferred_office");
+    }
+
+    // ── visa_status (the "specify permit" textarea) ──
+    // 'If "yes" can you specify the type of working permit you posses ...'
+    // Checked BEFORE right_to_work because the labels overlap: this one
+    // contains both "specify" and "permit", which is the more specific
+    // pattern. The soft-conditional path also covers when it fires (only
+    // when the prior right_to_work answer was "Yes").
+    if normalised_label.contains("type of working permit")
+        || normalised_label.contains("type of permit")
+        || (normalised_label.contains("specify") && normalised_label.contains("permit"))
+        || (normalised_label.contains("citizenship") && normalised_label.contains("visa"))
+    {
+        return Some("visa_status");
+    }
+
+    // ── right_to_work / eligibility ──
+    // "Do you have an eligibility / working permit to work in this particular location?"
+    // The answer is Yes/No (single-select), sourced from the package's
+    // `right_to_work` key.
+    if normalised_label.contains("right to work")
+        || normalised_label.contains("eligible to work")
+        || normalised_label.contains("working permit")
+        || normalised_label.contains("eligibility")
+        || (normalised_label.contains("permit") && normalised_label.contains("work"))
+    {
+        return Some("right_to_work");
     }
 
     None
@@ -713,8 +929,62 @@ mod tests {
         assert_eq!(match_semantic_key(&normalise_label("First Name"), "Anthropic"), None);
         assert_eq!(match_semantic_key(&normalise_label("Phone"), "Anthropic"), None);
         assert_eq!(
-            match_semantic_key(&normalise_label("Salary expectations"), "Anthropic"),
+            match_semantic_key(&normalise_label("Date of Birth"), "Anthropic"),
             None
+        );
+    }
+
+    #[test]
+    fn semantic_match_proton_field_set() {
+        // Every custom Proton field maps to a known semantic key after the
+        // matcher expansion. Drives the autofill from 4/18 filled to 13+/18.
+        let cases = [
+            ("How many years of professional experience do you have with Rust?", Some("years_of_rust")),
+            ("Why do you think this role is a good fit for you?", Some("why_interested")),
+            ("What it is about Proton that excites you?", Some("why_company")),
+            ("Please share your LinkedIn profile / GitHub / Portfolio", Some("links")),
+            ("What are your salary expectations? Please include your salary expectations (number only).", Some("salary_expectation")),
+            ("Salary expectations - please select the right choice between:", Some("salary_unit")),
+            ("Salary expectations - please select the currency for the number above:", Some("salary_currency")),
+            ("When can you start working with us?", Some("start_date")),
+            ("From what Proton's office location you'd like to work (please state country and a city)?", Some("preferred_office")),
+            ("Do you have an eligibility / working permit to work in this particular location?", Some("right_to_work")),
+            ("If \"yes\" can you specify the type of working permit you posses (citizenship, permanent residency, type of visa etc.)?", Some("visa_status")),
+            ("Anything else you want to share?", Some("cover_letter")),
+        ];
+        for (label, expected) in cases {
+            let got = match_semantic_key(&normalise_label(label), "Proton");
+            assert_eq!(got, expected, "label: {label}");
+        }
+    }
+
+    #[test]
+    fn is_soft_conditional_handles_inline_quoted_yes() {
+        // Proton's label is `If "yes" can you specify ...` — quote inside,
+        // not at the start. The original implementation only stripped
+        // leading non-alpha chars, so the quote inside broke the prefix
+        // match.
+        assert!(is_soft_conditional(
+            "If \"yes\" can you specify the type of working permit"
+        ));
+        assert!(is_soft_conditional("\"If yes\" please describe"));
+        assert!(is_soft_conditional("If yes, please describe"));
+        assert!(!is_soft_conditional("Anything else you want to share?"));
+    }
+
+    #[test]
+    fn trim_for_input_text_cuts_at_sentence_boundary() {
+        // Under the limit: no change.
+        let short = "Short answer.";
+        assert_eq!(trim_for_input_text(short), short);
+
+        // Over the limit: cut at the last sentence-ending punctuation.
+        let long = "First sentence ends here. Second sentence continues with much more text that exceeds the 250 character limit because it includes a lot of padding to ensure we are well past the cap and then keeps going on and on to demonstrate the trimming behaviour in detail forever.";
+        let trimmed = trim_for_input_text(long);
+        assert!(trimmed.chars().count() <= 250, "trimmed: {trimmed:?}");
+        assert!(
+            trimmed.ends_with(['.', '!', '?', ';', ',']),
+            "expected sentence-boundary end, got: {trimmed:?}"
         );
     }
 }
