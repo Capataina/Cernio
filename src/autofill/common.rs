@@ -30,10 +30,43 @@ const CHROME_PATH: &str =
 pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
     crate::tel!("chrome_config_build", "chrome_path": CHROME_PATH);
 
+    // chromiumoxide's DEFAULT_ARGS includes `--enable-automation`, which makes
+    // Chrome show the "Chrome is being controlled by automated test software"
+    // infobar and trips reCAPTCHA's bot heuristics. We disable the default
+    // arg set and manually re-add the defaults we actually want, EXCEPT
+    // `--enable-automation`. The remaining flags are taken from chromiumoxide
+    // 0.9.1's DEFAULT_ARGS list (see chromiumoxide/src/browser/config.rs).
     let config = BrowserConfig::builder()
         .chrome_executable(CHROME_PATH)
         .with_head()
+        .disable_default_args()
+        // Re-added defaults (everything in chromiumoxide DEFAULT_ARGS except
+        // `enable-automation`):
+        .arg("--disable-background-networking")
+        .arg("--enable-features=NetworkService,NetworkServiceInProcess")
+        .arg("--disable-background-timer-throttling")
+        .arg("--disable-backgrounding-occluded-windows")
+        .arg("--disable-breakpad")
+        .arg("--disable-client-side-phishing-detection")
+        .arg("--disable-component-extensions-with-background-pages")
+        .arg("--disable-default-apps")
+        .arg("--disable-dev-shm-usage")
+        .arg("--disable-features=TranslateUI")
+        .arg("--disable-hang-monitor")
+        .arg("--disable-ipc-flooding-protection")
+        .arg("--disable-popup-blocking")
+        .arg("--disable-prompt-on-repost")
+        .arg("--disable-renderer-backgrounding")
+        .arg("--disable-sync")
+        .arg("--force-color-profile=srgb")
+        .arg("--metrics-recording-only")
+        .arg("--no-first-run")
+        .arg("--password-store=basic")
+        .arg("--use-mock-keychain")
+        .arg("--lang=en_US")
+        // Stealth additions:
         .arg("--disable-blink-features=AutomationControlled")
+        .arg("--no-default-browser-check")
         .arg("--start-maximized")
         .build()
         .map_err(|e| {
@@ -56,12 +89,46 @@ pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
         }
     });
 
+    // Create a blank page first so we can inject the stealth init-script
+    // BEFORE the target URL loads. If we created the page directly at the
+    // target URL, the navigator.webdriver = undefined override would only
+    // take effect on subsequent navigations, not on the initial load.
     crate::tel!("chrome_new_page_start", "url": url);
-    let page = browser.new_page(url).await.map_err(|e| {
+    let page = browser.new_page("about:blank").await.map_err(|e| {
         let msg = e.to_string();
         crate::tel!("chrome_new_page_error", "url": url, "error": msg.clone());
         format!("Failed to open page: {msg}")
     })?;
+
+    // Inject stealth overrides before any document loads. Mirrors the
+    // puppeteer-extra-stealth surface for the most commonly-fingerprinted
+    // properties. Failures are non-fatal — the form may still work without
+    // them; they reduce reCAPTCHA's bot score, they don't gate function.
+    let stealth = r#"
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        Object.defineProperty(navigator, 'plugins',   { get: () => [1, 2, 3, 4, 5] });
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-GB', 'en'] });
+        window.chrome = { runtime: {} };
+        const originalQuery = window.navigator.permissions && window.navigator.permissions.query;
+        if (originalQuery) {
+            window.navigator.permissions.query = (p) =>
+                p.name === 'notifications'
+                    ? Promise.resolve({ state: Notification.permission })
+                    : originalQuery(p);
+        }
+    "#;
+    if let Err(e) = page.evaluate_on_new_document(stealth.to_string()).await {
+        crate::tel!("chrome_stealth_inject_error", "error": e.to_string());
+    } else {
+        crate::tel!("chrome_stealth_injected");
+    }
+
+    // Now navigate to the real target URL.
+    if let Err(e) = page.goto(url).await {
+        let msg = e.to_string();
+        crate::tel!("chrome_navigate_error", "url": url, "error": msg.clone());
+        return Err(format!("Failed to navigate to {url}: {msg}"));
+    }
     crate::tel!("chrome_new_page_ready");
 
     // Initial wait for the page to start rendering.

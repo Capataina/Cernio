@@ -22,19 +22,39 @@ impl ApplicantProfile {
         let personal = std::fs::read_to_string(profile_dir.join("personal.md"))
             .unwrap_or_default();
 
-        let first_name = extract_field(&personal, "Preferred name")
-            .or_else(|| extract_field(&personal, "First name"))
-            .unwrap_or_else(|| "Caner".to_string());
-        let last_name = extract_field(&personal, "Last name")
-            .or_else(|| extract_field(&personal, "Surname"))
-            .unwrap_or_else(|| "Cetinkaya".to_string());
-        let email = extract_field(&personal, "Email")
+        // Prefer the legal full name from the `## Full Name` section, since
+        // Greenhouse's "First Name" / "Last Name" fields are legal-identity
+        // fields used for background checks. Split the full name: last token
+        // is the surname, everything else is the first name (handles
+        // "Ata Caner Cetinkaya" → first="Ata Caner", last="Cetinkaya").
+        // Fallback chain: Full Name section → Preferred Name → hardcoded.
+        let (first_name, last_name) = match extract_section(&personal, "Full Name")
+            .filter(|s| !s.is_empty())
+            .map(|full| split_full_name(&full))
+        {
+            Some((f, l)) => (f, l),
+            None => {
+                let f = extract_section(&personal, "Preferred Name")
+                    .or_else(|| extract_field(&personal, "First name"))
+                    .unwrap_or_else(|| "Caner".to_string());
+                let l = extract_section(&personal, "Last Name")
+                    .or_else(|| extract_field(&personal, "Surname"))
+                    .unwrap_or_else(|| "Cetinkaya".to_string());
+                (f, l)
+            }
+        };
+        let email = extract_section(&personal, "Email")
+            .or_else(|| extract_field(&personal, "Email"))
             .unwrap_or_else(|| "atacanercetinkaya@gmail.com".to_string());
-        let phone = extract_field(&personal, "Phone")
+        let phone = extract_section(&personal, "Phone")
+            .or_else(|| extract_field(&personal, "Phone"))
             .unwrap_or_else(|| "+44 7391 904514".to_string());
-        let linkedin_url = extract_field(&personal, "LinkedIn")
+        let linkedin_url = extract_section(&personal, "LinkedIn")
+            .or_else(|| extract_field(&personal, "LinkedIn"))
             .unwrap_or_else(|| "https://www.linkedin.com/in/atacanercetinkaya/".to_string());
-        let website_url = extract_field(&personal, "Portfolio")
+        let website_url = extract_section(&personal, "Portfolio")
+            .or_else(|| extract_section(&personal, "Website"))
+            .or_else(|| extract_field(&personal, "Portfolio"))
             .or_else(|| extract_field(&personal, "Website"))
             .unwrap_or_else(|| "https://capataina.vercel.app/".to_string());
 
@@ -53,6 +73,57 @@ impl ApplicantProfile {
             website_url,
             resume_path,
         }
+    }
+}
+
+/// Extract the body of an Obsidian-style `## Heading` section.
+///
+/// Returns the first non-empty line of prose under the heading. Stops at the
+/// next heading of any level. Heading match is case-insensitive and ignores
+/// leading `#` / whitespace.
+///
+/// Example:
+/// ```text
+/// ## Full Name
+/// Ata Caner Cetinkaya
+/// ```
+/// → `Some("Ata Caner Cetinkaya")`.
+fn extract_section(content: &str, heading: &str) -> Option<String> {
+    let target = heading.trim().to_lowercase();
+    let mut lines = content.lines();
+    while let Some(line) = lines.next() {
+        let stripped = line.trim_start_matches('#').trim();
+        if !line.trim_start().starts_with('#') || stripped.is_empty() {
+            continue;
+        }
+        if stripped.to_lowercase() == target {
+            // Found the heading. Return the first non-empty line that follows
+            // and is not itself a heading.
+            for body_line in lines.by_ref() {
+                let t = body_line.trim();
+                if t.is_empty() {
+                    continue;
+                }
+                if t.starts_with('#') {
+                    return None;
+                }
+                return Some(t.to_string());
+            }
+            return None;
+        }
+    }
+    None
+}
+
+/// Split "Ata Caner Cetinkaya" into ("Ata Caner", "Cetinkaya").
+/// One-word names return (word, "").
+fn split_full_name(full: &str) -> (String, String) {
+    let trimmed = full.trim();
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    match parts.as_slice() {
+        [] => (String::new(), String::new()),
+        [only] => ((*only).to_string(), String::new()),
+        [first @ .., last] => (first.join(" "), (*last).to_string()),
     }
 }
 
@@ -198,5 +269,78 @@ pub async fn fill_application(
             crate::tel!("autofill_unsupported", "reason": "no_provider");
             AutofillResult::UnsupportedProvider("unknown".to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_section_finds_full_name() {
+        let md = "# Personal Information\n\n## Full Name\nAta Caner Cetinkaya\n\n## Preferred Name\nCaner\n";
+        assert_eq!(
+            extract_section(md, "Full Name"),
+            Some("Ata Caner Cetinkaya".to_string())
+        );
+        assert_eq!(
+            extract_section(md, "Preferred Name"),
+            Some("Caner".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_section_is_case_insensitive() {
+        let md = "## full name\nFoo Bar\n";
+        assert_eq!(extract_section(md, "Full Name"), Some("Foo Bar".to_string()));
+    }
+
+    #[test]
+    fn extract_section_returns_none_when_heading_missing() {
+        let md = "## Other\nvalue\n";
+        assert_eq!(extract_section(md, "Full Name"), None);
+    }
+
+    #[test]
+    fn extract_section_returns_none_for_empty_section() {
+        let md = "## Full Name\n\n## Email\nfoo@bar\n";
+        assert_eq!(extract_section(md, "Full Name"), None);
+    }
+
+    #[test]
+    fn split_full_name_handles_compound_first_name() {
+        let (f, l) = split_full_name("Ata Caner Cetinkaya");
+        assert_eq!(f, "Ata Caner");
+        assert_eq!(l, "Cetinkaya");
+    }
+
+    #[test]
+    fn split_full_name_handles_two_words() {
+        let (f, l) = split_full_name("Jane Doe");
+        assert_eq!(f, "Jane");
+        assert_eq!(l, "Doe");
+    }
+
+    #[test]
+    fn split_full_name_handles_single_word() {
+        let (f, l) = split_full_name("Cher");
+        assert_eq!(f, "Cher");
+        assert_eq!(l, "");
+    }
+
+    #[test]
+    fn applicant_profile_loads_legal_first_name_from_obsidian_personal_md() {
+        // Smoke test: ensure the real profile/personal.md parses to
+        // first_name="Ata Caner", last_name="Cetinkaya" (not "Caner" alone).
+        // Skipped if profile/personal.md is absent (e.g. in CI without
+        // the profile checked in).
+        let profile_dir = std::path::Path::new("profile");
+        if !profile_dir.join("personal.md").exists() {
+            eprintln!("skip: profile/personal.md not present");
+            return;
+        }
+        let p = ApplicantProfile::load(profile_dir);
+        assert_eq!(p.first_name, "Ata Caner");
+        assert_eq!(p.last_name, "Cetinkaya");
     }
 }
