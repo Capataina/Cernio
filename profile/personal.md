@@ -20,7 +20,7 @@ atacanercetinkaya@gmail.com
 +44 7391 904514
 
 ## Location
-London, UK (East Croydon — Ten Degrees, operated by Greystar). Tenancy ending ~24 May 2026; actively relocating. See [[Housing/_Overview]] for the full situation.
+London, UK (East Croydon — Ten Degrees, operated by Greystar). Tenancy ending 24 May 2026; moving to [[Housing/Stratford/East-Village/_Overview|Get Living East Village]] in Stratford on 15 June 2026 (22A Hightail Point, reserved 2026-05-08; HomeLet referencing complete, waiting on Get Living for tenancy paperwork). See [[Housing/_Overview]] for the full situation.
 
 ## Family
 Both parents are independent self-employed lawyers based in Turkey. Father specialises in tax law; mother in family law. They fund Caner's UK living expenses — see [[Housing/Financial Model]] for how this works.
@@ -71,3 +71,7 @@ Affects [[Housing/Requirements]] — the next flat should accommodate a part-tim
 
 ## Daily Hygiene
 Shower 1–3 times per day as a baseline habit: every morning, and after every toilet use. Does not wash hair every time; sometimes just rinses body. No dry skin issues; the routine is high-frequency but not skin-damaging. Documented here because it is a stable lifestyle constraint relevant to water bills, bathroom fit (preference for good showers), and schedule (morning routine has a non-negotiable shower slot).
+
+## Related
+- [[Context/Systems/Housing]] — housing applications cite the identity, family, and parental-funding facts captured here
+- [[Health/Cardio and Activity/Insights]] — genetic baseline observations reference parental context from this file

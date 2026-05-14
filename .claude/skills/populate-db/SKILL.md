@@ -131,17 +131,31 @@ Companies that the script could not resolve fall into three buckets. Route each 
 
 A bucket-3 declaration without a citable source is not evidence — it is a silent-skip draped in prose. If the evidence cannot be gathered, the company stays in `potential.md` marked as "needs human review" and is surfaced in the "What I did not do" section at the end.
 
+### 5.5. UK sponsor register entity lookup (every company)
+
+Every company being inserted or resolved in this run must have its `uk_sponsor_entity_name` column populated. This runs alongside the ATS resolution and is independent of resolved/bespoke status. The register is the UK Home Office's Register of Licensed Sponsors: Workers (Skilled Worker route), downloaded fresh each populate run from `https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers` as a CSV.
+
+Per-company workflow:
+
+1. **Normalise the cernio company name** (lowercase, strip Ltd/Limited/PLC/LLC/LLP/Inc/Corp/UK/Europe/Holdings/Group, replace spaces with single space).
+2. **Exact-match against the register's normalised entity names.** If a single hit on Skilled Worker route, write the raw register name to `uk_sponsor_entity_name`.
+3. **Token-prefix substring match** — if the cernio name's tokens are the first N tokens of a register entity's tokens (e.g. cernio `apple` matches register `apple europe limited`), and there is exactly one such match, accept it.
+4. **AI fallback** — for unmatched companies, search the register for likely entity variants (parent company, legal entity, trading-as name). For known acquisitions/rebrands (Meta → Facebook UK, HashiCorp → IBM UK Ltd, Cantab Capital → GAM UK), use the post-acquisition entity. If no register entry exists under any plausible name, write `unknown`.
+5. **Cite the source.** The summary table row's `Sponsor Entity` column records either the exact register name or `unknown`. For AI-fallback matches, the agent's per-company evidence section quotes the register line that confirmed the match (grep result or CSV row).
+
+Companies that are confirmed on the register but only via non-Skilled-Worker routes (Global Business Mobility: Senior or Specialist Worker, Graduate Trainee, Charity Worker, etc.) DO NOT qualify — those routes don't permit direct UK hire from outside the company. Such companies should be flagged for archival in step 6, not inserted.
+
 ### 6. Present results for user review
 
 Before any DB write, produce a summary table:
 
 ```
-| Company        | Result   | ATS        | Slug                     | Source                                |
-|----------------|----------|------------|--------------------------|---------------------------------------|
-| Cloudflare     | resolved | greenhouse | cloudflare               | cernio resolve (mechanical)           |
-| XTX Markets    | resolved | greenhouse | xtxmarketstechnologies   | AI fallback — careers page outbound   |
-| SurrealDB      | bespoke  | pinpoint   | —                        | surrealdb.pinpointhq.com (unsupported)|
-| Vypercore      | removed  | —          | —                        | Companies House: in liquidation       |
+| Company        | Result   | ATS        | Slug                     | Sponsor Entity                       | Source                                |
+|----------------|----------|------------|--------------------------|--------------------------------------|---------------------------------------|
+| Cloudflare     | resolved | greenhouse | cloudflare               | Cloudflare Limited                   | cernio resolve (mechanical)           |
+| XTX Markets    | resolved | greenhouse | xtxmarketstechnologies   | XTX Research LLP                     | AI fallback — careers page outbound   |
+| SurrealDB      | bespoke  | pinpoint   | —                        | unknown                              | surrealdb.pinpointhq.com (unsupported)|
+| Vypercore      | removed  | —          | —                        | n/a                                  | Companies House: in liquidation       |
 ```
 
 Wait for user approval. This is a review gate — the user can correct mistakes, skip entries, or request re-research. Writing to the DB only after confirmation.
@@ -187,6 +201,7 @@ The failure mode this section defends against is subagent prompts that embed a s
 5. **Profile is read fresh** — no caching, no embedded snapshots, no reliance on earlier-session memory of the profile.
 6. **Every AI-fallback decision is cited.** Bucket 1 cites the careers URL and the API response fields proving the slug; bucket 2 cites the careers URL and the unsupported-ATS signal; bucket 3 cites a specific status source (Companies House URL, HTTP response, redirect target). A fallback row without a citable source is not a decision, it is a guess — surface it under "What I did not do" instead.
 7. **The cernio resolve step cannot be substituted.** For companies whose careers pages are on supported ATS providers, `cernio resolve` is the only path into the database. Manual INSERT statements for an in-coverage company are a failure, not a shortcut.
+8. **Every company processed must have `uk_sponsor_entity_name` populated.** The column is set to the exact register entity name (Skilled Worker route only — non-SW routes do not qualify) or to the literal string `unknown` if no match is found under any plausible variant. Inserting a row with `uk_sponsor_entity_name` left as NULL is a failure of step 5.5.
 
 ---
 
@@ -205,5 +220,6 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Each bucket-2 bespoke row cites careers URL + unsupported-ATS signal** — the specific domain or script source that placed the provider in the unsupported list.
 - [ ] **Each bucket-3 dead-company row cites a source** — Companies House URL with status text, HTTP error code, or redirect-target URL. Prose assertion of deadness without a source belongs under "What I did not do."
 - [ ] **Summary table presented and approved** — the table from step 6 was emitted, the user explicitly approved, and the approval turn is identifiable in the transcript.
+- [ ] **`uk_sponsor_entity_name` populated for every inserted/resolved company** — cite the per-company source: exact register entity name (with the register row quoted) or the literal string `unknown` with the reason no match was found. NULLs in this column post-insert are a step-5.5 failure.
 - [ ] **`companies/potential.md` cleaned after successful insert** — the file's content after the run contains only companies that were neither resolved nor bespoke (or is empty). Diff or after-state reference cited.
 - [ ] **"What I did not do" declaration emitted** — at the end of the run, a section names every company that was skipped, deferred, left in `potential.md` for human review, or partially processed, with the reason. If nothing was skipped, the section says so explicitly; it is not absent.

@@ -1,182 +1,145 @@
 ---
 name: Open Source Contributions
 status: active
-source_repo: null
+source_repo: https://github.com/Capataina/OpenSourceContributions (umbrella, private)
 lifeos_folder: Projects/Open Source Contributions
-last_synced: 2026-04-29
-sources_read: 3
+last_synced: 2026-05-13
+sources_read: 18
 ---
 
 # Open Source Contributions
 
 ## One-line summary
 
-Per-upstream notes on Caner's external open-source engagement — `tinygrad/tinygrad` ONNX LSTM operator (PR #15453, closed on `sz.py` line-budget despite technical correctness) and `tracel-ai/burn` A-FINE no-reference image-quality metric (issue #4312, claim re-engaged 2026-04-24 after 25-day silence with maintainer-confirmed inlined-CLIP-ViT implementation in progress).
+A managed engagement track across 9 vetted Rust and ML-infrastructure upstreams, running out of a private umbrella repo (`Capataina/OpenSourceContributions`) that hosts durable per-repo culture/conventions notes and a local `scout-issues` skill, with active PRs into burn (one APPROVED, one draft) and tinygrad (one open) plus an interest comment posted on alloy.
 
 ## What it is
 
-This file aggregates Caner's external open-source engagement across multiple upstream repositories. It captures repo culture, review protocols, contribution history, what landed and what was rejected. Source: every file in `Projects/Open Source Contributions/` in LifeOS, including `_Overview.md`, `Tinygrad.md`, and `Burn.md`. Two upstreams currently tracked. The resume's Open Source Contributions section anchors here.
+The OSS track is a deliberate, structured engagement programme — not opportunistic drive-by contributions. The vetting layer picked 9 upstream targets based on stack alignment (Rust ML/infra), AI-policy compatibility, and review culture. Each target has a per-repo notes file capturing maintainers, review dynamics, claim-then-implement conventions, AI-policy posture, and a contribution history. The umbrella repo (`Capataina/OpenSourceContributions`, private, 386 KB, 11 commits over 2 days, 64 markdown files in `Notes/`) holds working memory; the vault folder `Projects/Open Source Contributions/` holds the durable narrative. The umbrella ships its own scout-issues skill that runs across all 9 vetted projects in parallel, producing a ranked top-10 list per scout pass.
 
----
+Two contributions have shipped substantive code so far: burn PR #4894 (A-FINE image-quality metric, +1864 / -0 across 10 files, APPROVED 2026-05-07 awaiting tracel-team merge) and tinygrad PR #16119 (minimal LSTM, +14 tokenised lines, open since 2026-05-09). Two more are in flight: burn PR #4938 (TensorContainer downcast panic fix, open as draft 2026-05-11) and burn issue #4519 (fold4d / Col2Im, informally claimed 2026-05-10).
 
-## tinygrad (tinygrad/tinygrad) — closed
+## Architecture
 
-### Repo culture
+The umbrella repo uses a **whitelist-style `.gitignore`** that excludes everything by default and explicitly re-includes `CLAUDE.md`, `README.md`, `Notes/`, `.claude/skills/scout-issues/`. Cloned upstreams (`tinygrad/`, `burn/`, etc.) live as sibling subdirectories inside the umbrella but are gitignored — they're working surfaces, not tracked content. Each cloned upstream additionally has a `.research/` subfolder inside its own clone (gitignored via `.git/info/exclude`) holding implementation notes that get extracted to the umbrella's `Notes/<repo>/` on session close.
 
-tinygrad is a minimalist deep-learning framework built by George Hotz / tiny corp. It is governed by an aggressive **line-budget philosophy** — low total line count is treated as a first-class metric for the core `tinygrad/` folder (tests don't count against it). Enforced by:
+`Notes/` is two-layered:
 
-- A bot comment on every PR reporting line-count delta via `sz.py` (tokenised, excluding docstrings).
-- Reviewers who close PRs on diff size alone regardless of technical correctness.
-- Written policy in the README "Contributing" section: *"If your PR looks complex, is a big diff, or adds lots of lines, it won't be reviewed or merged."*
+- **Universal layer:** speech-patterns.md (voice rules, commit-trailer omission, AI-tell anti-patterns), contribution-history.md (every attempt with lessons), possible-projects.md (the 9-project ranked list), and `_issue-scout-2026-05-10.md` (cross-project synthesis).
+- **Per-project layer:** one subfolder per upstream (alloy/, burn/, candle/, mistral.rs/, ratatui/, tauri/, tinygrad/, tokio/, tract/) with `contribution-culture.md`, `repo-conventions.md`, and a session-dated `_issue-triage-2026-05-10.md`. Deep per-issue research lives in further subfolders (e.g. `Notes/burn/fold4d/` has 8 files covering math spec, ONNX Col2Im-18, reference implementations, burn-internal surface, 6-commit plan, testing strategy; `Notes/burn/2924-tensor-container-panic/` has 5 files including timeline, current code state, directional options, reproducer).
 
-### Review dynamics
+The vault folder `Projects/Open Source Contributions/` mirrors the cross-cutting layer as durable narrative — Architecture, Workflow, Speech Patterns, Project Portfolio, Scout Methodology, Decisions, Roadmap, Gaps, _Overview — plus a `Repos/` subfolder with one file per upstream capturing engagement timeline, claim status, and sequencing. The vault per-repo files are canonical for **what happened**; OSS-repo per-project notes are canonical for **what we learned in detail**.
 
-| Reviewer | Role | Signal |
-|---|---|---|
-| **chenyuxyz** | Core collaborator, prolific reviewer | Closes large-diff PRs with one-line comments ("+78 lines is too much"). Enforces line budget strictly and quickly. |
+The source-of-truth hierarchy is explicit: live PR/issue state on GitHub > vault per-repo file > OSS-repo per-project notes > cloned upstream's CONTRIBUTING.md/README.
 
-### Contribution: ONNX LSTM operator (PR #15453)
+## Subsystems and components
 
-| Field | Value |
-|---|---|
-| PR | tinygrad/tinygrad#15453 |
-| Linked issue | #10897 ("onnx lstm op not implemented") |
-| Branch | `feat/onnx-lstm-support` → `master` |
-| Commit | `437de5a` ("Add ONNX LSTM support") |
-| Opened | 2026-03-24 18:10 UTC |
-| Closed | 2026-03-25 00:38 UTC (~6h 28m alive) |
-| Closed by | chenyuxyz |
-| Stated reason | "+78 lines is too much" |
-| Diff | +146 / −0 across 2 files |
+### tracel-ai/burn — Rust-first deep learning framework
 
-**Diff composition:**
+Most active engagement. Three concurrent threads is the ceiling (Decisions §D10).
 
-| File | Added | What |
-|---|---|---|
-| `tinygrad/nn/onnx.py` | +90 | `LSTM(...)` op + `_apply_rnn_activation(...)` helper |
-| `test/external/external_test_onnx_ops.py` | +56 | `helper_test_lstm` + 4 test cases |
+- **PR #4894 — A-FINE image-quality metric.** +1864 / -0 across 10 files. Adaptive Fidelity-Naturalness Evaluator, no-reference (blind) IQA metric proposed by torsteingrindvik on the image-quality-metrics meta-issue (#4312). Implementation includes an inlined CLIP ViT backbone with PyTorch-weight loader, 5 evaluator heads (technical, structural, aesthetic, authenticity, overall), end-to-end regression tests against the reference implementation, and a `forward_with_features` refactor preserving CLS-token output as a reusable feature-extraction surface. APPROVED 2026-05-07 by laggui (*"LGTM!"*) after a single CHANGES_REQUESTED round on `forward_with_features` returning a `ClipOutput { features, cls: Option }` struct. Awaiting tracel-team merge; no Caner-side action.
+- **PR #4938 — TensorContainer downcast panic fix.** +291 / -50 across 5 files, branch `fix/tensor-container-downcast-panic` off `upstream/main` commit `1e289582e`. Closes issues #2924 (VirtualNonsense, Mar 2025) and #3969 (lucasmdjl, Nov 2025) — same root cause confirmed by laggui. Two reporters 8 months apart; VirtualNonsense's PR #2965 went stale on an unanswered direction question (Result-API fix vs Backend-generic refactor). This PR chose the smaller path: Result-API stays internal to the container layer, public `GradientsParams::get`/`remove` keep their existing `Option` return type, `NotFound` maps to `None`, `TypeMismatch` panics with a descriptive message. Bonus correctness in `remove`: peek-before-remove via `Any::is::<T>()` so a wrong-backend `remove` no longer leaks the tensor. 7 tests added (4 regression + 3 adversarial). Marked draft 2026-05-11; PR body explicitly invites direction call between this path and nathanielsimard's larger Backend-generic refactor. Workspace tests + `clippy -D warnings` + fmt + rustdoc all clean.
+- **Issue #4519 — fold4d / Col2Im operator.** Informally claimed via antimora 👍 on 2026-05-10. ONNX `Col2Im` operator support, the inverse of `unfold4d`. Lives as a new `ModuleOps` trait method in `crates/burn-backend/src/backend/ops/modules/`. Two equivalent forward strategies (scatter-add vs conv_transpose2d-identity); backward is FREE (decomposes into already-differentiable primitives). ~460 LOC across 11 files, 6–8 focused hours estimated. Scoping comment NOT yet posted (agent draft ready). Queued behind PR #4894 review.
+- **Issue #4716 — PytorchStore non-contiguous layer index bug.** Top scout pick #2 from 2026-05-10. Zero claimers, antimora-authored. Sits in the exact `burn-store` surface PR #4894 just shipped 1864 LOC into — 0-day ramp. Queued for natural baton-pass when PR #4938 lands or stalls.
 
-The `sz.py` bot reported **+78 tokenised core lines** — tests are not counted against the core budget.
+burn's review culture is active and friendly: laggui (tracel-ai MEMBER) triages meta-issues, confirms claims within hours, gives implementation hints, uses short low-ceremony confirmations (*"Yeah it should be up for graps!"*). The PR-claim convention is "claim-then-implement": comment on the meta-issue, wait for MEMBER confirmation, then open the PR. Precedent-driven implementation is the norm — every closed item on a meta-issue links the merged PR as a template.
 
-### What the implementation covered
+### tinygrad/tinygrad — minimalist deep learning framework
 
-- **Directions**: forward, reverse, bidirectional (concatenating along `num_directions` dim).
-- **Gate decomposition**: proper i/o/f/c split of `W`, `R`, `Wb`, `Rb` per direction.
-- **Optional inputs defaulted to zero tensors** when absent (`B`, `initial_h`, `initial_c`).
-- **Explicit `NotImplementedError`** for unsupported features: `sequence_lens`, peephole weights `P`.
-- **Attributes handled**: `activation_alpha`, `activation_beta`, `activations`, `clip`, `direction`, `hidden_size`, `input_forget`, `layout` (0 / 1 with permute).
-- **`input_forget=1` → `f_t = 1.0 - i_t`** coupled-input-forget-gate shortcut.
-- **Gate clipping** applied to all four pre-activations before activation.
-- **Outputs**: `Y` (full sequence), `Y_h`, `Y_c`, with layout permutation when `layout=1`.
-- **`_apply_rnn_activation` helper** supporting all 11 ONNX RNN activations.
+- **PR #16119 — minimal LSTM operator.** Open since 2026-05-09. +14 tokenised lines (line-budget-aware), forward + reverse + bidirectional directions, passes Silero VAD parity. **2026-05-10: geohot (project owner) commented asking about ONNX test suite LSTM tests; reply sent confirming 2 of 4 upstream tests pass with this scope, soft-checking on whether to enable them in this PR.** Awaiting chenyuxyz response on the soft-check.
+- **Historical: PR #15453.** Closed 2026-03-25 (~6h 28m alive) by chenyuxyz with the stated reason *"+78 lines is too much"*. Original was +146 / -0 across 2 files; tests don't count against the core budget, but the `tinygrad/nn/onnx.py` core delta of +78 hit the budget limit. The resurrection effort built the minimal +14-line version after extensive postmortem work; a force-push attempt to reopen #15453 was blocked by GitHub policy, so #16119 is a fresh PR.
 
-**Test coverage**: forward basic, forward with initial state and all outputs, reverse, bidirectional.
+tinygrad is governed by an aggressive **line-budget philosophy** — low total line count in the core `tinygrad/` folder is treated as a first-class metric, enforced by a bot comment on every PR reporting `sz.py` tokenised-line delta. Written policy: *"If your PR looks complex, is a big diff, or adds lots of lines, it won't be reviewed or merged."*
 
-### Issue context
+### alloy-rs/alloy — modern Rust-first Ethereum library
 
-Originally opened 2025-06-20 by Quantizr (Jimmy) with a `NotImplementedError: op='LSTM' not supported` from loading Silero VAD v5 through tinygrad's ONNX frontend. chenyuxyz responded: *"probably fine to add. can you link an onnx model that has LSTM op that we can test?"* Caner commented "can I try this?" on 2025-07-28. PR submitted ~8 months later.
+- **Issue #1156 — JSON-RPC recursion limit.** Interest comment posted 2026-05-10. Top cross-project pick from the 2026-05-10 scout. ~30-LOC patch already drafted in-thread by ZzPoLariszZ; DaniPopes (active reviewer) endorsed in-tree fix. Awaiting joneskm (original 14-month-silent volunteer) or maintainer response.
 
-### Lessons learned (tinygrad)
+alloy's AI-policy is best-in-class for the candidate set. mattsse (lead maintainer) trailers his own commits with `🤖 Generated with [Claude Code]`. Externals (Elena343-ai, stevencartavia, DivooOliver, anim001k, dhai, James Prestwich) carry the same trailer openly. CONTRIBUTING.md is welcoming (*"It doesn't matter if you are just getting started with Rust or are the most weathered expert."*). Conventional commits + signed commits required, nightly toolchain for fmt/clippy. Median merged-PR LOC: 42. Sister-repo discipline matters — sol! / ABI bugs belong in `alloy-rs/core`, not the consumer repo.
 
-- **Line budget is the first-order filter** — a technically correct +90-line core change will be closed.
-- **Prerequisite-refactor pattern is the cultural norm** — *"If you can (cleanly) refactor to the point that the feature is a 3 line change, this is great."*
-- **Use `Fixes #N` syntax** in PR body so linked issues auto-close.
-- **Features must have regression tests, but test lines don't count against the budget.**
-- **Eight months between claim and submission is too long** — chenyuxyz had moved on; nobody was holding the issue.
+### Not-yet-engaged candidates (vetted, queued)
 
-### Path to re-submission
+- **tauri-apps/tauri** (Tier 1) — explicit pragmatic AI policy + `ai-slop` enforcement; daily Caner stack (Image Browser, Aurix).
+- **sonos/tract** (Tier 2) — ONNX/NNEF inference runtime; Sonos commercial backing. Note: tract Claude-trailers visible in `git log` are by external czoli1976, not maintainer kali (corrected in the 2026-05-10 scout).
+- **EricLBuehler/mistral.rs** (Tier 2) — LLM serving; cleanest first contact for LLM-infra learning.
+- **huggingface/candle** (Tier 2) — HF Rust ML framework; silent permissive AI-policy.
+- **ratatui/ratatui** (Tier 3) — formal AI policy added 2026-05; daily Caner stack (Cernio, Nyquestro).
+- **tokio-rs/tokio** (Tier 3) — aspirational; one merged PR is worth ten elsewhere.
 
-If re-attempting LSTM, the playbook that matches tinygrad's culture:
+## Technologies and concepts demonstrated
 
-1. **PR 1 — primitive refactor**: extract shared helper patterns (gate splitting, per-direction dispatch). Small, 3–10 lines, clear-win refactor.
-2. **PR 2 — `_apply_rnn_activation` as a dict lookup**: collapse the 15-line if/elif chain to ~6 lines via dispatch table.
-3. **PR 3 — forward-only LSTM using the helpers**: minimal LSTM, forward mode only, 3 canonical activations (Sigmoid, Tanh, Relu).
-4. **PR 4 — reverse + bidirectional**: add reverse and bidirectional modes on top.
+### Languages
 
-Each PR individually small, individually a clear win, individually easier to review than a single +146 monolith.
+- **Rust** — used substantively in burn contributions (1864 + 291 LOC = 2155 LOC across two PRs). Trait-based design (new `ModuleOps` method), generic over backend types, `Any::is::<T>()` for type-safe peek-before-remove, workspace-wide `clippy -D warnings` discipline.
+- **Python** — used in the tinygrad LSTM implementation. ONNX operator semantics modelled in pure Python following tinygrad's `tinygrad/nn/onnx.py` conventions.
 
----
+### Frameworks and libraries
 
-## tracel-ai/burn — active implementation
+- **burn** (deep-learning framework) — implemented a full image-quality metric (5 heads + CLIP ViT backbone + PyTorch-weight loader) inside the framework's perceptual-metrics directory convention. Following 4 precedent PRs (LPIPS, DISTS, Gram Matrix, FID) as templates.
+- **tinygrad** — implemented ONNX operator following the codebase's tokenised-line-budget conventions.
 
-### Repo culture
+### Runtimes / engines / platforms
 
-`burn` is tracel-ai's Rust-first deep-learning framework. It has a visible, **active meta-issue culture** — maintainers post checklists of feature items, community contributors pick them off one by one, each merge gets linked back into the checklist. Review cadence is fast and friendly; most items on the image-quality metrics checklist (#4312) have been claimed, implemented, and merged within a fortnight.
+- **ONNX runtime semantics** — modelled Col2Im-18 specification, LSTM operator with forward/reverse/bidirectional directions, regression-tested against ONNX reference outputs.
+- **PyTorch weight import** — recurring pattern across LPIPS/DISTS/FID precedents; A-FINE loader mirrors the same approach.
 
-### Maintainers and reviewers
+### Tools
 
-| Login | Role | Signal |
-|---|---|---|
-| **laggui** | MEMBER (tracel-ai core) | Triages meta-issues; confirms claims within hours; gives implementation hints (LPIPS / DISTS / Gram matrix loss as precedents; PyTorch weight import is supported pattern). Friendly, low-ceremony tone. |
-| torsteingrindvik | CONTRIBUTOR | Opens and curates #4312 ("Image quality metrics"); proposes new metrics with paper citations and benchmark evidence. |
-| softmaximalist, koreaygj, cong-or, kvthr | CONTRIBUTORs | Active checklist implementers (1–2 metrics per fortnight per person during active periods). |
+- **Git / GitHub** — claim-then-implement workflow with meta-issue comments, draft PRs as direction-forcing artefacts, force-push attempts on closed PRs (blocked by policy), informal-claim via 👍 reaction tracking.
+- **`gh` CLI** — `gh api repos/<owner>/<repo>/pulls/<n>` is the authoritative source for live PR/issue state per the source-of-truth hierarchy.
+- **`scout-issues` skill** — local Claude Code skill in the umbrella repo running parallel agents across all 9 vetted projects, producing ranked top-10 picks per pass.
 
-### Community norms
+### Domains and concepts
 
-- **Claim-then-implement pattern**: comment "I'll take on X" on the meta-issue, wait for MEMBER confirmation, then open the PR.
-- **Precedent-driven implementation**: the meta-issue links merged PRs for every closed item. Pattern-matching from prior PRs is the dominant style.
-- **PyTorch weight import is a supported, recurring pattern** — perceptual metrics (LPIPS, DISTS, Gram Matrix, FID) all load pretrained PyTorch weights into Rust.
-- **Short, direct confirmations** — laggui's response to Caner's claim was *"Yeah it should be up for graps!"* [sic] — minimal process, high trust.
-- **Long silences get re-engaged gracefully** — Caner broke a 25-day silence with an open, detailed technical message and laggui replied within ~4 days with substantive guidance.
+- **Image-quality metrics** — perceptual metrics with pretrained features; CLIP ViT-based no-reference IQA; 5-head fidelity-naturalness composition.
+- **ONNX operator semantics** — Col2Im as the inverse of `unfold4d`; LSTM with multiple directions; regression-test parity against ONNX Runtime.
+- **Maintainer-direction forcing** — draft-PR pattern that puts code on the table to force the direction answer that long-running issues never got (PR #4938 designed explicitly to avoid PR #2965's stale-on-direction-question fate).
+- **Cross-repo AI-policy mapping** — explicit enforcement (tauri's `ai-slop`), formal allow (alloy via mattsse's own trailers, ratatui post-2026-05), silent permissive (candle), strict line-budget (tinygrad).
+- **Speech patterns for upstream comms** — voice rules: no em-dashes, no slashes-as-prose-glue, plain text over decorated formatting, omit Co-Authored-By Claude trailer from commits (umbrella convention).
 
-### Contribution: A-FINE image-quality metric (issue #4312)
+## Key technical decisions
 
-| Field | Value |
-|---|---|
-| Issue | tracel-ai/burn#4312 ("Image quality metrics") |
-| Claim comment | comment #4128062726 — *"Can I tackle A-FINE?"* |
-| Confirmation | laggui MEMBER — *"Yeah it should be up for graps!"* |
-| Claimed | 2026-03-25 |
-| Confirmed | 2026-03-25 |
-| Re-engaged | 2026-04-19 — detailed technical questions after studying LPIPS / DISTS / FID / Gram precedent PRs, `burn-store`, PyIQA reference impl |
-| Maintainer response | 2026-04-23 — laggui confirmed one-PR strategy matching the inlined-backbone pattern used by LPIPS / DISTS / FID |
-| Implementation status | 2026-04-24 — Caner confirmed: *"Perfect, I've already started the implementation and everything seems to align well. I'll change the vit implementation to inline as well"* |
-| Status | **Active — implementation in progress under the agreed approach (single PR with inlined CLIP ViT backbone)** |
+- **D6 — Vault per-repo files are canonical narrative; OSS-repo per-project files are working memory.** When they diverge, the vault wins on "what happened" and the OSS-repo wins on "what we learned in detail."
+- **D10 — Three concurrent burn threads is the ceiling.** Currently at 2 actively Caner-side (fold4d scoping pending, PR #4938 draft awaiting maintainer); A-FINE doesn't count (ball with tracel-team merge); PytorchStore stays parked.
+- **Umbrella `.gitignore` is whitelist-style** — exclude everything by default, explicitly include `CLAUDE.md`, `README.md`, `Notes/`, `.claude/skills/scout-issues/`. Prevents cloned-upstream binaries and venvs from leaking into commits.
+- **Two-layer Notes:** universal cross-repo material (speech-patterns, contribution-history, possible-projects) separated from per-project subfolders. Reduces cross-contamination when working in one upstream.
+- **Draft-PR pattern as direction forcer** — PR #4938 marked draft until laggui or nathanielsimard responds; PR body explicitly invites the direction call.
+- **Commit-trailer omission rule (umbrella convention)** — do NOT include `Co-Authored-By: Claude` trailers on upstream commits in repos without explicit AI-policy permission. alloy and ratatui have formal/observed permission; others are silent or restrictive.
 
-**A-FINE** = Adaptive Fidelity-Naturalness Evaluator — a no-reference (blind) image-quality metric. Proposed on the meta-issue by torsteingrindvik on 2026-03-02.
+## What is currently built
 
-**Upstream references:**
+The umbrella repo (`Capataina/OpenSourceContributions`) has 386 KB tracked content as of 2026-05-10: CLAUDE.md (146 lines universal personality + workflow), README (26 lines), whitelist `.gitignore`, the `.claude/skills/scout-issues/` local skill, 4 universal Notes files (speech-patterns.md 28.3 KB, contribution-history.md 16.8 KB, possible-projects.md 14.8 KB, `_issue-scout-2026-05-10.md`), and 9 per-project subfolders covering all 9 vetted candidates with `contribution-culture.md`, `repo-conventions.md`, and `_issue-triage-2026-05-10.md`. Deep per-issue research lives in further subfolders: `Notes/burn/fold4d/` (8 files) and `Notes/burn/2924-tensor-container-panic/` (5 files) plus `Notes/tinygrad/` (7 files including `pr-15453-postmortem.md`, `silero-vad-spec.md`, `minimum-lstm-implementation.md`).
 
-- Paper: arXiv 2503.11221.
-- Project page: tianhewu.github.io/A-FINE-page.github.io/.
-- Reference implementation: ChrisDud0257/AFINE — Apache 2.0 (compatible with burn's dual MIT / Apache-2.0).
+Two PRs are open or approved on upstream repos: burn PR #4894 (APPROVED) and PR #4938 (draft). One PR open on tinygrad (#16119). One interest comment on alloy (#1156). Two informal claims on burn (#4519, #4716 queued). The shipped LOC across opened PRs: 2169 (1864 A-FINE + 291 TensorContainer + 14 tinygrad LSTM).
 
-### Scope and implementation strategy (locked 2026-04-23)
+## Current state
 
-Per laggui's guidance:
+Active. Most recent commit on umbrella repo: 2026-05-10 04:15 UTC (`b7e08c2`). Most recent upstream activity: burn PR #4938 opened 2026-05-11 (draft); tinygrad PR #16119 received a geohot comment 2026-05-10 with reply sent same day. Active engagements: 6 (4 ball-on-others, 2 awaiting merge or direction).
 
-- **Single PR**, not a backbone-first PR followed by A-FINE. Matches the inlined-backbone pattern used for LPIPS (#4403), DISTS (#4574), FID (#4644).
-- **CLIP ViT inlined** into the A-FINE module rather than carved out as a reusable component. Future CLIP-based metric can refactor it out.
-- **Port target**: `crates/burn-train/src/metric/vision/afine/` following the existing perceptual-metrics directory convention.
-- Five A-FINE heads + loader + tests all ship together in the one PR.
+## Gaps and known limitations
 
-### Precedent PRs relevant to A-FINE
+- **scout-issues skill output is unaudited** — the 2026-05-10 scout ran across 9 projects in parallel and surfaced a top-10 picks list, but only one of those picks (alloy #1156) has been engaged. The remainder are queued; whether the skill's ranking holds up against actual engagement quality is not yet validated.
+- **No merged PR yet** — burn PR #4894 is APPROVED but unmerged (2026-05-13: 6 days past approval); tinygrad PR #16119 is awaiting maintainer; burn PR #4938 is draft awaiting direction. The contribution track has substantive shipped work but no merged-into-mainline outcome to point at on the profile yet.
+- **Three-thread burn ceiling is a soft limit** — currently honoured but no mechanism enforces it beyond the agent's discipline.
+- **AI-policy posture across candidates is mostly inference, not explicit text** — only alloy, tauri, and ratatui (post-2026-05) have observable or formal AI-policy signals. Others (candle, mistral.rs, tract, tokio) are inferred-silent-permissive.
+- **Game-mod contributions** — the GitHub README lists 150,000+ aggregate mod downloads across RimWorld, Minecraft, Terraria, and Escape from Tarkov, but no LifeOS source documents these. Per the anti-puffing rule, this paragraph names the gap rather than synthesising content the LifeOS source does not support.
 
-| PR | Metric | Relevance |
-|---|---|---|
-| #4403 | LPIPS | Closest analogue — perceptual metric using pretrained features, inlined backbone pattern |
-| #4574 | DISTS | Perceptual metric with PyTorch-weight import pattern |
-| #4595 | Gram Matrix | PyTorch-weight import pattern for style/perceptual metric |
-| #4644 | FID | Uses InceptionV3 pretrained weights — largest precedent for heavyweight pretrained dependency |
+## Direction (in-flight, not wishlist)
 
-Lighter precedents for overall metric-crate structure: #4341 (L1/L2), #4379 (PSNR), #4396 (SSIM), #4547 (Smooth L1), #4555 (MS-SSIM).
+- **burn PR #4894 merge** — ball is with tracel-team merge-rights holders; no Caner-side action.
+- **burn PR #4938 direction call** — awaiting laggui or nathanielsimard response on Result-API vs Backend-generic refactor before clicking "Ready for review".
+- **burn issue #4519 scoping comment** — agent draft ready with 2 directional questions on default-impl strategy + output_size param; pending post.
+- **tinygrad PR #16119 follow-through** — soft-check sent on enabling ONNX test suite LSTM tests; awaiting chenyuxyz.
 
-### Lessons learned (burn)
+## Demonstrated skills
 
-- **A long silence survives if the comeback is technical depth rather than process apology** — Caner's 25-day-silence message showed the silence had been spent on due diligence (4 precedent PRs studied, `burn-store` read, PyIQA reference implementation read).
-- **The less-costly path is still an interim status comment within the first 2 weeks** — silence-then-substance recovered cleanly here, but is not the default playbook.
-- **Pattern-matching from precedent PRs is the dominant burn style** — the LPIPS / DISTS / FID inlined-backbone pattern is the template.
-
-### Timing note
-
-The A-FINE claim was posted ~16 hours after the tinygrad LSTM PR was closed overnight — the move from tinygrad to burn was direct and deliberate. burn is a better cultural match for Caner (Rust is a primary language, maintainers are active and friendly, the precedent checklist gives clear templates).
-
----
-
-## Cross-Vault Connections
-
-- The `Resume.md` Open Source Contributions section anchors here — every resume claim about external OSS work traces to one of the per-upstream files.
-- Source-of-truth hierarchy: per-contribution files canonical for repo culture and contribution history; the repos themselves are external authority on PR/issue status; this aggregation is the durable narrative + lessons-learned synthesis.
+- **Substantial upstream Rust ML contribution.** burn PR #4894 (+1864 / -0 across 10 files, APPROVED) demonstrates the ability to implement a complete domain-specific metric inside a Rust deep-learning framework — inlined CLIP ViT, PyTorch-weight loader, 5 evaluator heads, end-to-end regression suite.
+- **Type-correctness work in shared-state container internals.** burn PR #4938 demonstrates designing the smaller-path fix (Result-API internal to container, public `Option` API preserved) plus catching the latent leak in `remove` (peek-before-remove via `Any::is::<T>()`).
+- **Surviving and shipping under aggressive line-budget review.** tinygrad PR #16119 is +14 tokenised lines (down from #15453's +146); the resurrection required postmortem-then-minimisation against a codebase that closes PRs on `+78 lines is too much`.
+- **Maintainer-direction-forcing via draft PRs.** PR #4938's draft framing is deliberate — putting working code with tests on the table to force the direction call that killed PR #2965.
+- **Reading upstream conventions before contributing.** Per-repo `contribution-culture.md` + `repo-conventions.md` files document maintainer voice, review cadence, AI-policy posture, claim conventions, commit-trailer rules — captured before opening PRs.
+- **Cross-repo orchestration via local skills.** The `scout-issues` skill runs parallel agents across all 9 vetted projects and produces a ranked top-10 picks list per pass — local skill authorship demonstrated in service of OSS work.
 
 ---
 
@@ -184,6 +147,21 @@ The A-FINE claim was posted ~16 hours after the tinygrad LSTM PR was closed over
 
 | Path | Lines | Verbatim last line |
 |---|---|---|
-| Projects/Open Source Contributions/_Overview.md | 40 | "- [[Profile/Professional/Interests]] — OSS as an interest territory" |
-| Projects/Open Source Contributions/Burn.md | 124 | "- [[Profile/Professional/Experience]] — counts as external open-source engagement with a Rust deep-learning framework maintainer team" |
-| Projects/Open Source Contributions/Tinygrad.md | 130 | "- [[Projects/Open Source Contributions/Burn|Burn]] — sister contribution notes" |
+| Projects/Open Source Contributions/_Overview.md | 161 | "- [[Profile/Professional/Interests\|Interests]] — OSS as an interest territory" |
+| Projects/Open Source Contributions/Architecture.md | 137 | "- [[Projects/_Overview\|Projects Overview]] — peer to all Caner-owned projects" |
+| Projects/Open Source Contributions/Decisions.md | 179 | "- [[Projects/Open Source Contributions/Project Portfolio\|Project Portfolio]] — input to D10 sequencing" |
+| Projects/Open Source Contributions/Gaps.md | 124 | "- [[Projects/Open Source Contributions/Decisions\|Decisions]] — G9 reasons the deliberate-skip below" |
+| Projects/Open Source Contributions/Project Portfolio.md | 176 | "- [[Profile/Professional/Interests\|Interests]] — Rust systems, AI infrastructure, low-latency engines" |
+| Projects/Open Source Contributions/Roadmap.md | 139 | "- [[Projects/Open Source Contributions/Repos/Burn\|Burn]] / [[Projects/Open Source Contributions/Repos/Tinygrad\|Tinygrad]] — engagement queue" |
+| Projects/Open Source Contributions/Scout Methodology.md | 148 | "- [[Projects/Open Source Contributions/Architecture\|Architecture]] — the skill lives at `.claude/skills/scout-issues/` in the umbrella" |
+| Projects/Open Source Contributions/Speech Patterns.md | 195 | "- [[Projects/Open Source Contributions/Decisions\|Decisions]] — the no-em-dashes / no-slashes / plain-text rules" |
+| Projects/Open Source Contributions/Workflow.md | 145 | "- [[Projects/Open Source Contributions/Roadmap\|Roadmap]] — sequencing of next contributions" |
+| Projects/Open Source Contributions/Repos/Alloy.md | 87 | "- [[Profile/Professional/Interests\|Interests]] — DeFi infrastructure as an interest territory" |
+| Projects/Open Source Contributions/Repos/Burn.md | 183 | "- [[Profile/Professional/Experience\|Experience]] — counts as external open-source engagement with a Rust deep-learning framework maintainer team" |
+| Projects/Open Source Contributions/Repos/Candle.md | 147 | "- [[Profile/Professional/Interests\|Interests]] — Rust ML / Hugging Face ecosystem" |
+| Projects/Open Source Contributions/Repos/Mistral.rs.md | 164 | "- [[Profile/Professional/Interests\|Interests]] — LLM infrastructure as career territory" |
+| Projects/Open Source Contributions/Repos/Ratatui.md | 134 | "- [[Profile/Professional/Interests\|Interests]] — Rust foundational libraries" |
+| Projects/Open Source Contributions/Repos/Tauri.md | 150 | "- [[Profile/Professional/Interests\|Interests]] — local-first product engineering as career territory" |
+| Projects/Open Source Contributions/Repos/Tinygrad.md | 150 | "- [[Projects/Open Source Contributions/Repos/Tract\|Tract]] / [[Projects/Open Source Contributions/Repos/Tauri\|Tauri]] — queued candidates" |
+| Projects/Open Source Contributions/Repos/Tokio.md | 196 | "- [[Profile/Professional/Interests\|Interests]] — Rust async / foundational systems" |
+| Projects/Open Source Contributions/Repos/Tract.md | 154 | "- [[Profile/Professional/Interests\|Interests]] — edge ML / on-device inference as career territory" |

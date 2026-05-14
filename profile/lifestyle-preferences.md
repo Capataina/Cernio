@@ -44,9 +44,11 @@ Caner wants to live where humanity is visibly building the future, with enough p
 
 This is the environment preference with no natural home in any other file, so it's the main contribution of this document.
 
-**The gold standard is the London regenerated-district cluster:** Nine Elms, Kings Cross / Granary Square, Paddington Basin, Battersea Power Station, White City.
+**The gold standard is the London regenerated-district cluster:** Nine Elms, Kings Cross / Granary Square, Stratford / E20, Paddington Basin, Battersea Power Station, [[White City]].
 
-**The anti-pattern is the Canary Wharf failure mode:** visually modern but a pure skyscraper canyon — no mixed-scale massing, token greenery that's always crowded, poor walkability outside the central estate. "I felt miniscule" was the exact phrase. Tall buildings *alone* don't satisfy the preference; the ingredients need to mix.
+**Special-case addition: Wembley Park (Quintain Living's master-planned development specifically — not general Wembley).** Zone 4, which fails the standard Zone 1-2 strong preference. But the Quintain Living development at Wembley Park does meet the gold-standard ingredients individually — mixed-scale massing across the master plan, integrated greenery designed-in, recent regeneration, walkable as daily life. This makes it a viable budget-tier residential anchor in the housing search even though it wouldn't grade as well for office locations. **Wembley Park ≠ Wembley general** — the broader Wembley area (UNCLE Wembley Central, etc.) doesn't meet the criterion; only the Quintain Living-master-planned core qualifies.
+
+**The anti-pattern is the [[Canary Wharf]] failure mode:** visually modern but a pure skyscraper canyon — no mixed-scale massing, token greenery that's always crowded, poor walkability outside the central estate. "I felt miniscule" was the exact phrase. Tall buildings *alone* don't satisfy the preference; the ingredients need to mix.
 
 **What the gold-standard districts have in common:**
 
@@ -66,6 +68,8 @@ This is the environment preference with no natural home in any other file, so it
 |---|---|---|
 | Kings Cross / Granary Square | A+ | Google KGX1 (the timber-atrium building with the rooftop garden) is the single most attractive office environment Caner has named in the entire job search |
 | Nine Elms / Battersea | A+ | The single reference point for "done right" |
+| Stratford / E20 | A+ | Visited in person 20 April 2026 — "absolutely beautiful." Adjacent to Nine Elms and Kings Cross in the gold-standard cluster. Elizabeth + Jubilee + Central + Overground gives 7-minute Bond Street access; mixed-scale massing with integrated park-system (Olympic Park, Westfield, Stratford Cross). |
+| Wembley Park (Quintain Living development specifically) | B+ as office anchor / A- as residential anchor | Special case. Zone 4 — fails the standard Zone 1-2 office preference, so grade caps at B+ for office context. But the Quintain Living master-planned development meets the gold-standard ingredients (mixed-scale, greenery, recent regeneration, walkable) and serves as a viable budget-tier residential anchor in the 2026-04-29 housing strategy. Apply A- when grading neighbourhood quality for residential decisions; B+ when grading office locations. **Wembley Park ≠ Wembley general** — UNCLE Wembley Central and other operators outside the Quintain Living master plan don't qualify. |
 | Paddington Basin | A | Similar brief, smaller scale |
 | White City / Television Centre | A | Regeneration is recent and integrated |
 | Shoreditch / Old Street | B+ | Modern tech scene but aesthetic is more "reclaimed industrial" than "futuristic" |
@@ -109,7 +113,7 @@ Second axis this file uniquely owns. Important to record because it differentiat
 
 ## Safety and night walkability
 
-Third axis this file uniquely owns. **Currently the sharpest live pain point in Caner's day-to-day life** — he lives in East Croydon in a building where he cannot walk at night, and this is actively degrading his quality of life.
+Third axis this file uniquely owns. **The sharpest safety pain point in Caner's lived experience to date** — has been living in East Croydon through 2025-26 in a building where he cannot walk at night, and the experience is what every other safety grading is calibrated against. Resolved on the 15 June 2026 East Village move-in (Stratford / E20); the lesson persists as the canonical "what fails on this axis" anchor.
 
 **Rule:** a city or neighbourhood passes this axis if and only if Caner would feel safe walking home from a venue at midnight without being on high alert. This is a binary test with a named calibration point — York (where he walked home from clubs at 3am because the population mix of students and retirees kept the streets low-tension).
 
@@ -121,9 +125,9 @@ Third axis this file uniquely owns. **Currently the sharpest live pain point in 
 |---|---|---|
 | Tokyo, Singapore, Zürich, Copenhagen, Vienna, most of Japan and Switzerland | A+ | Low violent crime, high night walkability |
 | Most of Canada, most of Australia, Dubai | A | Safe by any reasonable standard |
-| Central London (West End, Kings Cross, Marylebone, Pimlico, Battersea) | A- | Safe with standard urban awareness |
+| Central London (West End, Kings Cross, Marylebone, Pimlico, Battersea, Stratford / E20) | A- | Safe with standard urban awareness |
 | Dublin, Berlin central, Paris central, Amsterdam central | B+ | Safe but with ambient property crime |
-| Outer London (Croydon, Tottenham, Peckham, Elephant and Castle) | D | Current Croydon is the "actively unhappy" calibration anchor |
+| Outer London (Croydon, Tottenham, Peckham, Elephant and Castle) | D | Croydon (lived 2025-26) is the "actively unhappy" calibration anchor; resolved 15 June 2026 |
 | SF Tenderloin, parts of LA, most US urban cores outside specific enclaves | D | Visible disorder, walkability collapses |
 | Johannesburg, São Paulo, Mexico City outer areas | F | Dealbreaker-class |
 
@@ -152,8 +156,9 @@ When a new city or neighbourhood comes up in grading, compare against these anch
 |---|---|---|---|---|---|---|
 | **London Kings Cross area** | Very strong | Strong | Decent | Strong | Strong | **Very strong** — the operating baseline |
 | **London Nine Elms / Battersea** | Very strong | Strong | Decent | Strong | Strong | **Very strong** |
+| **London Stratford / E20** | Very strong | Strong | Decent | Strong | Strong | **Very strong** — visited 20 April 2026; gold-standard cluster alongside Kings Cross and Nine Elms |
 | **London Canary Wharf** | Partial | Strong | Decent | Strong | Strong | **Good** — visually modern but mixed-scale failure |
-| **London Croydon (current)** | Weak | Weak | Weak | Decent | Strong | **Weak** — active pain point |
+| **London Croydon (2025-26 anchor)** | Weak | Weak | Weak | Decent | Strong | **Weak** — calibration pain point, resolved 15 June 2026 |
 | **Seattle** | Strong | Decent | Decent | Very strong | Strong | **Strong** on lifestyle — visa-blocked |
 | **Toronto downtown** | Very strong | Strong | Strong | Strong | Strong | **Very strong** on lifestyle — visa structurally hard |
 | **NYC Manhattan** | Very strong | Strong | Very strong | Very strong | Strong | **Very strong** on lifestyle — visa lottery |
@@ -167,7 +172,7 @@ When a new city or neighbourhood comes up in grading, compare against these anch
 | **Sydney CBD** | Good | Strong | Strong | Good | Strong | **Good** — visa achievable, timezone isolating |
 | **Amsterdam central** | Weak (explicitly rejected) | Decent | Decent | Strong | Strong | **Weak** — aesthetic and scale failure despite top-tier firms |
 
-**Interpretation rule:** the "Overall lifestyle fit" column is a holistic pattern-match judgment, not a mean of the other columns. When two axes are both "weak" — especially if one of them is the live Croydon-style safety pain point or the Amsterdam-style aesthetic mismatch — the overall fit tilts much harder than a naive average would suggest. Use this column as a starting point for reasoning, not as a mechanical score.
+**Interpretation rule:** the "Overall lifestyle fit" column is a holistic pattern-match judgment, not a mean of the other columns. When two axes are both "weak" — especially if one of them is the Croydon-style safety pain point or the Amsterdam-style aesthetic mismatch — the overall fit tilts much harder than a naive average would suggest. Use this column as a starting point for reasoning, not as a mechanical score.
 
 ---
 
@@ -177,7 +182,7 @@ Summary of what would make Caner unhappy in a city, cross-referenced from the se
 
 1. **Low-rise historic-only districts** — Jordaan, most of Italy outside Milan, Vienna's old town, Kraków. No height, no modernity, no futuristic energy.
 2. **Pure skyscraper canyons with no greenery or walkability** — Canary Wharf, parts of Houston, parts of HK Central, parts of Frankfurt.
-3. **High ambient crime / unsafe after dark** — Johannesburg, Detroit, SF Tenderloin, most US cores without a specific safe enclave, current Croydon.
+3. **High ambient crime / unsafe after dark** — Johannesburg, Detroit, SF Tenderloin, most US cores without a specific safe enclave, Croydon.
 4. **Religion in public life** — Gulf states, much of rural Turkey, parts of the US South. Agnostic atheist preference; see [[Profile/Personal|Personal]].
 5. **Extreme heat with poor AC infrastructure** — Cairo, Karachi, interior India, parts of SE Asia outside Singapore/modern-luxury enclaves.
 6. **Net-negative body-environment scaling** — Netherlands specifically, because the ~185cm male average makes daily physical environment uncomfortable at 170cm. See [[Profile/Personal|Personal]]. This is NL-specific, not a general rule.

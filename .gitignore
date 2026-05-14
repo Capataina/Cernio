@@ -1,12 +1,13 @@
 /target
-/state/*.db
 /state/*.db-wal
 /state/*.db-shm
-*.db
 *.db-wal
 *.db-shm
 .DS_Store
 *.bak
+
+# Claude Code runtime artefacts
+/.claude/scheduled_tasks.lock
 
 # Private local research — never committed
 /private/
