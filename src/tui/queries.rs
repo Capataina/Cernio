@@ -54,27 +54,110 @@ pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow
 pub fn fetch_jobs(
     conn: &Connection,
     company_filter: Option<i64>,
-    focused: bool,
-    show_archived: bool,
-    hide_applied: bool,
+    filters: &crate::tui::app::JobFilters,
     sort_mode: SortMode,
 ) -> Vec<JobRow> {
-    let focus_filter = if focused {
-        " AND (j.grade IS NULL OR j.grade NOT IN ('F', 'C'))"
+    // Build per-axis WHERE fragments. Empty axis = no filter on that axis.
+
+    // ── Grade axis ──
+    let grade_filter = if filters.grades.is_empty() {
+        String::new()
     } else {
-        ""
+        let mut parts = Vec::new();
+        let mut graded: Vec<String> = filters
+            .grades
+            .iter()
+            .filter(|g| g.as_str() != "?")
+            .map(|g| format!("'{}'", g.replace('\'', "''")))
+            .collect();
+        graded.sort();
+        if !graded.is_empty() {
+            parts.push(format!("j.grade IN ({})", graded.join(", ")));
+        }
+        if filters.grades.contains("?") {
+            parts.push("j.grade IS NULL".to_string());
+        }
+        format!(" AND ({})", parts.join(" OR "))
     };
 
-    let archive_filter = if show_archived {
-        ""
+    // ── ATS axis ──
+    let ats_filter = if filters.ats.is_empty() {
+        String::new()
     } else {
-        " AND j.evaluation_status != 'archived' AND c.status != 'archived'"
+        let mut parts = Vec::new();
+        let mut providers: Vec<String> = filters
+            .ats
+            .iter()
+            .filter(|a| a.as_str() != "bespoke")
+            .map(|a| format!("'{}'", a.replace('\'', "''")))
+            .collect();
+        providers.sort();
+        if !providers.is_empty() {
+            parts.push(format!(
+                "j.id IN (SELECT j2.id FROM jobs j2 JOIN company_portals cp \
+                 ON cp.company_id = j2.company_id AND cp.is_primary = 1 \
+                 WHERE cp.ats_provider IN ({}))",
+                providers.join(", ")
+            ));
+        }
+        if filters.ats.contains("bespoke") {
+            parts.push("c.status = 'bespoke'".to_string());
+        }
+        format!(" AND ({})", parts.join(" OR "))
     };
 
-    let applied_filter = if hide_applied {
-        " AND j.id NOT IN (SELECT job_id FROM user_decisions WHERE decision = 'applied')"
+    // ── Decision axis ──
+    let decision_filter = if filters.decisions.is_empty() {
+        String::new()
     } else {
-        ""
+        let mut parts = Vec::new();
+        let mut decided: Vec<String> = filters
+            .decisions
+            .iter()
+            .filter(|d| d.as_str() != "none")
+            .map(|d| format!("'{}'", d.replace('\'', "''")))
+            .collect();
+        decided.sort();
+        if !decided.is_empty() {
+            parts.push(format!(
+                "j.id IN (SELECT job_id FROM user_decisions WHERE decision IN ({}))",
+                decided.join(", ")
+            ));
+        }
+        if filters.decisions.contains("none") {
+            parts.push(
+                "j.id NOT IN (SELECT job_id FROM user_decisions)".to_string(),
+            );
+        }
+        format!(" AND ({})", parts.join(" OR "))
+    };
+
+    // ── Package axis ──
+    let package_filter = match (
+        filters.package.contains("prepared"),
+        filters.package.contains("not-prepared"),
+    ) {
+        (true, false) => {
+            " AND j.id IN (SELECT job_id FROM application_packages)".to_string()
+        }
+        (false, true) => {
+            " AND j.id NOT IN (SELECT job_id FROM application_packages)".to_string()
+        }
+        _ => String::new(),
+    };
+
+    // ── Archive axis ──
+    let archive_filter = match (
+        filters.archive.contains("archived"),
+        filters.archive.contains("active"),
+    ) {
+        (true, false) => {
+            " AND (j.evaluation_status = 'archived' OR c.status = 'archived')".to_string()
+        }
+        (false, true) => {
+            " AND j.evaluation_status != 'archived' AND c.status != 'archived'".to_string()
+        }
+        _ => String::new(),
     };
 
     let base = format!("
@@ -86,7 +169,7 @@ pub fn fetch_jobs(
                (SELECT 1 FROM application_packages ap WHERE ap.job_id = j.id) IS NOT NULL
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE 1=1{archive_filter}{focus_filter}{applied_filter}");
+        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "

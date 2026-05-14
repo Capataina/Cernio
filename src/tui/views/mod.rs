@@ -90,6 +90,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         overlays::draw_bulk_picker(frame, app);
     }
 
+    if app.show_filter_menu {
+        overlays::draw_filter_menu(frame, app);
+    }
+
     if app.show_help {
         overlays::draw_help_overlay(frame, app);
     }

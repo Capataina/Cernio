@@ -138,6 +138,128 @@ pub struct PipelineCard {
     pub grade: Option<String>,
 }
 
+// ── Filter model ─────────────────────────────────────────────────
+
+/// Multi-axis job filter. Each axis is a "show only this" set: an empty
+/// set means no filter on that axis (all values pass); a non-empty set
+/// shows only jobs matching one of the listed values (OR within axis).
+/// Across axes the filters AND together.
+#[derive(Debug, Clone)]
+pub struct JobFilters {
+    /// Grade values to include. Sentinel "?" matches NULL grade.
+    pub grades: HashSet<String>,
+    /// ATS provider values to include. Sentinel "bespoke" matches companies
+    /// without a portal entry (status = 'bespoke' or no row in company_portals).
+    pub ats: HashSet<String>,
+    /// Decision values to include. Sentinel "none" matches jobs with no
+    /// user_decisions row.
+    pub decisions: HashSet<String>,
+    /// Package filter — "prepared" / "not-prepared". Empty = both.
+    pub package: HashSet<String>,
+    /// Archive filter — "archived" / "active". Default {"active"} preserves
+    /// the historical hide-archived-by-default behaviour.
+    pub archive: HashSet<String>,
+}
+
+impl Default for JobFilters {
+    fn default() -> Self {
+        let mut archive = HashSet::new();
+        archive.insert("active".to_string());
+        Self {
+            grades: HashSet::new(),
+            ats: HashSet::new(),
+            decisions: HashSet::new(),
+            package: HashSet::new(),
+            archive,
+        }
+    }
+}
+
+impl JobFilters {
+    /// Total number of chips currently active across all axes.
+    pub fn active_chip_count(&self) -> usize {
+        self.grades.len()
+            + self.ats.len()
+            + self.decisions.len()
+            + self.package.len()
+            + self.archive.len()
+    }
+
+    /// Returns true iff every axis is at its default state.
+    pub fn is_default(&self) -> bool {
+        self.grades.is_empty()
+            && self.ats.is_empty()
+            && self.decisions.is_empty()
+            && self.package.is_empty()
+            && self.archive.len() == 1
+            && self.archive.contains("active")
+    }
+
+    /// Reset every axis to default.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Clear every chip (including the default "active" on archive).
+    pub fn clear_all(&mut self) {
+        self.grades.clear();
+        self.ats.clear();
+        self.decisions.clear();
+        self.package.clear();
+        self.archive.clear();
+    }
+}
+
+/// Filter-menu axis enumeration — drives the visual rows in the overlay
+/// and the keyboard navigation between rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterAxis {
+    Grade,
+    Ats,
+    Decision,
+    Package,
+    Archive,
+}
+
+impl FilterAxis {
+    pub const ALL: [FilterAxis; 5] = [
+        FilterAxis::Grade,
+        FilterAxis::Ats,
+        FilterAxis::Decision,
+        FilterAxis::Package,
+        FilterAxis::Archive,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            FilterAxis::Grade => "Grade",
+            FilterAxis::Ats => "ATS",
+            FilterAxis::Decision => "Decision",
+            FilterAxis::Package => "Package",
+            FilterAxis::Archive => "Archive",
+        }
+    }
+
+    pub fn chips(self) -> &'static [&'static str] {
+        match self {
+            FilterAxis::Grade => &["SS", "S", "A", "B", "C", "F", "?"],
+            FilterAxis::Ats => &[
+                "greenhouse",
+                "ashby",
+                "lever",
+                "workable",
+                "smartrecruiters",
+                "workday",
+                "eightfold",
+                "bespoke",
+            ],
+            FilterAxis::Decision => &["applied", "watching", "interview", "rejected", "none"],
+            FilterAxis::Package => &["prepared", "not-prepared"],
+            FilterAxis::Archive => &["archived", "active"],
+        }
+    }
+}
+
 pub struct App {
     pub running: bool,
     pub view: View,
@@ -145,9 +267,10 @@ pub struct App {
     pub theme: Theme,
     pub show_help: bool,
     pub detail_scroll: u16,
-    pub focused_mode: bool,
-    pub show_archived: bool,
-    pub hide_applied: bool,
+    pub filters: JobFilters,
+    pub show_filter_menu: bool,
+    pub filter_menu_axis: usize,   // 0..5 (matches FilterAxis::ALL)
+    pub filter_menu_chip: usize,   // chip index within the focused axis
     pub frame_count: u64,
     pub toasts: Vec<Toast>,
 

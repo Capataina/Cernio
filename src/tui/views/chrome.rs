@@ -9,7 +9,12 @@ use crate::tui::app::{App, Focus, SortMode, View};
 // ── Tab bar ──────────────────────────────────────────────────────
 
 pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
-    let focused_indicator = if app.focused_mode { " [FOCUSED]" } else { "" };
+    let filters_active = !app.filters.is_default();
+    let filter_indicator = if filters_active {
+        format!(" [FILTERS:{}]", app.filters.active_chip_count())
+    } else {
+        String::new()
+    };
 
     // Dashboard tab — plain text, no count.
     let dashboard_tab = Line::from(" Dashboard ");
@@ -42,11 +47,11 @@ pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         Style::default().fg(Color::DarkGray)
     };
-    let jobs_tab = if app.focused_mode {
+    let jobs_tab = if filters_active {
         Line::from(vec![
             Span::raw(" Jobs ("),
             Span::styled(format!("{jobs_count}"), job_count_style),
-            Span::raw(format!("/{}){focused_indicator} ", app.total_jobs_unfiltered)),
+            Span::raw(format!("/{}){filter_indicator} ", app.total_jobs_unfiltered)),
         ])
     } else {
         Line::from(vec![
@@ -154,7 +159,7 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 ("w/a/x/i", "decide"),
                 ("o", "open"),
                 ("/", "search"),
-                ("f", if app.focused_mode { "all" } else { "focus" }),
+                ("f", "filters"),
                 ("?", "help"),
             ];
             if app.job_filter_company.is_some() {
@@ -226,10 +231,14 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 SortMode::ByDate => "date",
                 SortMode::ByLocation => "location",
             };
-            let focus_indicator = if app.focused_mode { " · FOCUS" } else { "" };
+            let filter_label = if app.filters.is_default() {
+                String::new()
+            } else {
+                format!(" · filters:{}", app.filters.active_chip_count())
+            };
             right_parts.push(Span::styled(
                 format!(
-                    " {} visible · sort:{sort_label}{focus_indicator} ",
+                    " {} visible · sort:{sort_label}{filter_label} ",
                     app.jobs.len()
                 ),
                 app.theme.dim,

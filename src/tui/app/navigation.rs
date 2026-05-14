@@ -233,7 +233,7 @@ impl App {
         self.detail_scroll = 0;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, self.focused_mode, self.show_archived, self.hide_applied, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, &self.filters, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -248,7 +248,7 @@ impl App {
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
-            self.jobs = queries::fetch_jobs(&conn, None, self.focused_mode, self.show_archived, self.hide_applied, self.sort_mode);
+            self.jobs = queries::fetch_jobs(&conn, None, &self.filters, self.sort_mode);
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));

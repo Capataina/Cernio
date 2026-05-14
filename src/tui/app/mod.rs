@@ -26,7 +26,8 @@ impl App {
         crate::pipeline::format::run_silent(&conn);
 
         let companies = queries::fetch_companies(&conn, false);
-        let jobs = queries::fetch_jobs(&conn, None, false, false, false, SortMode::ByGrade);
+        let filters = JobFilters::default();
+        let jobs = queries::fetch_jobs(&conn, None, &filters, SortMode::ByGrade);
         let stats = queries::fetch_stats(&conn);
         let total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
 
@@ -58,9 +59,10 @@ impl App {
             theme: Theme::default(),
             show_help: false,
             detail_scroll: 0,
-            focused_mode: false,
-            show_archived: false,
-            hide_applied: false,
+            filters,
+            show_filter_menu: false,
+            filter_menu_axis: 0,
+            filter_menu_chip: 0,
             frame_count: 0,
             toasts: Vec::new(),
             companies,
@@ -112,13 +114,14 @@ impl App {
             return;
         };
 
-        self.companies = queries::fetch_companies(&conn, self.show_archived);
+        // Mirror the filter menu's archive setting onto company fetch so the
+        // Companies view reflects the same "show archived?" semantics.
+        let show_archived = self.filters.archive.contains("archived");
+        self.companies = queries::fetch_companies(&conn, show_archived);
         self.jobs = queries::fetch_jobs(
             &conn,
             self.job_filter_company,
-            self.focused_mode,
-            self.show_archived,
-            self.hide_applied,
+            &self.filters,
             self.sort_mode,
         );
         self.stats = queries::fetch_stats(&conn);

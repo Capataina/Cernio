@@ -33,6 +33,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Filter menu — multi-axis toggle picker.
+    if app.show_filter_menu {
+        overlays::handle_filter_menu(app, key);
+        return;
+    }
+
     // Search mode — route all input to the search handler.
     if app.search_mode {
         overlays::handle_search_input(app, key);
@@ -86,26 +92,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('f') => {
             if !matches!(app.view, View::Dashboard | View::Pipeline | View::Activity) {
-                app.focused_mode = !app.focused_mode;
-                app.hide_applied = app.focused_mode;
-                app.add_toast(if app.focused_mode {
-                    "Focused: hiding F/C + applied".to_string()
-                } else {
-                    "Showing all grades + applied".to_string()
-                });
-                app.refresh();
-            }
-            return;
-        }
-        KeyCode::Char('A') => {
-            if !matches!(app.view, View::Dashboard) {
-                app.show_archived = !app.show_archived;
-                app.add_toast(if app.show_archived {
-                    "Showing archived".to_string()
-                } else {
-                    "Hiding archived".to_string()
-                });
-                app.refresh();
+                app.show_filter_menu = true;
+                app.filter_menu_axis = 0;
+                app.filter_menu_chip = 0;
             }
             return;
         }
