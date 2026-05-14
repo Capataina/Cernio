@@ -110,29 +110,34 @@ impl App {
         let job_id = job.id;
         let company_id = job.company_id;
 
-        // Look up the ATS provider and application package from the DB.
-        let (ats_provider, package_answers) = if let Ok(conn) = Connection::open(&self.db_path) {
-            let provider = conn
-                .query_row(
-                    "SELECT cp.ats_provider FROM company_portals cp
-                     WHERE cp.company_id = ?1 AND cp.is_primary = 1 LIMIT 1",
-                    rusqlite::params![company_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .ok();
+        // Look up the ATS provider, slug, and application package from the DB.
+        let (ats_provider, ats_slug, package_answers) =
+            if let Ok(conn) = Connection::open(&self.db_path) {
+                let portal = conn
+                    .query_row(
+                        "SELECT cp.ats_provider, cp.ats_slug FROM company_portals cp
+                         WHERE cp.company_id = ?1 AND cp.is_primary = 1 LIMIT 1",
+                        rusqlite::params![company_id],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                    )
+                    .ok();
 
-            let answers = conn
-                .query_row(
-                    "SELECT answers FROM application_packages WHERE job_id = ?1",
-                    rusqlite::params![job_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .ok();
+                let answers = conn
+                    .query_row(
+                        "SELECT answers FROM application_packages WHERE job_id = ?1",
+                        rusqlite::params![job_id],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .ok();
 
-            (provider, answers)
-        } else {
-            (None, None)
-        };
+                let (provider, slug) = match portal {
+                    Some((p, s)) => (Some(p), Some(s)),
+                    None => (None, None),
+                };
+                (provider, slug, answers)
+            } else {
+                (None, None, None)
+            };
 
         let has_package = package_answers.is_some();
 
@@ -153,6 +158,7 @@ impl App {
                 let _ = crate::autofill::fill_application(
                     &job_url,
                     Some("greenhouse"),
+                    ats_slug.as_deref(),
                     &profile,
                     package_answers.as_deref(),
                 )

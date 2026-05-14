@@ -1,5 +1,6 @@
 pub mod common;
 pub mod greenhouse;
+pub mod greenhouse_api;
 
 use std::path::Path;
 
@@ -102,30 +103,58 @@ fn extract_field(content: &str, field_name: &str) -> Option<String> {
 pub enum AutofillResult {
     /// Browser launched and form filled successfully.
     Success { fields_filled: usize },
-    /// ATS provider not supported for autofill.
+    /// ATS provider not supported for autofill, or company is off-platform.
     UnsupportedProvider(String),
-    /// Browser launch failed.
+    /// Browser launch or API fetch failed.
     BrowserError(String),
 }
 
 /// Launch autofill for a job. Dispatches to the correct ATS provider.
 ///
-/// `package_json` is the pre-generated answers JSON from application_packages,
-/// if one exists for this job. The format is a JSON object mapping question
-/// labels to answer text.
+/// `ats_slug` is the ATS-side identifier for the company (from
+/// `company_portals.ats_slug` in the DB) — required for Greenhouse
+/// because the public API is keyed on it, not on the URL.
+///
+/// `package_json` is the pre-generated answers JSON from
+/// `application_packages`, if one exists. Format: JSON object mapping
+/// question labels to answer text.
 pub async fn fill_application(
     job_url: &str,
     ats_provider: Option<&str>,
+    ats_slug: Option<&str>,
     profile: &ApplicantProfile,
     package_json: Option<&str>,
 ) -> AutofillResult {
-    // Parse the package answers if provided.
     let answers: std::collections::HashMap<String, String> = package_json
         .and_then(|json| serde_json::from_str(json).ok())
         .unwrap_or_default();
 
     match ats_provider {
-        Some("greenhouse") => greenhouse::fill(job_url, profile, &answers).await,
+        Some("greenhouse") => {
+            // Resolve slug + job_id. Prefer parsing the URL since it carries
+            // both; fall back to (slug-from-DB, gh_jid-from-URL) for the
+            // custom-domain-wrapper case.
+            let (slug, job_id) = match greenhouse_api::parse_url(job_url) {
+                Some((s, id)) => (s, id),
+                None => {
+                    let Some(slug) = ats_slug else {
+                        return AutofillResult::UnsupportedProvider(
+                            "greenhouse: no slug in URL and none in DB — \
+                             cannot resolve job"
+                                .into(),
+                        );
+                    };
+                    let Some(job_id) = greenhouse_api::extract_gh_jid(job_url) else {
+                        return AutofillResult::UnsupportedProvider(
+                            "greenhouse: no gh_jid in URL".into(),
+                        );
+                    };
+                    (slug.to_string(), job_id)
+                }
+            };
+
+            greenhouse::fill(job_url, &slug, job_id, profile, &answers).await
+        }
         Some(provider) => AutofillResult::UnsupportedProvider(provider.to_string()),
         None => AutofillResult::UnsupportedProvider("unknown".to_string()),
     }

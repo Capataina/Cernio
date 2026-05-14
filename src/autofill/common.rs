@@ -1,7 +1,20 @@
+//! Shared CDP helpers for ATS-driving autofill.
+//!
+//! Two layers:
+//!   - Real-keystroke / real-click helpers built on `Element::type_str`,
+//!     `Element::click`, and `DOM.setFileInputFiles`. These generate
+//!     genuine browser events and fire React's synthetic event system
+//!     natively — fixing the bug noted in the old code where direct
+//!     `.value = ...` assignment didn't propagate to React state.
+//!   - Legacy JS-based fallback helpers (`fill_field`, `fill_by_strategies`,
+//!     `fill_custom_questions`) preserved for non-Greenhouse providers and
+//!     for emergency fallback if the schema-driven path fails.
+
 use std::collections::HashMap;
 use std::time::Duration;
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
+use chromiumoxide::cdp::browser_protocol::dom::SetFileInputFilesParams;
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 
@@ -39,16 +52,185 @@ pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
         .await
         .map_err(|e| format!("Failed to open page: {e}"))?;
 
-    // Wait for the page to be fully loaded.
+    // Initial wait for the page to start rendering.
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     Ok((browser, page))
 }
 
+/// Poll until the selector exists in the DOM or the timeout elapses.
+pub async fn wait_for_selector(page: &Page, selector: &str, timeout: Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if page.find_element(selector).await.is_ok() {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+    false
+}
+
+/// Type real keystrokes into the focused element identified by selector.
+///
+/// Uses CDP `Input.dispatchKeyEvent` (via chromiumoxide's `Element::type_str`)
+/// which fires through React's synthetic event system natively — no
+/// `nativeInputValueSetter` workaround needed.
+///
+/// Returns true if the element was found and the input was dispatched.
+pub async fn type_into(page: &Page, selector: &str, text: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    let Ok(element) = page.find_element(selector).await else {
+        return false;
+    };
+    if element.focus().await.is_err() {
+        return false;
+    }
+    element.type_str(text).await.is_ok()
+}
+
+/// Upload a file to `<input type="file">` matching selector.
+///
+/// Uses CDP `DOM.setFileInputFiles` against the element's `backend_node_id`.
+/// This is the only path that works for hidden file inputs (Greenhouse's
+/// resume input has `class="visually-hidden"` and clicking the visible
+/// "Attach Resume" button opens the native file picker).
+pub async fn set_file(page: &Page, selector: &str, path: &str) -> bool {
+    let Ok(element) = page.find_element(selector).await else {
+        return false;
+    };
+    let Ok(params) = SetFileInputFilesParams::builder()
+        .file(path.to_string())
+        .backend_node_id(element.backend_node_id)
+        .build()
+    else {
+        return false;
+    };
+    page.execute(params).await.is_ok()
+}
+
+/// Open a Greenhouse combobox and click the option whose visible label
+/// matches `option_label` (case-insensitive, trimmed).
+///
+/// Greenhouse renders selects as React-Select comboboxes:
+///   `<input id="X" role="combobox" aria-haspopup="true">` + a separate
+///   `<button aria-label="Toggle flyout">`. Options appear as `<li>` or
+///   `[role="option"]` children of the listbox after the trigger fires.
+pub async fn click_combobox_option(
+    page: &Page,
+    combobox_selector: &str,
+    option_label: &str,
+) -> bool {
+    // Focus the combobox input — typing into it filters options on
+    // many implementations, and focusing alone is enough to make the
+    // adjacent trigger button work reliably.
+    let Ok(combobox) = page.find_element(combobox_selector).await else {
+        return false;
+    };
+    let _ = combobox.focus().await;
+    let _ = combobox.click().await;
+
+    // Give React a tick to render the listbox.
+    tokio::time::sleep(Duration::from_millis(250)).await;
+
+    // Find an option in the listbox whose visible text matches the label.
+    // We use evaluate here because the listbox is rendered into a portal
+    // and the exact selector varies — React-Select uses
+    // `[id^="react-select-"][id$="-option-N"]`. We match by text content.
+    let js = format!(
+        r#"
+        (() => {{
+            const target = {target_json};
+            const norm = s => s.toLowerCase().trim();
+            const wanted = norm(target);
+
+            const options = document.querySelectorAll(
+                '[role="option"], li[id*="react-select"]'
+            );
+            for (const opt of options) {{
+                if (norm(opt.textContent || '') === wanted) {{
+                    opt.click();
+                    return true;
+                }}
+            }}
+            // Fallback: contains match.
+            for (const opt of options) {{
+                if (norm(opt.textContent || '').includes(wanted)) {{
+                    opt.click();
+                    return true;
+                }}
+            }}
+            return false;
+        }})()
+        "#,
+        target_json = serde_json::to_string(option_label).unwrap_or_default(),
+    );
+
+    page.evaluate(js)
+        .await
+        .ok()
+        .and_then(|r| r.into_value::<bool>().ok())
+        .unwrap_or(false)
+}
+
+/// Click a checkbox in a multi-select fieldset whose label matches `option_label`.
+///
+/// Greenhouse multi-selects render as:
+///   `<fieldset id="question_NNN[]" class="checkbox">
+///       <input type="checkbox" id="question_NNN[]_OPTION_ID" value="OPTION_ID"/>
+///       <label for="question_NNN[]_OPTION_ID">Option text</label>
+///       ...
+///    </fieldset>`
+///
+/// We find the label whose text matches, then click the associated input
+/// (using `for=`). Idempotent — already-checked boxes are left alone.
+pub async fn set_checkbox_in_fieldset(
+    page: &Page,
+    fieldset_selector: &str,
+    option_label: &str,
+    checked: bool,
+) -> bool {
+    let js = format!(
+        r#"
+        (() => {{
+            const fs = document.querySelector({fs_json});
+            if (!fs) return false;
+            const target = {target_json}.toLowerCase().trim();
+            const labels = fs.querySelectorAll('label');
+            for (const lab of labels) {{
+                if ((lab.textContent || '').toLowerCase().trim() === target) {{
+                    const forId = lab.getAttribute('for');
+                    if (!forId) continue;
+                    const cb = document.getElementById(forId);
+                    if (!cb) continue;
+                    const want = {want};
+                    if (cb.checked !== want) cb.click();
+                    return true;
+                }}
+            }}
+            return false;
+        }})()
+        "#,
+        fs_json = serde_json::to_string(fieldset_selector).unwrap_or_default(),
+        target_json = serde_json::to_string(option_label).unwrap_or_default(),
+        want = if checked { "true" } else { "false" },
+    );
+    page.evaluate(js)
+        .await
+        .ok()
+        .and_then(|r| r.into_value::<bool>().ok())
+        .unwrap_or(false)
+}
+
+// ── Legacy JS-based helpers (kept for non-Greenhouse providers + fallback) ──
+
 /// Try to find an input/textarea by CSS selector and fill it with text.
 /// Uses JavaScript to set the value directly, avoiding conflicts with
 /// Chrome's autofill and ensuring the full value is inserted cleanly.
-/// Returns true if the field was found and filled.
+///
+/// NOTE: this is the React-incompatible path. For Greenhouse, prefer
+/// `type_into()` which uses real CDP keystrokes.
 pub async fn fill_field(page: &Page, selector: &str, value: &str) -> bool {
     if value.is_empty() {
         return false;
@@ -77,11 +259,8 @@ pub async fn fill_field(page: &Page, selector: &str, value: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Try to find an input field by various strategies:
-/// 1. By id
-/// 2. By name attribute
-/// 3. By label text (using aria or for= association)
-/// Returns true if found and filled.
+/// Try multiple selectors in order; return true on first hit.
+#[allow(dead_code)]
 pub async fn fill_by_strategies(
     page: &Page,
     strategies: &[&str],
@@ -95,21 +274,13 @@ pub async fn fill_by_strategies(
     false
 }
 
-/// Fill custom question textareas using pre-generated answers.
-///
-/// Greenhouse renders custom questions as textarea or input elements
-/// with associated labels. We match answer keys against label text
-/// (case-insensitive, substring match) and fill matching fields.
-///
-/// Returns the number of fields successfully filled.
+/// Legacy label-text matching for custom-question textareas.
+/// Used by non-Greenhouse ATSes; the Greenhouse path uses the JSON schema.
+#[allow(dead_code)]
 pub async fn fill_custom_questions(page: &Page, answers: &HashMap<String, String>) -> u32 {
     let mut filled = 0u32;
 
-    // Use JavaScript to find all textareas and large inputs with labels,
-    // then match them against our answer keys.
     for (question, answer) in answers {
-        // Try to find a textarea or input whose label contains the question text.
-        // We use JavaScript here because matching by label text requires DOM traversal.
         let js = format!(
             r#"
             (() => {{
@@ -124,7 +295,6 @@ pub async fn fill_custom_questions(page: &Page, answers: &HashMap<String, String
                                 return forId;
                             }}
                         }}
-                        // Try sibling/child textarea.
                         const parent = label.closest('.field') || label.parentElement;
                         if (parent) {{
                             const ta = parent.querySelector('textarea, input[type="text"]');
@@ -149,24 +319,4 @@ pub async fn fill_custom_questions(page: &Page, answers: &HashMap<String, String
     }
 
     filled
-}
-
-/// Upload a file to an input[type="file"] element.
-#[allow(dead_code)]
-pub async fn upload_file(page: &Page, selector: &str, path: &str) -> bool {
-    let Ok(element) = page.find_element(selector).await else {
-        return false;
-    };
-
-    // Use CDP to set file input — chromiumoxide exposes this through
-    // the element's underlying node.
-    let _ = element
-        .click()
-        .await;
-
-    // File upload via CDP requires DOM.setFileInputFiles.
-    // For now, we'll skip this — the user can drag-drop their CV.
-    // TODO: Implement CDP file upload when needed.
-    let _ = path;
-    false
 }
