@@ -8,9 +8,25 @@
 //! Verified against 13 distinct Greenhouse-resolved companies during the
 //! form-anatomy survey (see `context/references/greenhouse-form-anatomy.md`).
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 const API_HOST: &str = "https://boards-api.greenhouse.io";
+
+/// Turn an explicit JSON `null` into `T::default()`.
+///
+/// `#[serde(default)]` alone handles only missing keys; the Greenhouse API
+/// surfaces *present-and-null* fields for empty collections (e.g.
+/// `"compliance": null` on jobs with no EEOC block — Proton 4585460101).
+/// Without this helper, those nulls fail deserialization into a `Vec<_>`
+/// with `parse: error decoding response body`.
+fn null_to_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    let opt = Option::<T>::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
 
 /// Full job + form schema as returned by the Greenhouse Job Board API.
 #[derive(Debug, Deserialize)]
@@ -30,11 +46,11 @@ pub struct JobSchema {
     pub absolute_url: Option<String>,
 
     /// Main application form questions.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub questions: Vec<Question>,
 
     /// Geolocation block (lat/long hidden + location text).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub location_questions: Vec<Question>,
 
     /// Company-defined diversity survey (different schema — see DemographicQuestion).
@@ -42,7 +58,8 @@ pub struct JobSchema {
     pub demographic_questions: Option<DemographicBlock>,
 
     /// Legally-mandated compliance sections (EEOC, etc.). Each has a type tag.
-    #[serde(default)]
+    /// Present-and-null on jobs with no compliance block (e.g. Proton).
+    #[serde(default, deserialize_with = "null_to_default")]
     pub compliance: Vec<ComplianceSection>,
 }
 
@@ -55,7 +72,7 @@ pub struct Question {
     pub label: String,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub fields: Vec<Field>,
 }
 
@@ -64,7 +81,7 @@ pub struct Field {
     pub name: String,
     #[serde(rename = "type")]
     pub field_type: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub values: Vec<FieldOption>,
 }
 
@@ -115,7 +132,7 @@ pub struct DemographicBlock {
     pub title: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub questions: Vec<DemographicQuestion>,
 }
 
@@ -129,7 +146,7 @@ pub struct DemographicQuestion {
     pub required: bool,
     #[serde(default)]
     pub answer_type: Option<AnswerType>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub answer_options: Vec<AnswerOption>,
 }
 
@@ -162,7 +179,7 @@ pub struct ComplianceSection {
     pub kind: String,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub questions: Vec<Question>,
 }
 
@@ -314,6 +331,46 @@ mod tests {
     #[test]
     fn returns_none_for_unrelated_url() {
         assert!(parse_url("https://stripe.com/jobs/search?gh_jid=7531158").is_none());
+    }
+
+    #[test]
+    fn deserializes_null_compliance_and_demographic() {
+        // Proton job 4585460101 returns `"compliance": null` and
+        // `"demographic_questions": null`. Without the null_to_default
+        // helper, this fails with "parse: error decoding response body".
+        let payload = r#"{
+            "id": 4585460101,
+            "title": "Rust Software Engineer",
+            "questions": [
+                {
+                    "label": "First Name",
+                    "required": true,
+                    "fields": [{"name": "first_name", "type": "input_text", "values": []}]
+                }
+            ],
+            "location_questions": [],
+            "demographic_questions": null,
+            "compliance": null
+        }"#;
+        let schema: JobSchema = serde_json::from_str(payload).expect("must deserialize");
+        assert_eq!(schema.questions.len(), 1);
+        assert!(schema.compliance.is_empty());
+        assert!(schema.demographic_questions.is_none());
+    }
+
+    #[test]
+    fn deserializes_null_question_fields() {
+        // Defensive: if a question itself has `"fields": null` we still cope.
+        let payload = r#"{
+            "id": 1,
+            "title": "t",
+            "questions": [
+                {"label": "L", "fields": null}
+            ]
+        }"#;
+        let schema: JobSchema = serde_json::from_str(payload).expect("must deserialize");
+        assert_eq!(schema.questions.len(), 1);
+        assert!(schema.questions[0].fields.is_empty());
     }
 
     #[test]
