@@ -22,6 +22,13 @@ pub struct JobSchema {
     #[serde(default)]
     pub language: Option<String>,
 
+    /// Canonical Greenhouse-hosted URL for this job. The autofill navigates
+    /// here rather than to whatever wrapper URL the DB carried — fixes the
+    /// case where a custom-domain wrapper page (HRT, GSA, Squarepoint)
+    /// doesn't itself render the form.
+    #[serde(default)]
+    pub absolute_url: Option<String>,
+
     /// Main application form questions.
     #[serde(default)]
     pub questions: Vec<Question>,

@@ -69,8 +69,14 @@ pub async fn fill(
         }
     };
 
-    // ── Step 2: launch browser ──
-    let (browser, page) = match common::launch_and_navigate(job_url).await {
+    // ── Step 2: launch browser at the canonical Greenhouse URL ──
+    // The schema's `absolute_url` is the canonical job-boards.greenhouse.io
+    // URL. Use it in preference to whatever wrapper URL the DB carried:
+    // custom-domain pages (HRT, GSA, Squarepoint) often don't render the
+    // form on their wrapper page, so navigating there leaves the autofill
+    // with nothing to fill.
+    let navigate_url = schema.absolute_url.as_deref().unwrap_or(job_url);
+    let (browser, page) = match common::launch_and_navigate(navigate_url).await {
         Ok(result) => result,
         Err(e) => return AutofillResult::BrowserError(e),
     };
@@ -84,6 +90,7 @@ pub async fn fill(
 
     // Pre-index the package answers by normalised label for fast lookup.
     let answer_index = build_answer_index(answers);
+    let company_name = schema.company_name.clone();
 
     let mut filled = 0u32;
     let mut skipped = 0u32;
@@ -91,7 +98,7 @@ pub async fn fill(
     // ── Step 3: main `questions[]` ──
     let mut prev_answer: Option<String> = None;
     for question in &schema.questions {
-        match fill_question(&page, question, profile, &answer_index, &prev_answer).await {
+        match fill_question(&page, question, profile, &answer_index, &company_name, &prev_answer).await {
             FillOutcome::Filled(answer_snapshot) => {
                 filled += 1;
                 prev_answer = answer_snapshot;
@@ -172,6 +179,7 @@ async fn fill_question(
     question: &Question,
     profile: &ApplicantProfile,
     answer_index: &HashMap<String, String>,
+    company_name: &str,
     prev_answer: &Option<String>,
 ) -> FillOutcome {
     let Some(field) = question.fields.first() else {
@@ -196,11 +204,20 @@ async fn fill_question(
         }
     }
 
-    // Resolve answer: first try the standard-field map (by field.name),
-    // then fall back to label match against the answer index.
+    // Resolve answer in priority order:
+    //   1. Standard field name (e.g. `first_name` → profile.first_name)
+    //   2. Exact match of normalised label against package keys
+    //   3. Semantic-key fallback (prepare-applications writes domain-aware
+    //      keys like `why_company`, `cover_letter`; we map those to common
+    //      Greenhouse label patterns at fill time)
+    let normalised = normalise_label(&question.label);
     let answer = profile_field(profile, &field.name)
         .map(str::to_string)
-        .or_else(|| answer_index.get(&normalise_label(&question.label)).cloned());
+        .or_else(|| answer_index.get(&normalised).cloned())
+        .or_else(|| {
+            match_semantic_key(&normalised, company_name)
+                .and_then(|key| answer_index.get(key).cloned())
+        });
 
     let Some(answer) = answer else {
         return FillOutcome::Skipped;
@@ -370,6 +387,88 @@ fn is_soft_conditional(label: &str) -> bool {
     SOFT_CONDITIONAL_PREFIXES.iter().any(|p| l.starts_with(p))
 }
 
+/// Map a Greenhouse question label to a `prepare-applications` semantic key.
+///
+/// The skill writes JSON with fixed keys (`why_company`, `why_interested`,
+/// `technical_project`, `cover_letter`). The autofill matches the schema's
+/// per-question labels — they don't align directly, so we bridge here.
+///
+/// Returns the matching semantic key if the label fits a known pattern.
+/// The semantic key vocabulary is closed and documented in the
+/// prepare-applications skill body.
+fn match_semantic_key(normalised_label: &str, company_name: &str) -> Option<&'static str> {
+    let company_lower = company_name.to_lowercase();
+    let has_company = !company_lower.is_empty()
+        && normalised_label.contains(&company_lower);
+
+    // ── why_company ──
+    // "Why Anthropic?", "Why do you want to work at X?",
+    // "What is it about Proton that excites you?"
+    if has_company
+        && (normalised_label.contains("why")
+            || normalised_label.contains("excites")
+            || normalised_label.contains("about"))
+    {
+        return Some("why_company");
+    }
+    if normalised_label.contains("why")
+        && (normalised_label.contains("work at")
+            || normalised_label.contains("work here")
+            || normalised_label.contains("join us")
+            || normalised_label.contains("join the team"))
+    {
+        return Some("why_company");
+    }
+
+    // ── why_interested ──
+    // "Why this role?", "Why are you interested?",
+    // "Why does this track interest you?"
+    if normalised_label.contains("why")
+        && (normalised_label.contains("interested")
+            || normalised_label.contains("this role")
+            || normalised_label.contains("this position")
+            || normalised_label.contains("this opportunity")
+            || normalised_label.contains("this track")
+            || normalised_label.contains("this team")
+            || normalised_label.contains("good fit"))
+    {
+        return Some("why_interested");
+    }
+    if normalised_label.contains("applied for this role")
+        || normalised_label.contains("apply for this role")
+    {
+        return Some("why_interested");
+    }
+
+    // ── technical_project ──
+    // "Tell us about a technical project you've worked on",
+    // "Describe a project you've built",
+    // "Outline a highly scalable system you developed"
+    if normalised_label.contains("technical project")
+        || normalised_label.contains("describe a project")
+        || normalised_label.contains("scalable system")
+        || normalised_label.contains("system you")
+        || (normalised_label.contains("project") && normalised_label.contains("worked on"))
+        || (normalised_label.contains("project") && normalised_label.contains("built"))
+        || (normalised_label.contains("project") && normalised_label.contains("developed"))
+    {
+        return Some("technical_project");
+    }
+
+    // ── cover_letter ──
+    // "Cover Letter" / "Additional Information" textareas where the
+    // recruiter is asking for an essay. The standard field name
+    // `cover_letter_text` is already handled by the file-or-text routing.
+    if normalised_label == "additional information"
+        || normalised_label == "anything else you want to share?"
+        || normalised_label == "anything else you want to share"
+    {
+        return Some("cover_letter");
+    }
+
+    None
+}
+
 /// Map a Greenhouse-standard field name to the corresponding profile field.
 /// Returns the value, or None if the field name is custom (matched by label
 /// against the answer index instead).
@@ -462,5 +561,92 @@ mod tests {
     fn css_escape_handles_brackets() {
         assert_eq!(css_escape_id("question_123[]"), "question_123\\[\\]");
         assert_eq!(css_escape_id("first_name"), "first_name");
+    }
+
+    #[test]
+    fn semantic_match_why_company_with_name() {
+        assert_eq!(
+            match_semantic_key(&normalise_label("Why Anthropic?"), "Anthropic"),
+            Some("why_company")
+        );
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("What is it about Proton that excites you?"),
+                "Proton"
+            ),
+            Some("why_company")
+        );
+    }
+
+    #[test]
+    fn semantic_match_why_company_without_name() {
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Why do you want to work at this company?"),
+                "Anthropic"
+            ),
+            Some("why_company")
+        );
+    }
+
+    #[test]
+    fn semantic_match_why_interested() {
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Why do you think this role is a good fit for you?"),
+                "Proton"
+            ),
+            Some("why_interested")
+        );
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Why does this track interest you?"),
+                "Squarepoint Capital"
+            ),
+            Some("why_interested")
+        );
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Please briefly highlight why you have applied for this role specifically at XTX."),
+                "XTX Markets"
+            ),
+            Some("why_interested")
+        );
+    }
+
+    #[test]
+    fn semantic_match_technical_project() {
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Tell us about a technical project you've worked on."),
+                "Generic"
+            ),
+            Some("technical_project")
+        );
+        assert_eq!(
+            match_semantic_key(
+                &normalise_label("Please briefly outline a highly scalable system that you have played a significant role in developing"),
+                "XTX Markets"
+            ),
+            Some("technical_project")
+        );
+    }
+
+    #[test]
+    fn semantic_match_cover_letter_overflow() {
+        assert_eq!(
+            match_semantic_key(&normalise_label("Additional Information"), "Anthropic"),
+            Some("cover_letter")
+        );
+    }
+
+    #[test]
+    fn semantic_match_returns_none_on_unrelated() {
+        assert_eq!(match_semantic_key(&normalise_label("First Name"), "Anthropic"), None);
+        assert_eq!(match_semantic_key(&normalise_label("Phone"), "Anthropic"), None);
+        assert_eq!(
+            match_semantic_key(&normalise_label("Salary expectations"), "Anthropic"),
+            None
+        );
     }
 }
