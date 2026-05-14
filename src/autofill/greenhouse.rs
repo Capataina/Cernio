@@ -137,6 +137,14 @@ pub async fn fill(
     let mut filled = 0u32;
     let mut skipped = 0u32;
 
+    // Track which semantic keys have already been used on this form so we
+    // don't write the same answer twice. Example: "Cover Letter" file input
+    // and "Anything else you want to share?" textarea both resolve to the
+    // `cover_letter` package key via the matcher; without this set, the
+    // cover letter ends up in both, which reads as redundant AI output.
+    let mut consumed_semantic_keys: std::collections::HashSet<&'static str> =
+        std::collections::HashSet::new();
+
     // ── Step 3: main `questions[]` ──
     crate::tel!("gh_questions_phase_start", "count": schema.questions.len());
     let mut prev_answer: Option<String> = None;
@@ -144,7 +152,17 @@ pub async fn fill(
         let q_label = question.label.clone();
         let field_name = question.fields.first().map(|f| f.name.clone()).unwrap_or_default();
         let field_type = question.fields.first().map(|f| f.field_type.clone()).unwrap_or_default();
-        match fill_question(&page, question, profile, &answer_index, &company_name, &prev_answer).await {
+        match fill_question(
+            &page,
+            question,
+            profile,
+            &answer_index,
+            &company_name,
+            &prev_answer,
+            &mut consumed_semantic_keys,
+        )
+        .await
+        {
             FillOutcome::Filled(answer_snapshot) => {
                 crate::tel!(
                     "gh_question_filled",
@@ -249,6 +267,7 @@ async fn fill_question(
     answer_index: &HashMap<String, String>,
     company_name: &str,
     prev_answer: &Option<String>,
+    consumed_keys: &mut std::collections::HashSet<&'static str>,
 ) -> FillOutcome {
     let Some(field) = question.fields.first() else {
         return FillOutcome::Skipped;
@@ -298,19 +317,35 @@ async fn fill_question(
     //   3. Semantic-key fallback (prepare-applications writes domain-aware
     //      keys like `why_company`, `cover_letter`; we map those to common
     //      Greenhouse label patterns at fill time)
-    let answer = profile_field(profile, &field.name)
-        .map(str::to_string)
-        .or_else(|| answer_index.get(&normalised).cloned())
-        .or_else(|| {
-            match_semantic_key(&normalised, company_name)
-                .and_then(|key| answer_index.get(key).cloned())
-        });
+    //
+    // Track which semantic key (if any) was consumed for this field, so the
+    // caller can mark it used and prevent the same answer from being
+    // written into a second field that happens to match the same key.
+    let (answer, semantic_key_used) = {
+        if let Some(v) = profile_field(profile, &field.name) {
+            (Some(v.to_string()), None)
+        } else if let Some(v) = answer_index.get(&normalised).cloned() {
+            (Some(v), None)
+        } else if let Some(key) = match_semantic_key(&normalised, company_name) {
+            if consumed_keys.contains(key) {
+                // Already used elsewhere on this form. Skip rather than
+                // duplicate the same essay across multiple fields.
+                (None, None)
+            } else if let Some(v) = answer_index.get(key).cloned() {
+                (Some(v), Some(key))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    };
 
     let Some(answer) = answer else {
         return FillOutcome::Skipped;
     };
 
-    match field.kind() {
+    let outcome = match field.kind() {
         FieldKind::InputText => {
             // Greenhouse uses `input_text` for some questions whose answers
             // are essay-length (e.g. Proton's "Why is this role a good fit"
@@ -379,7 +414,17 @@ async fn fill_question(
             }
         }
         FieldKind::InputHidden | FieldKind::Unknown => FillOutcome::Skipped,
+    };
+
+    // Mark the semantic key as consumed only if the field was actually
+    // filled — a skipped fill (selector not found, focus broken, etc.)
+    // does not consume the key, so a later field can retry it.
+    if matches!(outcome, FillOutcome::Filled(_)) {
+        if let Some(key) = semantic_key_used {
+            consumed_keys.insert(key);
+        }
     }
+    outcome
 }
 
 /// Pick the closest matching option label in `values` for the given answer.

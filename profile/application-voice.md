@@ -120,7 +120,26 @@ Consistency matters more than the specific choice. Caner's spoken voice and CV a
 > [!tip] The asymmetry
 > Underselling a real achievement reads as **hedging**. A measurable outcome stated plainly reads as **confidence**. Claiming something that isn't there reads as **fabrication**, and the reader can spot it faster than the writer thinks.
 
-### 2.8 No fawning, no pleading
+### 2.8 No redundancy across fields
+
+If a form has a dedicated field for some information (visa status, GPA, current employer, start date, salary, etc.), the cover letter and free-text essays should not repeat that information. Recruiters skim cover letters AND the structured fields, and seeing the same fact in both reads as machine-generated boilerplate that doesn't realise the structured field exists.
+
+The pattern lands worst when the duplicate is in "Anything else you want to share?". That field is the recruiter's read of "what didn't fit elsewhere" — putting the visa note there when the form already asked it explicitly is a textbook AI tell.
+
+The discipline: when generating cover letters and free-text essays, treat the rest of the form as already containing the structured facts. Don't repeat what the form already asks for in dedicated fields:
+
+| Information | Lives in (structured) | Don't repeat in (free text) |
+|---|---|---|
+| Visa status, work permit | The "right to work" / "permit type" fields | Cover letter, "anything else" |
+| Salary expectation | The salary number / currency / unit fields | Cover letter |
+| Start date / notice period | The "when can you start" field | Cover letter |
+| Office location preference | The "preferred office" field | Cover letter |
+| Years of experience with specific tech | The "years of X" field | The essay answers (they should focus on what was built, not how long) |
+| Education credentials | The graduation year / GPA fields | Cover letter (unless an academic credential is genuinely load-bearing for the role) |
+
+The exception: when the structured field is missing or the form is unusually thin. If the form has no visa field but the role is in a country where visa status is decision-shaping, the cover letter is the right place to mention it. Default behaviour is "trust the form to ask the structured questions, don't pre-empt them".
+
+### 2.9 No fawning, no pleading
 
 > [!warning] The single biggest tonal trap in cover letters
 > Echoing the company's own marketing language back to them, name-dropping scale or pedigree as if reverent of it, and praising the company as exceptional reads as **performative impressment**. Recruiters see this on every templated application; it is the loudest "this candidate is desperate" signal in the genre.

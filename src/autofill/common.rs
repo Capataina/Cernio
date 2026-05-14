@@ -68,7 +68,12 @@ pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
         // Stealth additions:
         .arg("--disable-blink-features=AutomationControlled")
         .arg("--no-default-browser-check")
-        .arg("--start-maximized")
+        // `--start-maximized` is unreliable on macOS (the OS doesn't have
+        // a true "maximize" — the green button does "zoom", which Chrome
+        // doesn't see). Set an explicit large window size that fits any
+        // modern display; user can fullscreen manually if they want.
+        .arg("--window-size=1600,1100")
+        .arg("--window-position=80,40")
         .build()
         .map_err(|e| {
             crate::tel!("chrome_config_error", "error": e.clone());
