@@ -16,7 +16,7 @@ const API_HOST: &str = "https://boards-api.greenhouse.io";
 ///
 /// `#[serde(default)]` alone handles only missing keys; the Greenhouse API
 /// surfaces *present-and-null* fields for empty collections (e.g.
-/// `"compliance": null` on jobs with no EEOC block — Proton 4585460101).
+/// `"compliance": null` on jobs with no EEOC block).
 /// Without this helper, those nulls fail deserialization into a `Vec<_>`
 /// with `parse: error decoding response body`.
 fn null_to_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -26,6 +26,53 @@ where
 {
     let opt = Option::<T>::deserialize(deserializer)?;
     Ok(opt.unwrap_or_default())
+}
+
+/// Accept either a JSON string or a JSON number and return it as a `String`.
+///
+/// Proton's form (job 4585460101) returns `FieldOption.value` as a number
+/// for several options (e.g. `{"label": "gross annual", "value": 37551344101}`)
+/// while most other forms return strings. The autofill always stringifies
+/// the value before sending it to the page anyway, so coercing to `String`
+/// at deserialize time is lossless.
+fn string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Visitor;
+    use std::fmt;
+
+    struct V;
+    impl<'de> Visitor<'de> for V {
+        type Value = String;
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a string or a number")
+        }
+        fn visit_str<E>(self, v: &str) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_string<E>(self, v: String) -> Result<String, E> {
+            Ok(v)
+        }
+        fn visit_i64<E>(self, v: i64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_u64<E>(self, v: u64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_f64<E>(self, v: f64) -> Result<String, E> {
+            // Avoid scientific notation for IDs that fit in i64/u64.
+            if v.fract() == 0.0 && v.abs() < (i64::MAX as f64) {
+                Ok((v as i64).to_string())
+            } else {
+                Ok(v.to_string())
+            }
+        }
+        fn visit_bool<E>(self, v: bool) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+    }
+    deserializer.deserialize_any(V)
 }
 
 /// Full job + form schema as returned by the Greenhouse Job Board API.
@@ -88,6 +135,10 @@ pub struct Field {
 #[derive(Debug, Deserialize, Clone)]
 pub struct FieldOption {
     pub label: String,
+    /// String or number. Proton returns numeric IDs for some options
+    /// (e.g. compensation-currency multi_value_single_select); other
+    /// forms return strings. `string_or_number` coerces both to String.
+    #[serde(deserialize_with = "string_or_number")]
     pub value: String,
 }
 
@@ -356,6 +407,37 @@ mod tests {
         assert_eq!(schema.questions.len(), 1);
         assert!(schema.compliance.is_empty());
         assert!(schema.demographic_questions.is_none());
+    }
+
+    #[test]
+    fn deserializes_field_option_value_as_number() {
+        // Proton (job 4585460101) returns numeric values for some
+        // FieldOption.value fields. Coercing string-or-number to
+        // String is required; otherwise the schema fetch fails with
+        // `invalid type: integer X, expected a string`.
+        let payload = r#"{
+            "id": 1,
+            "title": "t",
+            "questions": [
+                {
+                    "label": "Compensation currency",
+                    "fields": [{
+                        "name": "currency",
+                        "type": "multi_value_single_select",
+                        "values": [
+                            {"label": "gross annual", "value": 37551344101},
+                            {"label": "CHF", "value": 37551344201},
+                            {"label": "Already a string", "value": "USD"}
+                        ]
+                    }]
+                }
+            ]
+        }"#;
+        let schema: JobSchema = serde_json::from_str(payload).expect("must deserialize");
+        let opts = &schema.questions[0].fields[0].values;
+        assert_eq!(opts[0].value, "37551344101");
+        assert_eq!(opts[1].value, "37551344201");
+        assert_eq!(opts[2].value, "USD");
     }
 
     #[test]
