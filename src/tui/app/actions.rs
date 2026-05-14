@@ -168,9 +168,17 @@ impl App {
                     )
                     .ok();
 
+                // CAST(... AS TEXT) defends against rows that were ever
+                // inserted via `sqlite3` shell's readfile() (or any other
+                // path that stored the answers as BLOB through SQLite's
+                // type-affinity coercion). row.get::<_, String> rejects
+                // BLOB-typed values and would silently return None,
+                // producing the "no package" gate failure observed in
+                // session-1778793032.jsonl event [118] despite the row
+                // being physically present.
                 let answers = conn
                     .query_row(
-                        "SELECT answers FROM application_packages WHERE job_id = ?1",
+                        "SELECT CAST(answers AS TEXT) FROM application_packages WHERE job_id = ?1",
                         rusqlite::params![job_id],
                         |row| row.get::<_, String>(0),
                     )
