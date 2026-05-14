@@ -28,17 +28,26 @@ const CHROME_PATH: &str =
 /// The browser is visible (not headless) so the user can see the form
 /// being filled and take over for review and submission.
 pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
+    crate::tel!("chrome_config_build", "chrome_path": CHROME_PATH);
+
     let config = BrowserConfig::builder()
         .chrome_executable(CHROME_PATH)
         .with_head()
         .arg("--disable-blink-features=AutomationControlled")
         .arg("--start-maximized")
         .build()
-        .map_err(|e| format!("Failed to build browser config: {e}"))?;
+        .map_err(|e| {
+            crate::tel!("chrome_config_error", "error": e.clone());
+            format!("Failed to build browser config: {e}")
+        })?;
 
-    let (browser, mut handler) = Browser::launch(config)
-        .await
-        .map_err(|e| format!("Failed to launch Chrome: {e}"))?;
+    crate::tel!("chrome_launch_start");
+    let (browser, mut handler) = Browser::launch(config).await.map_err(|e| {
+        let msg = e.to_string();
+        crate::tel!("chrome_launch_error", "error": msg.clone());
+        format!("Failed to launch Chrome: {msg}")
+    })?;
+    crate::tel!("chrome_launched");
 
     // Spawn the CDP handler — manages websocket communication with Chrome.
     tokio::spawn(async move {
@@ -47,10 +56,13 @@ pub async fn launch_and_navigate(url: &str) -> Result<(Browser, Page), String> {
         }
     });
 
-    let page = browser
-        .new_page(url)
-        .await
-        .map_err(|e| format!("Failed to open page: {e}"))?;
+    crate::tel!("chrome_new_page_start", "url": url);
+    let page = browser.new_page(url).await.map_err(|e| {
+        let msg = e.to_string();
+        crate::tel!("chrome_new_page_error", "url": url, "error": msg.clone());
+        format!("Failed to open page: {msg}")
+    })?;
+    crate::tel!("chrome_new_page_ready");
 
     // Initial wait for the page to start rendering.
     tokio::time::sleep(Duration::from_secs(2)).await;

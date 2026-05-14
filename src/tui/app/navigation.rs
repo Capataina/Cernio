@@ -221,10 +221,19 @@ impl App {
 
     pub fn enter_company_jobs(&mut self) {
         let Some(company) = self.selected_company() else {
+            crate::tel!("enter_company_jobs_no_selection");
             return;
         };
         let id = company.id;
         let name = company.name.clone();
+        crate::tel!(
+            "view_change",
+            "from": format!("{:?}", self.view),
+            "to": "Jobs",
+            "reason": "enter_company_jobs",
+            "company_id": id,
+            "company_name": &name,
+        );
 
         self.job_filter_company = Some(id);
         self.job_filter_company_name = Some(name);
@@ -234,6 +243,7 @@ impl App {
 
         if let Ok(conn) = Connection::open(&self.db_path) {
             self.jobs = queries::fetch_jobs(&conn, self.job_filter_company, &self.filters, self.sort_mode);
+            crate::tel!("enter_company_jobs_done", "jobs_count": self.jobs.len());
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));
@@ -245,10 +255,16 @@ impl App {
         if self.job_filter_company.is_none() {
             return;
         }
+        crate::tel!(
+            "clear_job_filter",
+            "prev_company_id": self.job_filter_company,
+            "prev_company_name": self.job_filter_company_name.as_deref(),
+        );
         self.job_filter_company = None;
         self.job_filter_company_name = None;
         if let Ok(conn) = Connection::open(&self.db_path) {
             self.jobs = queries::fetch_jobs(&conn, None, &self.filters, self.sort_mode);
+            crate::tel!("clear_job_filter_done", "jobs_count": self.jobs.len());
             self.job_state = TableState::default();
             if !self.jobs.is_empty() {
                 self.job_state.select(Some(0));

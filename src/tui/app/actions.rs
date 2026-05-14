@@ -10,25 +10,44 @@ impl App {
     /// Apply a decision to all selected jobs (multi or single).
     pub fn record_decision_multi(&mut self, decision: &str) {
         let ids = self.selected_job_ids();
-        if ids.is_empty() { return; }
+        crate::tel!(
+            "decision_record_start",
+            "decision": decision,
+            "job_ids": &ids,
+            "count": ids.len(),
+        );
+        if ids.is_empty() {
+            crate::tel!("decision_record_empty");
+            return;
+        }
 
         let count = ids.len();
         if let Ok(conn) = Connection::open(&self.db_path) {
             let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
             for id in &ids {
-                let _ = conn.execute(
+                let insert_result = conn.execute(
                     "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
                     rusqlite::params![id, decision, now],
                 );
+                crate::tel!(
+                    "db_user_decisions_insert",
+                    "job_id": id,
+                    "decision": decision,
+                    "rows": insert_result.unwrap_or(0),
+                );
 
-                // Clean up application package when a job is marked applied.
+                // NOTE: previously this branch DELETEd from application_packages
+                // when a job was marked "applied". That fired on every `p` press
+                // (autofill auto-marks applied) and wiped the package mid-run,
+                // making any retry impossible. Removed — packages are small and
+                // keeping them around is harmless. A `cernio clean --packages`
+                // command can sweep stale entries if needed later.
                 if decision == "applied" {
-                    let _ = conn.execute(
-                        "DELETE FROM application_packages WHERE job_id = ?1",
-                        rusqlite::params![id],
-                    );
+                    crate::tel!("decision_applied_no_delete", "job_id": id);
                 }
             }
+        } else {
+            crate::tel!("decision_record_db_open_failed");
         }
         if count == 1 {
             let icon = match decision {
@@ -43,6 +62,7 @@ impl App {
             self.add_toast(format!("{decision} {count} jobs"));
         }
         self.multi_select_jobs.clear();
+        crate::tel!("decision_record_done", "decision": decision, "count": count);
         self.refresh();
     }
 
@@ -85,32 +105,58 @@ impl App {
             ),
             View::Dashboard | View::Pipeline | View::Activity => (None, false),
         };
+        crate::tel!(
+            "open_url_attempt",
+            "view": format!("{:?}", self.view),
+            "url": url.as_deref(),
+            "is_job": is_job,
+        );
         if let Some(url) = url {
-            let _ = std::process::Command::new("open").arg(&url).spawn();
+            let spawn_result = std::process::Command::new("open").arg(&url).spawn();
+            match spawn_result {
+                Ok(_) => crate::tel!("open_url_spawn_ok", "url": url.clone()),
+                Err(e) => crate::tel!("open_url_spawn_error", "url": url.clone(), "error": e.to_string()),
+            }
 
             // Auto-mark as applied when opening a job URL.
             if is_job {
                 self.record_decision_multi("applied");
             }
+        } else {
+            crate::tel!("open_url_no_url");
         }
     }
 
     /// Launch autofill for the selected job — opens Chrome with the
     /// application form pre-filled from the user's profile.
     pub fn autofill_selected_job(&mut self) {
+        crate::tel!("autofill_invoke_attempt", "view": format!("{:?}", self.view));
         if self.view != View::Jobs {
+            crate::tel!("autofill_blocked_not_jobs_view", "view": format!("{:?}", self.view));
             return;
         }
 
         let Some(job) = self.selected_job() else {
+            crate::tel!("autofill_blocked_no_selected_job");
             return;
         };
 
         let job_url = job.url.clone();
         let job_id = job.id;
         let company_id = job.company_id;
+        let job_title = job.title.clone();
+        let job_company = job.company_name.clone();
+        crate::tel!(
+            "autofill_target",
+            "job_id": job_id,
+            "company_id": company_id,
+            "title": job_title.clone(),
+            "company": job_company.clone(),
+            "url": job_url.clone(),
+        );
 
         // Look up the ATS provider, slug, and application package from the DB.
+        let lookup_start = std::time::Instant::now();
         let (ats_provider, ats_slug, package_answers) =
             if let Ok(conn) = Connection::open(&self.db_path) {
                 let portal = conn
@@ -136,8 +182,17 @@ impl App {
                 };
                 (provider, slug, answers)
             } else {
+                crate::tel!("autofill_db_open_failed", "db_path": self.db_path.display().to_string());
                 (None, None, None)
             };
+        crate::tel!(
+            "autofill_db_lookup",
+            "duration_ms": lookup_start.elapsed().as_millis() as u64,
+            "provider": ats_provider.as_deref(),
+            "slug": ats_slug.as_deref(),
+            "has_package": package_answers.is_some(),
+            "package_chars": package_answers.as_deref().map(|s| s.len()).unwrap_or(0),
+        );
 
         // ── Gate: provider must support autofill ──
         // Anything not currently autofillable is inert under `p` — no browser
@@ -148,15 +203,18 @@ impl App {
                 None => "Autofill unavailable: no ATS portal recorded — use `o` to open".to_string(),
                 Some(p) => format!("Autofill not supported for {p} — use `o` to open"),
             };
+            crate::tel!(
+                "autofill_gate_unsupported_provider",
+                "provider": provider_str,
+                "toast": msg.clone(),
+            );
             self.add_toast(msg);
             return;
         }
 
         // ── Gate: an application package must be prepared ──
-        // Without prepared answers the autofill can only do standard fields,
-        // which isn't the experience the user wants under `p`. Use the
-        // prepare-applications skill first.
         let Some(package_answers) = package_answers else {
+            crate::tel!("autofill_gate_no_package", "job_id": job_id);
             self.add_toast(
                 "No application package for this job — run prepare-applications first".to_string(),
             );
@@ -164,25 +222,80 @@ impl App {
         };
 
         // Spawn the autofill on the Tokio runtime (no stderr output — TUI is in raw mode).
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            handle.spawn(async move {
-                let profile = crate::autofill::ApplicantProfile::load(
-                    std::path::Path::new("profile"),
+        let handle_result = tokio::runtime::Handle::try_current();
+        match handle_result {
+            Err(e) => {
+                // Without a running runtime the spawn would silently no-op. Surface this loudly.
+                crate::tel!(
+                    "autofill_tokio_handle_acquire_failed",
+                    "error": e.to_string(),
                 );
-                let _ = crate::autofill::fill_application(
-                    &job_url,
-                    Some("greenhouse"),
-                    ats_slug.as_deref(),
-                    &profile,
-                    Some(package_answers.as_str()),
-                )
-                .await;
-            });
+                self.add_toast("Autofill cannot start — no Tokio runtime available".to_string());
+                return;
+            }
+            Ok(handle) => {
+                crate::tel!("autofill_spawn_start", "job_id": job_id);
+                handle.spawn(async move {
+                    crate::tel!("autofill_task_running", "job_id": job_id);
+                    let profile = crate::autofill::ApplicantProfile::load(
+                        std::path::Path::new("profile"),
+                    );
+                    crate::tel!(
+                        "autofill_profile_loaded",
+                        "job_id": job_id,
+                        "first_name": &profile.first_name,
+                        "last_name": &profile.last_name,
+                        "email": &profile.email,
+                        "phone": &profile.phone,
+                        "resume_path": profile.resume_path.as_deref(),
+                    );
+                    let result = crate::autofill::fill_application(
+                        &job_url,
+                        Some("greenhouse"),
+                        ats_slug.as_deref(),
+                        &profile,
+                        Some(package_answers.as_str()),
+                    )
+                    .await;
+                    // Telemetry-anchor the AutofillResult rather than dropping it
+                    // with `let _`. Previously this was silent on failure, which
+                    // is why pressing p with a broken autofill produced no
+                    // visible error.
+                    match &result {
+                        crate::autofill::AutofillResult::Success { fields_filled } => {
+                            crate::tel!(
+                                "autofill_task_completed",
+                                "job_id": job_id,
+                                "outcome": "success",
+                                "fields_filled": fields_filled,
+                            );
+                        }
+                        crate::autofill::AutofillResult::UnsupportedProvider(msg) => {
+                            crate::tel!(
+                                "autofill_task_completed",
+                                "job_id": job_id,
+                                "outcome": "unsupported",
+                                "message": msg,
+                            );
+                        }
+                        crate::autofill::AutofillResult::BrowserError(msg) => {
+                            crate::tel!(
+                                "autofill_task_completed",
+                                "job_id": job_id,
+                                "outcome": "browser_error",
+                                "message": msg,
+                            );
+                        }
+                    }
+                });
+                crate::tel!("autofill_spawn_ok", "job_id": job_id);
+            }
         }
 
-        // Mark as applied and show toast.
+        // Show toast. Note: pressing p NO LONGER auto-marks the job as
+        // applied — the user hasn't submitted the form yet. Press `a` after
+        // submission to record the actual application.
         self.add_toast("Autofilling Greenhouse (with answers)...".to_string());
-        self.record_decision_multi("applied");
     }
 
     // ── Clipboard ───────────────────────────────────────────────

@@ -9,8 +9,19 @@ use ratatui::crossterm::event::{
 use super::app::{App, Focus, View};
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
+    // Telemetry: every keystroke logs with a full state snapshot.
+    // This is the primary trace input — replaying the keystroke sequence
+    // against the snapshots reproduces any reported issue.
+    crate::tel!(
+        "key_press",
+        "code": format!("{:?}", key.code),
+        "modifiers": format!("{:?}", key.modifiers),
+        "state": app.snapshot(),
+    );
+
     // Help overlay swallows all keys — any press dismisses it.
     if app.show_help {
+        crate::tel!("help_dismissed");
         app.show_help = false;
         return;
     }
@@ -49,36 +60,43 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
 
     match key.code {
         KeyCode::Char('q') => {
+            crate::tel!("quit_requested", "trigger": "q");
             app.running = false;
             return;
         }
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            crate::tel!("quit_requested", "trigger": "ctrl_c");
             app.running = false;
             return;
         }
         KeyCode::Char('?') => {
+            crate::tel!("help_open");
             app.show_help = true;
             return;
         }
         KeyCode::Char('1') => {
+            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Dashboard", "trigger": "key_1");
             app.view = View::Dashboard;
             app.focus = Focus::List;
             app.detail_scroll = 0;
             return;
         }
         KeyCode::Char('2') => {
+            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Companies", "trigger": "key_2");
             app.view = View::Companies;
             app.focus = Focus::List;
             app.detail_scroll = 0;
             return;
         }
         KeyCode::Char('3') => {
+            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Jobs", "trigger": "key_3");
             app.view = View::Jobs;
             app.focus = Focus::List;
             app.detail_scroll = 0;
             return;
         }
         KeyCode::Char('4') => {
+            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Pipeline", "trigger": "key_4");
             app.view = View::Pipeline;
             app.focus = Focus::List;
             app.detail_scroll = 0;
@@ -92,9 +110,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('f') => {
             if !matches!(app.view, View::Dashboard | View::Pipeline | View::Activity) {
+                crate::tel!("filter_menu_open", "view": format!("{:?}", app.view));
                 app.show_filter_menu = true;
                 app.filter_menu_axis = 0;
                 app.filter_menu_chip = 0;
+            } else {
+                crate::tel!("filter_menu_open_blocked_view", "view": format!("{:?}", app.view));
             }
             return;
         }

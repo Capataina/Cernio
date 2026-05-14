@@ -14,6 +14,7 @@ pub mod config;
 pub mod db;
 pub mod http;
 pub mod pipeline;
+pub mod telemetry;
 pub mod tui;
 
 /// Test-only helpers. Hidden from docs.

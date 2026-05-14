@@ -125,9 +125,26 @@ pub async fn fill_application(
     profile: &ApplicantProfile,
     package_json: Option<&str>,
 ) -> AutofillResult {
+    crate::tel!(
+        "autofill_invoked",
+        "job_url": job_url,
+        "provider": ats_provider,
+        "slug": ats_slug,
+        "has_package": package_json.is_some(),
+        "package_chars": package_json.map(|s| s.len()).unwrap_or(0),
+    );
+
     let answers: std::collections::HashMap<String, String> = package_json
-        .and_then(|json| serde_json::from_str(json).ok())
+        .and_then(|json| match serde_json::from_str(json) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                crate::tel!("autofill_package_parse_error", "error": e.to_string());
+                None
+            }
+        })
         .unwrap_or_default();
+
+    crate::tel!("autofill_package_parsed", "answer_keys": answers.len());
 
     match ats_provider {
         Some("greenhouse") => {
@@ -135,9 +152,13 @@ pub async fn fill_application(
             // both; fall back to (slug-from-DB, gh_jid-from-URL) for the
             // custom-domain-wrapper case.
             let (slug, job_id) = match greenhouse_api::parse_url(job_url) {
-                Some((s, id)) => (s, id),
+                Some((s, id)) => {
+                    crate::tel!("autofill_slug_from_url", "slug": s.clone(), "job_id": id);
+                    (s, id)
+                }
                 None => {
                     let Some(slug) = ats_slug else {
+                        crate::tel!("autofill_unsupported", "reason": "no_slug_url_or_db");
                         return AutofillResult::UnsupportedProvider(
                             "greenhouse: no slug in URL and none in DB — \
                              cannot resolve job"
@@ -145,17 +166,37 @@ pub async fn fill_application(
                         );
                     };
                     let Some(job_id) = greenhouse_api::extract_gh_jid(job_url) else {
+                        crate::tel!("autofill_unsupported", "reason": "no_gh_jid_in_url");
                         return AutofillResult::UnsupportedProvider(
                             "greenhouse: no gh_jid in URL".into(),
                         );
                     };
+                    crate::tel!("autofill_slug_from_db", "slug": slug, "job_id": job_id);
                     (slug.to_string(), job_id)
                 }
             };
 
-            greenhouse::fill(job_url, &slug, job_id, profile, &answers).await
+            let result = greenhouse::fill(job_url, &slug, job_id, profile, &answers).await;
+            match &result {
+                AutofillResult::Success { fields_filled } => {
+                    crate::tel!("autofill_success", "fields_filled": fields_filled);
+                }
+                AutofillResult::UnsupportedProvider(msg) => {
+                    crate::tel!("autofill_unsupported", "message": msg);
+                }
+                AutofillResult::BrowserError(msg) => {
+                    crate::tel!("autofill_browser_error", "message": msg);
+                }
+            }
+            result
         }
-        Some(provider) => AutofillResult::UnsupportedProvider(provider.to_string()),
-        None => AutofillResult::UnsupportedProvider("unknown".to_string()),
+        Some(provider) => {
+            crate::tel!("autofill_unsupported", "reason": "non_greenhouse_provider", "provider": provider);
+            AutofillResult::UnsupportedProvider(provider.to_string())
+        }
+        None => {
+            crate::tel!("autofill_unsupported", "reason": "no_provider");
+            AutofillResult::UnsupportedProvider("unknown".to_string())
+        }
     }
 }

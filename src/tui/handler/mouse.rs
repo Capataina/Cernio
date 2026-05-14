@@ -3,7 +3,29 @@ use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEven
 use crate::tui::app::{App, Focus, PipelineColumn, View};
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
-    if app.show_help || app.show_grade_picker || app.show_bulk_picker {
+    // Only emit telemetry for clicks (not every scroll-pixel) — scroll is high-frequency.
+    let is_click = matches!(mouse.kind, MouseEventKind::Down(_));
+    if is_click {
+        crate::tel!(
+            "mouse_click",
+            "kind": format!("{:?}", mouse.kind),
+            "column": mouse.column,
+            "row": mouse.row,
+            "modifiers": format!("{:?}", mouse.modifiers),
+            "view": format!("{:?}", app.view),
+        );
+    } else if matches!(mouse.kind, MouseEventKind::ScrollDown | MouseEventKind::ScrollUp) {
+        // Scroll events: log only every 5th to avoid flooding.
+        if app.frame_count % 5 == 0 {
+            crate::tel!(
+                "mouse_scroll",
+                "kind": format!("{:?}", mouse.kind),
+                "view": format!("{:?}", app.view),
+            );
+        }
+    }
+
+    if app.show_help || app.show_grade_picker || app.show_bulk_picker || app.show_filter_menu {
         return;
     }
 

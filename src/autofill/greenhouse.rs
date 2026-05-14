@@ -55,38 +55,80 @@ pub async fn fill(
     profile: &ApplicantProfile,
     answers: &HashMap<String, String>,
 ) -> AutofillResult {
+    crate::tel!(
+        "gh_fill_start",
+        "job_url": job_url,
+        "slug": slug,
+        "job_id": job_id,
+        "answer_keys": answers.len(),
+        "resume_path": profile.resume_path.as_deref(),
+    );
+
     // ── Step 1: fetch the schema ──
+    let fetch_start = std::time::Instant::now();
     let schema = match JobSchema::fetch(slug, job_id).await {
-        Ok(Some(s)) => s,
+        Ok(Some(s)) => {
+            crate::tel!(
+                "gh_schema_fetched",
+                "duration_ms": fetch_start.elapsed().as_millis() as u64,
+                "title": s.title.clone(),
+                "main_questions": s.questions.len(),
+                "compliance_sections": s.compliance.len(),
+                "location_questions": s.location_questions.len(),
+                "has_demographic": s.demographic_questions.is_some(),
+                "absolute_url": s.absolute_url.as_deref(),
+            );
+            s
+        }
         Ok(None) => {
+            crate::tel!(
+                "gh_schema_404",
+                "slug": slug,
+                "job_id": job_id,
+                "duration_ms": fetch_start.elapsed().as_millis() as u64,
+            );
             return AutofillResult::UnsupportedProvider(format!(
                 "Greenhouse API returned 404 for slug={slug}, id={job_id} — \
                  company may be off-platform; reclassify as bespoke"
             ));
         }
         Err(e) => {
+            crate::tel!(
+                "gh_schema_error",
+                "slug": slug,
+                "job_id": job_id,
+                "error": e,
+                "duration_ms": fetch_start.elapsed().as_millis() as u64,
+            );
             return AutofillResult::BrowserError(format!("API fetch: {e}"));
         }
     };
 
     // ── Step 2: launch browser at the canonical Greenhouse URL ──
-    // The schema's `absolute_url` is the canonical job-boards.greenhouse.io
-    // URL. Use it in preference to whatever wrapper URL the DB carried:
-    // custom-domain pages (HRT, GSA, Squarepoint) often don't render the
-    // form on their wrapper page, so navigating there leaves the autofill
-    // with nothing to fill.
     let navigate_url = schema.absolute_url.as_deref().unwrap_or(job_url);
+    crate::tel!("gh_browser_launch_start", "url": navigate_url);
+    let launch_start = std::time::Instant::now();
     let (browser, page) = match common::launch_and_navigate(navigate_url).await {
-        Ok(result) => result,
-        Err(e) => return AutofillResult::BrowserError(e),
+        Ok(result) => {
+            crate::tel!(
+                "gh_browser_launched",
+                "duration_ms": launch_start.elapsed().as_millis() as u64,
+            );
+            result
+        }
+        Err(e) => {
+            crate::tel!(
+                "gh_browser_launch_error",
+                "error": e.clone(),
+                "duration_ms": launch_start.elapsed().as_millis() as u64,
+            );
+            return AutofillResult::BrowserError(e);
+        }
     };
 
     // Wait for the application form to render.
-    if !common::wait_for_selector(&page, "#application-form", Duration::from_secs(8)).await {
-        // Not fatal — some embed pages render the form lazily after a click.
-        // We continue and let individual selectors fail per-field if the form
-        // never appeared.
-    }
+    let form_found = common::wait_for_selector(&page, "#application-form", Duration::from_secs(8)).await;
+    crate::tel!("gh_form_wait", "found": form_found);
 
     // Pre-index the package answers by normalised label for fast lookup.
     let answer_index = build_answer_index(answers);
@@ -96,18 +138,39 @@ pub async fn fill(
     let mut skipped = 0u32;
 
     // ── Step 3: main `questions[]` ──
+    crate::tel!("gh_questions_phase_start", "count": schema.questions.len());
     let mut prev_answer: Option<String> = None;
     for question in &schema.questions {
+        let q_label = question.label.clone();
+        let field_name = question.fields.first().map(|f| f.name.clone()).unwrap_or_default();
+        let field_type = question.fields.first().map(|f| f.field_type.clone()).unwrap_or_default();
         match fill_question(&page, question, profile, &answer_index, &company_name, &prev_answer).await {
             FillOutcome::Filled(answer_snapshot) => {
+                crate::tel!(
+                    "gh_question_filled",
+                    "label": q_label,
+                    "field": field_name,
+                    "type": field_type,
+                );
                 filled += 1;
                 prev_answer = answer_snapshot;
             }
             FillOutcome::Skipped => {
+                crate::tel!(
+                    "gh_question_skipped",
+                    "label": q_label,
+                    "field": field_name,
+                    "type": field_type,
+                );
                 skipped += 1;
                 prev_answer = None;
             }
             FillOutcome::SkippedConditional => {
+                crate::tel!(
+                    "gh_question_skipped_conditional",
+                    "label": q_label,
+                    "field": field_name,
+                );
                 skipped += 1;
                 // Keep prev_answer — chain of conditionals could continue.
             }
@@ -150,6 +213,12 @@ pub async fn fill(
         }
     }
 
+    crate::tel!(
+        "gh_fill_done",
+        "filled": filled,
+        "skipped": skipped,
+    );
+
     // Park the browser open — Chrome stays so the user can review + submit.
     tokio::spawn(async move {
         let _keep_alive = browser;
@@ -158,7 +227,6 @@ pub async fn fill(
         }
     });
 
-    let _ = skipped; // tracked for future telemetry; not surfaced yet
     AutofillResult::Success {
         fields_filled: filled as usize,
     }

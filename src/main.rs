@@ -1,10 +1,17 @@
-use cernio::{ats, config, db, pipeline, tui};
+use cernio::{ats, config, db, pipeline, telemetry, tui};
 use db::Database;
 use std::path::Path;
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
+    let subcommand = args.get(1).map(|s| s.as_str()).unwrap_or("");
+
+    // Initialise telemetry for any subcommand. The writer is a singleton,
+    // so calling init twice is a no-op. We want TUI sessions and pipeline
+    // runs alike to land in `~/Library/Application Support/cernio/telemetry/`.
+    telemetry::init();
+    cernio::tel!("cli_invoked", "subcommand": subcommand, "argv": &args[1..]);
 
     match args.get(1).map(|s| s.as_str()) {
         Some("tui") => cmd_tui(),

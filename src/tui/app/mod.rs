@@ -18,18 +18,32 @@ use super::theme::Theme;
 
 impl App {
     pub fn new(db_path: &Path) -> Result<Self, rusqlite::Error> {
+        crate::tel!("app_new_start", "db_path": db_path.display().to_string());
+        let init_start = std::time::Instant::now();
         let conn = Connection::open(db_path)?;
+        crate::tel!("app_db_opened", "duration_ms": init_start.elapsed().as_millis() as u64);
 
         // Auto-format any unformatted job descriptions on TUI launch.
         // This is fast (no-op when already formatted) and ensures grading
         // agents and TUI display always see clean text.
         crate::pipeline::format::run_silent(&conn);
+        crate::tel!("app_format_done");
 
+        let fetch_start = std::time::Instant::now();
         let companies = queries::fetch_companies(&conn, false);
+        crate::tel!("app_fetch_companies", "count": companies.len(), "duration_ms": fetch_start.elapsed().as_millis() as u64);
+
         let filters = JobFilters::default();
+        let fetch_start = std::time::Instant::now();
         let jobs = queries::fetch_jobs(&conn, None, &filters, SortMode::ByGrade);
+        crate::tel!("app_fetch_jobs", "count": jobs.len(), "duration_ms": fetch_start.elapsed().as_millis() as u64);
+
+        let fetch_start = std::time::Instant::now();
         let stats = queries::fetch_stats(&conn);
+        crate::tel!("app_fetch_stats", "duration_ms": fetch_start.elapsed().as_millis() as u64);
+
         let total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
+        crate::tel!("app_fetch_total_jobs", "count": total_jobs_unfiltered);
 
         let mut company_state = TableState::default();
         if !companies.is_empty() {
@@ -110,7 +124,9 @@ impl App {
     }
 
     pub fn refresh(&mut self) {
+        let refresh_start = std::time::Instant::now();
         let Ok(conn) = Connection::open(&self.db_path) else {
+            crate::tel!("refresh_db_open_failed", "db_path": self.db_path.display().to_string());
             return;
         };
 
@@ -126,6 +142,15 @@ impl App {
         );
         self.stats = queries::fetch_stats(&conn);
         self.total_jobs_unfiltered = queries::fetch_total_job_count(&conn);
+        crate::tel!(
+            "refresh_done",
+            "duration_ms": refresh_start.elapsed().as_millis() as u64,
+            "companies": self.companies.len(),
+            "jobs": self.jobs.len(),
+            "total_jobs_unfiltered": self.total_jobs_unfiltered,
+            "view": format!("{:?}", self.view),
+            "filters_active": self.filters.active_chip_count(),
+        );
         self.activity_data = queries::fetch_activity_data(&conn);
         self.activity_timeline = queries::fetch_activity_timeline(&conn);
         self.last_search_at = queries::fetch_last_search_at(&conn);
@@ -175,6 +200,79 @@ impl App {
     pub fn spinner_char(&self) -> char {
         const CHARS: [char; 4] = ['◐', '◑', '◒', '◓'];
         CHARS[(self.frame_count / 5) as usize % 4]
+    }
+
+    /// Structured snapshot of every observable App state field — attached
+    /// to every key-press / action telemetry event so the trace lets us
+    /// reconstruct exactly what the user was looking at when something
+    /// happened.
+    pub fn snapshot(&self) -> serde_json::Value {
+        let selected_job = self.selected_job().map(|j| (j.id, j.title.clone(), j.company_name.clone(), j.grade.clone(), j.evaluation_status.clone(), j.has_package));
+        let selected_company = self.selected_company().map(|c| (c.id, c.name.clone(), c.status.clone(), c.grade.clone()));
+
+        serde_json::json!({
+            "view": format!("{:?}", self.view),
+            "focus": format!("{:?}", self.focus),
+            "frame_count": self.frame_count,
+            "selected_job": selected_job.as_ref().map(|(id, title, company, grade, status, pkg)| serde_json::json!({
+                "id": id,
+                "title": title,
+                "company": company,
+                "grade": grade,
+                "evaluation_status": status,
+                "has_package": pkg,
+            })),
+            "selected_company": selected_company.as_ref().map(|(id, name, status, grade)| serde_json::json!({
+                "id": id,
+                "name": name,
+                "status": status,
+                "grade": grade,
+            })),
+            "counts": {
+                "companies_visible": self.companies.len(),
+                "jobs_visible": self.jobs.len(),
+                "total_jobs_unfiltered": self.total_jobs_unfiltered,
+                "multi_select_jobs": self.multi_select_jobs.len(),
+                "multi_select_companies": self.multi_select_companies.len(),
+                "toasts": self.toasts.len(),
+            },
+            "search": {
+                "mode": self.search_mode,
+                "query": &self.search_query,
+            },
+            "sort_mode": format!("{:?}", self.sort_mode),
+            "group_by_company": self.group_by_company,
+            "show_quick_peek": self.show_quick_peek,
+            "show_help": self.show_help,
+            "show_grade_picker": self.show_grade_picker,
+            "show_bulk_picker": self.show_bulk_picker,
+            "show_filter_menu": self.show_filter_menu,
+            "bulk_action": &self.bulk_action,
+            "job_filter_company": self.job_filter_company,
+            "job_filter_company_name": self.job_filter_company_name.as_deref(),
+            "filters": {
+                "active_chip_count": self.filters.active_chip_count(),
+                "is_default": self.filters.is_default(),
+                "grades": self.filters.grades.iter().cloned().collect::<Vec<_>>(),
+                "ats": self.filters.ats.iter().cloned().collect::<Vec<_>>(),
+                "decisions": self.filters.decisions.iter().cloned().collect::<Vec<_>>(),
+                "package": self.filters.package.iter().cloned().collect::<Vec<_>>(),
+                "archive": self.filters.archive.iter().cloned().collect::<Vec<_>>(),
+            },
+            "filter_menu": {
+                "axis": self.filter_menu_axis,
+                "chip": self.filter_menu_chip,
+            },
+            "detail_scroll": self.detail_scroll,
+            "dashboard_scroll": self.dashboard_scroll,
+            "activity_scroll": self.activity_scroll,
+            "pipeline_column": format!("{:?}", self.pipeline_column),
+            "terminal": {
+                "width": self.terminal_width,
+                "height": self.terminal_height,
+            },
+            "session_uptime_secs": self.session_start.elapsed().as_secs(),
+        })
     }
 }
 
