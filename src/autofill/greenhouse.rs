@@ -257,7 +257,16 @@ async fn fill_question(
     // Soft-conditional: if the label starts with "If yes" / "If no" / etc,
     // only fill when the immediately previous question's answer matches.
     if is_soft_conditional(&question.label) {
-        let label_lower = question.label.to_lowercase();
+        // Same quote-stripping normalisation as is_soft_conditional, so that
+        // `If "yes" can you specify ...` matches the "if yes" branch (Proton's
+        // permit-type follow-up). Without this, the conditional fires but the
+        // inner yes/no decision falls through to false and skips the question.
+        let label_lower: String = question
+            .label
+            .to_lowercase()
+            .chars()
+            .filter(|&c| c != '"' && c != '\'' && c != '\u{201C}' && c != '\u{201D}')
+            .collect();
         let prev_lower = prev_answer
             .as_deref()
             .unwrap_or("")
@@ -498,32 +507,42 @@ async fn fill_file_field(
 
     if is_cover_letter {
         // We have text, not a PDF. Greenhouse exposes "Enter manually" near
-        // the file input — clicking it swaps in a textarea named
-        // `cover_letter_text` (or similar). Try the manual-entry flow.
+        // the file input — clicking it swaps in a textarea (conventionally
+        // named `<field>_text`). Try the manual-entry flow with per-step
+        // telemetry so the next run pinpoints exactly where it fails.
         let Some(answer) = answer_index.get("cover_letter").cloned() else {
+            crate::tel!("gh_cover_letter_no_answer");
             return FillOutcome::Skipped;
         };
-        // The Enter manually button lives in the same form group as the
-        // file input. Greenhouse doesn't expose a stable container id, so
-        // pass an empty container_selector — common::click_button_with_text
-        // falls back to `document` in that case.
-        if !common::click_button_with_text(page, "", "Enter manually").await {
+        crate::tel!("gh_cover_letter_attempt", "answer_chars": answer.len());
+
+        let clicked = common::click_button_with_text(page, "", "Enter manually").await;
+        crate::tel!("gh_cover_letter_button_clicked", "ok": clicked);
+        if !clicked {
             return FillOutcome::Skipped;
         }
-        // Wait a beat for the textarea to render after the button click.
-        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
-        // Greenhouse's manual-entry textarea is conventionally named
-        // `<field_name>_text` (e.g. `cover_letter_text`).
-        let textarea_selector = format!("#{}_text", css_escape_id(&field.name));
-        if common::type_into(page, &textarea_selector, &answer).await {
-            return FillOutcome::Filled(Some(answer));
+
+        // Wait for the textarea to render after the button click.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // Try multiple Greenhouse-conventional selectors in priority order.
+        let escaped = css_escape_id(&field.name);
+        let candidates = [
+            format!("#{}_text", escaped),                // cover_letter_text
+            format!("textarea#{}", escaped),             // textarea#cover_letter
+            format!("textarea[name='{}_text']", escaped),
+            format!("textarea[name='{}']", escaped),
+        ];
+        for sel in &candidates {
+            if common::type_into(page, sel, &answer).await {
+                crate::tel!("gh_cover_letter_filled", "selector": sel);
+                return FillOutcome::Filled(Some(answer));
+            }
         }
-        // Fallback: some Greenhouse variants use a textarea matched by the
-        // field's name with a different suffix or no suffix.
-        let alt_selector = format!("textarea#{}", css_escape_id(&field.name));
-        if common::type_into(page, &alt_selector, &answer).await {
-            return FillOutcome::Filled(Some(answer));
-        }
+        crate::tel!(
+            "gh_cover_letter_textarea_not_found",
+            "tried": candidates.iter().collect::<Vec<_>>()
+        );
         return FillOutcome::Skipped;
     }
 

@@ -203,19 +203,30 @@ pub async fn type_into(page: &Page, selector: &str, text: &str) -> bool {
     type_into_v2(page, selector, text).await.is_ok()
 }
 
-/// Click a `<button>` whose visible text equals (case-insensitive) `label`.
+/// Click a `<button>` whose visible text *contains* (case-insensitive) `label`.
 /// Used to drive Greenhouse's "Enter manually" / "Attach" dual-button widget
 /// on file-input fields where we have text, not a PDF.
+///
+/// Match is substring + case-insensitive. Greenhouse buttons frequently
+/// wrap text in spans / include icons / append helper text ("Enter manually
+/// (text)"), so equality is too strict. We also widen the selector to
+/// include `<a>` elements with role="button" and `<div role="button">`.
+///
+/// `container_selector` narrows the search to a specific form group; pass
+/// an empty string to search the whole document.
 pub async fn click_button_with_text(page: &Page, container_selector: &str, label: &str) -> bool {
     let js = format!(
         r#"
         (() => {{
-            const root = document.querySelector({container_json}) || document;
+            const sel = {container_json};
+            const root = (sel && sel.length) ? (document.querySelector(sel) || document) : document;
             const wanted = ({label_json}).toLowerCase().trim();
-            const btns = root.querySelectorAll('button, [role="button"]');
-            for (const b of btns) {{
+            const candidates = root.querySelectorAll(
+                'button, [role="button"], a[role="button"], div[role="button"]'
+            );
+            for (const b of candidates) {{
                 const t = (b.textContent || '').toLowerCase().trim();
-                if (t === wanted) {{
+                if (t.includes(wanted)) {{
                     b.click();
                     return true;
                 }}

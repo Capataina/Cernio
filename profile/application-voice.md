@@ -120,6 +120,31 @@ Consistency matters more than the specific choice. Caner's spoken voice and CV a
 > [!tip] The asymmetry
 > Underselling a real achievement reads as **hedging**. A measurable outcome stated plainly reads as **confidence**. Claiming something that isn't there reads as **fabrication**, and the reader can spot it faster than the writer thinks.
 
+### 2.8 No fawning, no pleading
+
+> [!warning] The single biggest tonal trap in cover letters
+> Echoing the company's own marketing language back to them, name-dropping scale or pedigree as if reverent of it, and praising the company as exceptional reads as **performative impressment**. Recruiters see this on every templated application; it is the loudest "this candidate is desperate" signal in the genre.
+
+What the trap looks like in practice (each is a real cover-letter-killer pattern):
+
+| Pattern | Why it lands wrong |
+|---|---|
+| "X is the rare company where..." / "X is exceptional because..." | Reads as if the writer needs to convince themselves; recruiters know it's their company and don't need to be sold on it |
+| Citing user counts, employee counts, valuation, fundraising totals | Numbers the reader already knows. Quoting them back signals nothing except that the writer reads the about page |
+| "Founded by [pedigree institution]" or other origin-story name-drops | The reader doesn't need their own backstory recited. It positions the writer below the company, not alongside it |
+| "I would be honoured to..." / "Thrilled at the opportunity..." | Begging-coded; even when sincere, it shifts the dynamic from peer-to-peer toward supplicant-to-gatekeeper |
+| "X is the production version of what I've been practising" | Self-aggrandising disguised as flattery. Reads as the writer comparing themselves favourably to the company |
+| Repeating the company's own marketing phrases ("first principles", "mission-driven", "psychologically safe environment") | The reader wrote those phrases; hearing them back reads as parroting rather than analysis |
+
+The underlying principle: **treat the company as a peer doing interesting work, not a benefactor to win over.** Confidence comes from grounding the application in shared technical interest, not in performative awe. A good test: would the same sentence make sense if the company was a friend's side project rather than a famous brand? If yes, it's grounded. If it depends on the brand's prestige to land, it's fawning.
+
+What replaces fawning:
+
+- **State technical alignment as fact, not as wonder.** "Proton's architecture is the kind I'd build for myself" carries the same information as "Proton is the rare company where..." but lands as a peer-to-peer observation.
+- **Acknowledge interesting work without praising the company.** "Cross-platform Rust client preserving end-to-end encryption is the kind of project I'd want to work on regardless of who built it" lands stronger than "Proton's mission inspires me."
+- **Skip pedigree references entirely.** If a candidate is genuinely good fit, the application stands without crediting CERN or Stanford or YC. If the candidate isn't a fit, namedropping won't fix it.
+- **Avoid claiming you've been "preparing" for this exact role.** Even when true, it reads as backwards-projecting. State the projects, let the alignment speak.
+
 ---
 
 ## 3. What a Skimming Reader Actually Does
