@@ -36,6 +36,23 @@ Grading happens in five steps. Each step informs the next. The grade letter is t
 
 The fit assessment written to the database should be the output of this process — the actual reasoning, not a summary. Q1 reasoning leads the assessment narrative; Q2 reasoning follows; Q3-Q5 close. This ordering surfaces the dominant axis in the visible text so the grade letter and the narrative cannot drift apart.
 
+**Q-pattern → letter mapping anchors (illustrative, not lookups).** The aggregation is judgement, not arithmetic — but the centre-of-gravity for each Q1 × Q2-Q5 combination is anchored here so different graders converge on the same letter when the Q1 verdict is shared:
+
+| Q1 verdict | Q2-Q5 profile | Letter |
+|---|---|---|
+| cleared-decisively | all four strong (≥3 of 4 strong + the fourth at least moderate) | SS |
+| cleared-decisively | mostly strong (Q2 strong + Q3-Q5 moderate-strong, no weak axis) | S |
+| cleared-decisively | Q2 strong + at least one Q3/Q4/Q5 with a notable weakness | A |
+| cleared-decisively | Q2-Q5 moderate across the board (no notable strength, no notable weakness) | A or B per which side dominates |
+| cleared-decisively | Q2-Q5 weak across the board (small company, narrow scope, weak ceiling, stack mismatch) | B |
+| cleared-with-friction | strong Q2-Q5 | A — friction is the cap, S is not reachable |
+| cleared-with-friction | moderate Q2-Q5 | A or B |
+| cleared-with-friction | weak Q2-Q5 | B or C |
+| real-headwind | any Q2-Q5 strength | C — prestige-trap aggregation, cannot reach above C |
+| hard-fail | any | F |
+
+These rows are anchors, not lookups. The assessment may land between two rows (e.g., Q1 cleared-decisively, Q2 strong, Q3 moderate, Q4 strong, Q5 clean — between the SS and S rows). When it does, name the closest anchor and justify the deviation in the assessment narrative. The role of the anchors is to make the aggregation legible to a future reader, not to override the grader's judgement on edge cases.
+
 ---
 
 ## The Core Questions
@@ -104,6 +121,15 @@ A role that aligns with 2-3 active projects (or active plus substantively-built 
 **Each per-project file describes what the project demonstrates** — its technologies, domain, scope, and what kind of engineering it shows. Read those files (and `profile/projects/index.md` for the inventory) rather than relying on hardcoded project summaries; the per-project files are the source of truth and evolve over time.
 
 Also check `portfolio-gaps.md` — does this role require something the profile explicitly lacks? A gap in a "nice to have" is different from a gap in a core requirement.
+
+**Q3 decomposes into two sub-axes: Concept-fit and Stack-fit.** Treating Q3 as a single "tech-match" score collapses two distinct signals into one and produces the same letter for a candidate with strong concept-fit + adjacent stack as for one with weak concept-fit + exact stack. The two sub-axes weight differently:
+
+- **Concept-fit (load-bearing).** Does the candidate's portfolio demonstrate the underlying engineering paradigm the role demands — low-latency, distributed systems, ML infrastructure, performance-critical, observability, lock-free, financial systems, compiler engineering, embedded, etc.? This is what the role's hiring manager actually cares about: do you understand the problem class the team works on? Read `profile/skills.md` §Concepts and Domains for the explicit list of paradigms the candidate has demonstrated across the portfolio. Each paradigm in that section is concept-fit evidence; the per-project files in `profile/projects/` show which projects demonstrate which paradigm.
+- **Stack-fit (tiebreaker only).** Does the candidate's portfolio use the role's primary language / framework? Languages are taught in weeks; the candidate's primary stack vs the role's primary stack matters only as a refinement once concept-fit is settled. A Rust-primary candidate applying to a Go backend role with low-latency concept overlap is not "stack-mismatched and weak Q3" — they are concept-strong and stack-adjacent, which the rubric weighs as moderate-to-strong Q3 depending on how decisive the concept overlap is.
+
+**Worked decomposition.** A Go backend role at a high-traffic site demanding "lock-free / low-latency / high-performance / observability". Candidate: Rust-primary, zero Go projects. Stack-fit = zero. Concept-fit = strong (Nyquestro lock-free matching engine + Image Browser ML inference observability + Cernio async pipelines). Q3 lands strong on concept-fit, not weak on stack-fit. The aggregation then weighs Q1 × Q2 × Q3 (strong) × Q4 × Q5 — not Q1 × Q2 × Q3 (weak stack-mismatch) × Q4 × Q5.
+
+**Detection rule for the grader.** Before concluding Q3 is weak on a stack mismatch, check whether the role's description names a paradigm the candidate's `profile/skills.md` §Concepts and Domains lists. If yes, Q3 weight is set by the paradigm overlap, not the language overlap. Cross-language concept-fit is the most-common-missed Q3 signal in the rubric's failure history; the detection rule exists to make it visible.
 
 ### 4. Would the candidate enjoy the day-to-day work?
 
@@ -250,11 +276,20 @@ The same career-stage factors that affect company grading affect job grading, bu
 
 **Over-weighting tech stack — with one important asymmetry.** As a generic rule, a graduate Go role at a strong sponsoring company is worth more than a Rust role at a 3-person startup with no funding. Languages are learned in months; company signal, career trajectory, and sponsorship compound over years. So tech stack should not normally be the deciding factor between adjacent grades.
 
-The asymmetry: when a candidate's portfolio is **concentrated in a specific stack** (multiple substantive projects at Proficient band in `profile/skills.md`, several per-project files in `profile/projects/` all using the same primary language, the candidate's strongest differentiator vs other graduates in the same applicant pool), stack alignment carries more weight than the generic rule implies. The mechanism: stack alignment with the role is what flips a marginal applicant into a competitive one inside the applicant pool, because the candidate's evidence base (the projects) directly anchors to the role's technical requirements. For these candidates, a role using their primary stack is *meaningfully more landable* (Q1) and *meaningfully more demonstrable* (Q3) than a role using an adjacent stack — those are the two questions doing the work, not "stack as tiebreaker" in isolation.
+The asymmetry: when a candidate's portfolio is **concentrated in a specific stack** (multiple substantive projects at Proficient band in `profile/skills.md`, several per-project files in `profile/projects/` all using the same primary language), stack alignment with the role's primary stack flips a marginal applicant into a competitive one inside the realistic applicant pool. The portfolio's evidence base directly anchors to the role's technical requirements. The carveout magnitude scales with the concentration:
 
-This is not a stack-specific carveout; it applies to any candidate whose portfolio is concentrated. Detection from `profile/`: count the per-project files where the language listed first in the project's stack matches the role's primary stack, AND the project's status frontmatter is active or substantively-built-dormant. When that count is ≥3 (a meaningful concentration), Q1 and Q3 both benefit from stack alignment beyond the generic tiebreaker weight. When the count is 0-1 (the candidate has touched the stack but it isn't a concentration), the generic rule holds.
+| Stack concentration | Effect on Q1 (within realistic pool) | Effect on Q3 | What it does NOT offset |
+|---|---|---|---|
+| 0-1 active projects in role's stack | Generic rule applies — stack is a tiebreaker only | Q3 neutral or weak on stack-axis (concept-axis assessed separately per §Q3 decomposition) | Anything |
+| 2 active projects in role's stack | Mild positive on Q1 within realistic pool; Q3 strengthens on stack-axis | Q3 moderate on stack-axis | Hard credential floors, role-type exclusions, location hard-fails |
+| 3-4 active projects in role's stack (the "meaningful concentration" threshold) | ~1-letter offset on implicit-selectivity Q1 friction (a role the candidate would otherwise read as B/C on selectivity grounds aggregates to A/B when the stack concentration is decisive) | Q3 strong on stack-axis | Hard credential floors, role-type exclusions, location hard-fails |
+| 5+ active projects in role's stack, particularly when the role's selectivity is stack-specific (e.g. description language like "complex Rust pet projects accepted as evidence" or "deep expertise in our primary stack") | ~1.5-letter offset on implicit-selectivity Q1 friction | Q3 dominant on stack-axis — the candidate's portfolio is the differentiating evidence vs the applicant pool | Hard credential floors (explicit "5+ years" / "8+ years" / staff-IC scope / leadership expectations), hard exclusions per `preferences.toml` (customer-facing, gambling, consumer-crypto), location hard-fails outside `preferences.toml.hard.locations` |
 
-The reverse case is symmetrical: a role using a stack the candidate has never touched and has no concentration in is Q3-weak by default, regardless of how "transferable" the underlying paradigm is. The portfolio is the evidence; the absence of relevant projects in `profile/projects/` is real Q3 friction.
+The offset magnitudes are *judgement anchors*, not arithmetic. The carveout NEVER offsets a hard credential floor or hard exclusion — it modulates implicit-selectivity Q1 friction only. A role with both narrow-funnel selectivity AND a hard 5+ years floor stays at F regardless of the candidate's stack concentration.
+
+**Worked aggregation with stack-concentration carveout.** Proton Rust SWE — Proton states "less than 1% of candidates hired" (implicit selectivity → Q1 real-headwind at face value). Without the carveout, Proton aggregates to C through the prestige-trap rule. With the carveout: the candidate has 7+ active Rust projects per `profile/projects/index.md`, AND the description's "complex Rust pet projects" clause explicitly accepts portfolio evidence as a credential substitute. Stack-concentration is 5+ active projects in role's primary stack with stack-specific selectivity language — the carveout offsets the implicit-selectivity friction by ~1.5 letters. Q1 reads as cleared-with-friction (not cleared-decisively — the 1% rate still bites at the realistic-conversion level), Q3 dominant on stack-axis. Aggregation: Q1 cleared-with-friction + Q2 strong (Proton brand) + Q3 dominant + Q4 strong (privacy/Rust passion alignment) + Q5 clean. Per the §Step 3 anchor table, "cleared-with-friction + strong Q2-Q5" → A. The role lands at A, not C — the stack-concentration carveout produces a different aggregation outcome than the generic prestige-trap rule.
+
+The reverse case is symmetrical: a role using a stack the candidate has never touched and has no concentration in is Q3-weak on stack-axis by default. But Q3-weak on stack-axis does NOT mean Q3 is weak overall — the concept-axis is assessed independently per §Q3 decomposition. Cross-language concept-fit can carry Q3 to strong even with zero stack-fit; see the worked decomposition in §Q3.
 
 **Under-weighting company signal for a first job.** Read `experience.md` — there is no work history. The first employer's name IS the credential. A generic backend role at Bloomberg is worth more for career trajectory than a perfectly-aligned role at a company nobody has heard of.
 
@@ -263,6 +298,24 @@ The reverse case is symmetrical: a role using a stack the candidate has never to
 **Assuming "no sponsorship mention" means "won't sponsor."** Large companies with international teams almost always sponsor. Only penalise sponsorship when there are active negative signals.
 
 **Penalising graduate programmes for breadth.** "You'll rotate across three teams" is a feature, not a bug. Do not downgrade for uncertain team placement in a structured programme.
+
+**Post-graduation candidates applying to new-grad / intern programmes — boilerplate vs structural filter.** A recent graduate (e.g. degree completed July 2025) applying to a 2026 new-grad or summer intern programme is typically in the realistic primary-target pool even when description wording says "currently pursuing a degree". Corporate-template language often does not match the actual structural filter. The detection rule decides whether the wording is template-boilerplate (no Q1 friction) or a real structural filter (Q1 hard-fail):
+
+Detection signals the wording is **template-boilerplate** (treat as no Q1 friction; the candidate is in the realistic primary-target pool):
+- The role is at a large established firm with a history of hiring recent grads into intern-to-full-time pipelines (Cloudflare, Amazon, Google, Meta, Microsoft, Stripe, Palantir, etc.).
+- The description elsewhere refers to "early-career", "new-grad", "structured programme", "training programme", "intern-to-full-time conversion" — corporate-template plurality.
+- No explicit graduation-date cutoff in the description text.
+- The firm's intern pipeline is publicly known to accept recent grads (visible in past hiring data, LinkedIn cohort patterns, etc.).
+
+Detection signals the wording IS a **structural filter** (treat as Q1 hard-fail):
+- Explicit graduation-year requirement ("Spring 2027 or later", "must be returning to studies after summer", "expected graduation date of Spring 2027 or later").
+- The firm's intern pipeline is single-stream and explicitly cohort-based with return-to-school logic ("expected to return for fall semester", "intern-to-thesis pathway").
+- The description includes return-to-school logic anywhere in the body.
+- The firm is small/young with no recent-grad-conversion history.
+
+When the description is ambiguous (the wording exists but no detection signals lean one way), default to the boilerplate reading and weigh the realistic conversion analysis: does the firm's actual hiring pattern accept post-graduation candidates for this cohort? Cite the assessment text accordingly.
+
+The wording when it's template-boilerplate produces no Q1 friction and the role aggregates per the candidate's actual fit. The wording when it's a structural filter is Q1 hard-fail and the role is F. Producing different agents reaching different letters on the same role indicates this detection rule was not applied — the rule's purpose is to make the disambiguation visible in the assessment.
 
 **Grade inflation from enthusiasm.** An exciting role that's unachievable (hard 5+ years requirement) is still F. Enthusiasm is a signal that the application will be strong — it doesn't change achievability.
 
@@ -276,7 +329,10 @@ Reputation and selectivity are not the same axis; do not infer one from the othe
 
 ## Worked Examples
 
-### Example: Graduate SWE, Infrastructure @ Cloudflare (→ SS)
+> [!important] Calibrate to the reasoning, not to the letter.
+> The letters in these examples are the OUTPUTS of the aggregation, not pre-set anchors that override the principle-based grading. Each worked example shows how Q1-Q5 reasoning + the §Step 3 anchor table produce the letter; the letter at the end of each example is the visible OUTCOME of that walk, not a calibration target for memorisation. Two roles that share a letter in this section are not necessarily "the same" — they reached that letter through different Q1-Q5 patterns. When grading a real job, do not pattern-match on the surface-similar worked example and copy its letter; run the candidate's actual Q1-Q5 reasoning against the §Step 3 anchor table and let the letter emerge from the aggregation.
+
+### Worked Aggregation: Graduate SWE, Infrastructure @ Cloudflare
 
 **Q1 — Can they get it?** Yes. Explicitly graduate programme. No years required. Structured onboarding with mentorship.
 
@@ -290,9 +346,9 @@ Reputation and selectivity are not the same axis; do not infer one from the othe
 
 **Dimensions confirm:** All critical and high-weight dimensions strong. No weaknesses.
 
-**Grade: SS.** Every question has a strong answer. Dimensions confirm. The Rust + infrastructure + systems alignment with the strongest projects in the portfolio makes this a standout.
+**Aggregation outcome: SS.** Every question has a strong answer. Dimensions confirm. The Rust + infrastructure + systems alignment with the strongest projects in the portfolio makes this a standout. Per the §Step 3 anchor table: Q1 cleared-decisively + all four Q2-Q5 strong → SS.
 
-### Example: SDE-I, New Grad @ Amazon (→ SS) — reputable AND realistic
+### Worked Aggregation: SDE-I, New Grad @ Amazon (reputable AND realistic)
 
 This example exists to make the reputation × selectivity decoupling explicit. A reputable name is not, on its own, evidence that the candidate is outside the realistic applicant pool. Some of the strongest CV-signal firms run wide-funnel graduate pipelines that genuinely accept the candidate's profile shape. Those land at SS, not at stretch.
 
@@ -308,9 +364,9 @@ This example exists to make the reputation × selectivity decoupling explicit. A
 
 **Dimensions confirm:** All critical and high-weight dimensions strong. Q1 cleared genuinely.
 
-**Grade: SS.** Reputation is strong AND realistic conversion is strong. This is the load-bearing distinction the realism semantic exists to make: Amazon's wide-funnel grad pipeline + university acceptance breadth + standard-screen shape make Q1 genuinely cleared. Reputable does not mean hard. Compare with the Jane Street example immediately below — same FAANG-tier-or-above CV signal, opposite Q1 reading.
+**Aggregation outcome: SS.** Reputation is strong AND realistic conversion is strong. Per the §Step 3 anchor table: Q1 cleared-decisively + all four Q2-Q5 strong → SS. This is the load-bearing distinction the realism semantic exists to make: Amazon's wide-funnel grad pipeline + university acceptance breadth + standard-screen shape make Q1 genuinely cleared. Reputable does not mean hard. Compare with the Jane Street example immediately below — same FAANG-tier-or-above CV signal, opposite Q1 reading.
 
-### Example: Software Engineer @ Jane Street (London) (→ C) — reputable BUT brutal
+### Worked Aggregation: Software Engineer @ Jane Street (London) (reputable BUT brutal)
 
 This example exists to make the prestige-trap pattern visible. A reputable name with strong technical alignment aggregates down through the Q1-primary lens when Q1 fails on implicit selectivity. The pre-realism reading of this role would land at SS — Q2, Q3, and Q4 all confirm in the absolute frame. The aggregation in Step 3 catches that Q1 is the weak link and the role lands at C, not in the top tiers.
 
@@ -324,11 +380,11 @@ This example exists to make the prestige-trap pattern visible. A reputable name 
 
 **Q5 — Practical constraints?** Solved. London, established Skilled Worker sponsorship.
 
-**Grade: C.** Q1 reads as a real headwind: the firm's narrow-funnel pipeline filters on credentials the candidate does not have, the sub-1% conversion makes the application a lottery rather than a primary target. Through the §How to Grade a Job Step 3 aggregation, the Q1 headwind dominates: strong Q2 + strong Q3 + strong Q4 refine *which* below-the-line letter the role lands at, but cannot lift it back across the line into A or above. The aggregation lands at C — the lottery / Q1-headwind band where the application is worth firing only when the rest of the pipeline is thin enough that lottery tickets are worth the time cost. The fit assessment explicitly names the Q1 hiring-pattern signal so the grade is auditable.
+**Aggregation outcome: C.** Per the §Step 3 anchor table: Q1 real-headwind + any Q2-Q5 strength → C (prestige-trap aggregation, cannot reach above C). The firm's narrow-funnel pipeline filters on credentials the candidate does not have, the sub-1% conversion makes the application a lottery rather than a primary target. Through the §How to Grade a Job Step 3 aggregation, the Q1 headwind dominates: strong Q2 + strong Q3 + strong Q4 refine *which* below-the-line letter the role lands at, but cannot lift it back across the line into A or above. The aggregation lands at C — the lottery / Q1-headwind band where the application is worth firing only when the rest of the pipeline is thin enough that lottery tickets are worth the time cost. The fit assessment explicitly names the Q1 hiring-pattern signal so the grade is auditable.
 
 The contrast with the Amazon example above is the load-bearing point of this rubric's aggregation semantic: same FAANG-or-above CV signal in both, but Amazon's wide-funnel pipeline genuinely accepts the candidate's profile shape (Q1 cleared, aggregates to SS) while Jane Street's narrow-funnel pipeline filters on credentials and pedigree the candidate does not have (Q1 a real headwind, aggregates to C despite identical Q2/Q3/Q4 strength). Reputation and selectivity are independent axes; do not conflate them. The aggregation handles the rest.
 
-### Example: Graduate SWE @ Monzo (→ A)
+### Worked Aggregation: Graduate SWE @ Monzo
 
 **Q1 — Can they get it?** Yes. Graduate-level, achievable.
 
@@ -340,9 +396,9 @@ The contrast with the Amazon example above is the load-bearing point of this rub
 
 **Q5 — Practical constraints?** All solved. London, guaranteed sponsor, established hiring.
 
-**Grade: A.** Three strong answers (achievable, good CV line, constraints solved), one moderate (edge), one moderate (engagement). The brand signal + sponsorship + engineering depth make this solidly A despite the tech stack and domain being adjacent rather than core.
+**Aggregation outcome: A.** Per the §Step 3 anchor table: Q1 cleared-decisively + Q2 strong + Q3 moderate + Q4 moderate + Q5 strong → A (cleared-decisively + Q2 strong + at least one Q3/Q4 with notable weakness). The brand signal + sponsorship + engineering depth make this solidly A despite the tech stack and domain being adjacent rather than core.
 
-### Example: Graduate Backend Engineer @ a mid-tier UK fintech (→ B) — landable-but-mediocre
+### Worked Aggregation: Graduate Backend Engineer @ a mid-tier UK fintech (landable-but-mediocre)
 
 This example exists to make the landable-but-mediocre case explicit. The aggregation in Step 3 produces B for roles where Q1 is genuinely cleared but Q2-Q4 collectively land in the lower-quality band. These roles previously drifted to C under the old "achievable but limited career value" framing; the revised aggregation keeps them at B, where they belong as backup applications worth firing when the SS/S/A pipeline is thin.
 
@@ -358,15 +414,15 @@ This example exists to make the landable-but-mediocre case explicit. The aggrega
 
 **Aggregation.** Q1 is cleared, so the role is in the landable band. Q2-Q4 are collectively in the "decent on most dimensions, no single weakness that downgrades to C, no single strength that elevates to A" zone — moderate CV value, adjacent stack, moderate engagement. The aggregation lands at B: a landable backup application worth firing when the SS/S/A pipeline is thin, not a top priority but not a dismissal either.
 
-**Grade: B.** The role is genuinely landable AND genuinely mediocre on quality; B captures both. Compare with the Monzo example above (also A) — Monzo's "Software Engineer at a strong-brand UK fintech" Q2 signal is enough to lift it to A; this role's lesser-known fintech Q2 signal is not, and the aggregation correctly separates them. The contrast also makes the rubric's landability-first aggregation visible: both roles clear Q1, but Q2-Q4 differentiate the letter within the Q1-cleared band.
+**Aggregation outcome: B.** Per the §Step 3 anchor table: Q1 cleared-decisively + Q2 moderate + Q3 moderate + Q4 moderate + Q5 strong → A or B per which side dominates (here B, because the moderate Q2-Q4 collectively outweighs the single strong Q5). The role is genuinely landable AND genuinely mediocre on quality; B captures both. Compare with the Monzo example above (also A) — Monzo's "Software Engineer at a strong-brand UK fintech" Q2 signal is enough to lift it to A; this role's lesser-known fintech Q2 signal is not, and the aggregation correctly separates them. The contrast also makes the rubric's landability-first aggregation visible: both roles clear Q1, but Q2-Q4 differentiate the letter within the Q1-cleared band.
 
-### Example: Senior Staff Platform Engineer @ Unknown Corp (→ F)
+### Worked Aggregation: Senior Staff Platform Engineer @ Unknown Corp
 
 **Q1 — Can they get it?** No. Description requires "8+ years of production experience, led platform teams of 5+, principal-level architecture ownership." Hard seniority mismatch per `experience.md`.
 
-**Grade: F.** Question 1 fails decisively. No other questions matter.
+**Aggregation outcome: F.** Per the §Step 3 anchor table: Q1 hard-fail → F (any Q2-Q5 profile). Question 1 fails decisively; no other questions matter.
 
-### Example: "Software Engineer" @ Well-funded Startup — Actually Solutions Engineering (→ F)
+### Worked Aggregation: "Software Engineer" @ Well-funded Startup — Actually Solutions Engineering
 
 **Q1 — Can they get it?** Probably, based on seniority.
 
@@ -378,7 +434,7 @@ This example exists to make the landable-but-mediocre case explicit. The aggrega
 
 **Q5 — Practical constraints?** Fails. Customer-facing roles are a hard exclusion in `preferences.toml`.
 
-**Grade: F.** Hard exclusion triggered (customer-facing role type). Title said "Software Engineer" but description reveals solutions engineering.
+**Aggregation outcome: F.** Q5 hard exclusion triggered (customer-facing role type per `preferences.toml`). Per the §Step 3 anchor table: Q5 hard-fail produces F regardless of Q2-Q4 strength. Title said "Software Engineer" but description reveals solutions engineering.
 
 ---
 
