@@ -36,7 +36,7 @@ Grading happens in five steps. Each step informs the next. The grade letter is t
 
 The fit assessment written to the database should be the output of this process — the actual reasoning, not a summary. Q1 reasoning leads the assessment narrative; Q2 reasoning follows; Q3-Q5 close. This ordering surfaces the dominant axis in the visible text so the grade letter and the narrative cannot drift apart.
 
-**Q-pattern → letter mapping anchors (illustrative, not lookups).** The aggregation is judgement, not arithmetic — but the centre-of-gravity for each Q1 × Q2-Q5 combination is anchored here so different graders converge on the same letter when the Q1 verdict is shared:
+**Q-pattern → letter mapping anchors (load-bearing default mapping).** The §Step 3 anchor rows are load-bearing: when the candidate's Q1 verdict and Q2-Q5 profile match a row, the row's letter is the default. Deviating from a row's letter requires the assessment to name the deviation explicitly in the form *"Anchor row would produce X, but this case differs because [specific reason], so the letter is Y."* Silent deviation from a matching anchor row is a Q-pattern application error. The table is the legibility mechanism for the aggregation — a future reader (the user, another grader, the `check-integrity` skill) should be able to map the assessment's Q1-Q5 reasoning to a specific anchor row and verify the letter matches.
 
 | Q1 verdict | Q2-Q5 profile | Letter |
 |---|---|---|
@@ -85,6 +85,23 @@ Read `experience.md` for formal work history and the per-project files in `profi
 
 The detection rule for the grader: when reasoning about Q1, ignore Q2's signal entirely. Q2 answers "would this look good on a CV?" Q1 answers "does this firm hire people who look like this candidate, in volumes that make conversion plausible?" Conflating them is the exact failure mode the realism semantic exists to prevent.
 
+**Q1 Verdict Detection Signals (mechanical mapping from description patterns to Q1 verdict).** The Q1 verdict is the load-bearing input to the §Step 3 anchor table. Reading variance across graders on the Q1 verdict produces letter-disagreement downstream regardless of how sharp the aggregation rules are. This table makes the Q1 reading mechanical for the common patterns; the verdict is the most-restrictive signal when multiple patterns apply:
+
+| Description / firm signal | Q1 verdict |
+|---|---|
+| Wide-funnel established-firm graduate/intern programme (Cloudflare, Amazon, Palantir, Stripe, Spotify, etc. with explicit "Graduate" / "New Grad" / "Intern" title + structured pipeline) accepting BEng 2:2 degree class | **cleared-decisively** |
+| Mid-tier UK firm with explicit graduate/junior framing, no hard credential floor (Lendable, Trainline, Monzo, Yapily, B2C2, Squarepoint graduate-programme roles) | **cleared-decisively** |
+| Role with "personal projects accepted" or "or equivalent demonstrated ability" framing + no explicit X+ year floor | **cleared-decisively** if firm is wide-funnel; **cleared-with-friction** if firm is narrow-funnel with stack-specific evidence-acceptance |
+| Soft floor: 2-year-experience requirement, "in commercial setting" language, "production environment" language without years number | **cleared-with-friction** |
+| Post-graduation candidate + "currently pursuing" template-boilerplate at wide-funnel firm (per §Common Grading Errors §"Post-graduation candidates and new-grad / intern pipelines") | **cleared-with-friction** (NOT hard-fail) |
+| Post-graduation candidate + "currently pursuing" with explicit graduation-year cutoff (e.g. "Spring 2027 or later") | **hard-fail** |
+| Implicit-selectivity Q1: narrow-funnel firm (HFT/quant prop trader / brand-AI research lab) + no stack-specific evidence-acceptance language | **real-headwind** |
+| Explicit hard floor: "X+ years" with X ≥ 3, "X-Y years" with X ≥ 4, "significant experience" / "deep expertise" / "extensive experience" / "expert-level" | **hard-fail** |
+| Hard Q5 exclusion: role-type on `preferences.toml.hard.exclude_role_types`, location outside `preferences.toml.hard.locations`, sector on `exclude_sectors` | **hard-fail** |
+| Staff/Principal/Senior-IC scope (compensation £200k+, "own the X" / "shape the Y" / "design at scale" / leadership expectations) | **hard-fail** |
+
+**Most-restrictive-signal rule.** When the description has multiple signals, the most-restrictive signal determines Q1. A role with both "Graduate" title AND a 5+ years floor is **hard-fail** (the floor dominates the title). A role with both "wide-funnel firm" AND "sub-1% hire rate stated explicitly" is **real-headwind** (the explicit selectivity dominates the firm-class default). The Q1 detection table is the floor for Q1 reading consistency — graders may add nuance to the verdict's phrasing but the verdict letter (cleared-decisively / cleared-with-friction / real-headwind / hard-fail) is constrained to the most-restrictive matching row.
+
 **If the answer to Q1 is clearly no — whether through an explicit credential floor (hard 5+ years requirement, staff/principal scope, leadership expectations, PhD required) or through implicit selectivity that puts the candidate sub-1% on realistic conversion — the grade is F or C depending on how brutal the gap is. No other question matters when Q1 fails.** This is the only question that can unilaterally determine the grade. A role where Q1 reads as a real headwind (genuine non-zero conversion but the candidate is outside the realistic primary-target pool) aggregates down to C through the Q1-primary lens described in §How to Grade a Job Step 3, regardless of how strong Q2-Q4 read in the absolute frame — see the §Grade Scale §A and §C definitions below for how the aggregation produces the letter without sub-categories.
 
 ### 2. Would this be a good first line on the candidate's CV?
@@ -130,6 +147,8 @@ Also check `portfolio-gaps.md` — does this role require something the profile 
 **Worked decomposition.** A Go backend role at a high-traffic site demanding "lock-free / low-latency / high-performance / observability". Candidate: Rust-primary, zero Go projects. Stack-fit = zero. Concept-fit = strong (Nyquestro lock-free matching engine + Image Browser ML inference observability + Cernio async pipelines). Q3 lands strong on concept-fit, not weak on stack-fit. The aggregation then weighs Q1 × Q2 × Q3 (strong) × Q4 × Q5 — not Q1 × Q2 × Q3 (weak stack-mismatch) × Q4 × Q5.
 
 **Detection rule for the grader.** Before concluding Q3 is weak on a stack mismatch, check whether the role's description names a paradigm the candidate's `profile/skills.md` §Concepts and Domains lists. If yes, Q3 weight is set by the paradigm overlap, not the language overlap. Cross-language concept-fit is the most-common-missed Q3 signal in the rubric's failure history; the detection rule exists to make it visible.
+
+**Concept-fit citation specificity.** When the fit assessment names Concept-fit, the citation is the EXACT verbatim entry from `profile/skills.md` §Concepts and Domains — not a paraphrased paradigm name. Each named paradigm pairs with the specific project from `profile/projects/` that demonstrates it AND the project's `status:` frontmatter value. Generic paradigm names without skills.md verbatim entry + project anchor are insufficient — they read as ceremonial citation and produce inter-grader variance on Q3 strength. The format the assessment uses: *"Concept-fit: skills.md §Concepts and Domains lists '[exact verbatim entry]' ([proficiency band], anchored on `projects/[name].md` status:[active|paused|dormant], [one-line evidence]) — matches the role's '[verbatim role-description language]' requirement."* The structural specificity is what makes inter-grader concept-fit readings converge; paraphrased citations don't.
 
 ### 4. Would the candidate enjoy the day-to-day work?
 
@@ -276,7 +295,29 @@ The same career-stage factors that affect company grading affect job grading, bu
 
 **Over-weighting tech stack — with one important asymmetry.** As a generic rule, a graduate Go role at a strong sponsoring company is worth more than a Rust role at a 3-person startup with no funding. Languages are learned in months; company signal, career trajectory, and sponsorship compound over years. So tech stack should not normally be the deciding factor between adjacent grades.
 
-The asymmetry: when a candidate's portfolio is **concentrated in a specific stack** (multiple substantive projects at Proficient band in `profile/skills.md`, several per-project files in `profile/projects/` all using the same primary language), stack alignment with the role's primary stack flips a marginal applicant into a competitive one inside the realistic applicant pool. The portfolio's evidence base directly anchors to the role's technical requirements. The carveout magnitude scales with the concentration:
+The asymmetry: when a candidate's portfolio is **concentrated in a specific stack** (multiple substantive projects at Proficient band in `profile/skills.md`, several per-project files in `profile/projects/` all using the same primary language), stack alignment with the role's primary stack flips a marginal applicant into a competitive one inside the realistic applicant pool. The portfolio's evidence base directly anchors to the role's technical requirements.
+
+**Hard-Floor Recognition Signals — when the carveout CANNOT fire.** Before the stack-concentration magnitude table applies, the grader classifies the role's floor language. The carveout offsets implicit-selectivity friction only; it never offsets hard credential floors or hard exclusions. This table is the mechanical disambiguation for which floor language counts as which class:
+
+| Description / firm signal | Floor class | Carveout offset eligible? |
+|---|---|---|
+| Explicit "X+ years" with X ≥ 3 | **HARD floor** — Q1 hard-fail | **NO** — carveout cannot fire regardless of stack-concentration |
+| Explicit "X+ years" with X = 2 | Soft floor — Q1 cleared-with-friction (borderline-clearable via portfolio) | **NO offset** but Q1 doesn't drop to real-headwind solely on the 2-year floor |
+| "X-Y years" range with floor X ≥ 4 (e.g. "5-10 years", "8-12 years") | **HARD floor** — Q1 hard-fail | **NO** |
+| "significant experience" / "deep expertise" / "expert-level" / "extensive experience" / "demonstrable production experience" | **HARD floor proxy** — Q1 real-headwind to hard-fail | **NO** |
+| "in a commercial setting" / "in a production environment" without years number | Soft floor — Q1 cleared-with-friction | Partial offset for ≥5 stack-concentration ONLY when description ALSO has stack-specific evidence-acceptance language ("complex Rust pet projects accepted", "or equivalent demonstrated ability") |
+| "less than 1% hired" / "highly selective" / named narrow-funnel firm (HFT/quant prop trader / brand-AI lab) | **Implicit-selectivity floor** — Q1 real-headwind | Partial offset (~1.5 letters per the magnitude table below) for ≥5 stack-concentration ONLY when description has stack-specific evidence-acceptance language |
+| "personal projects accepted" / "or equivalent demonstrated ability" / "complex pet projects" / "side projects valid" | NOT a floor — explicit portfolio-evidence-acceptance | N/A — Q1 cleared-with-friction at worst; this language is the carveout's primary trigger |
+| "Graduate" / "New Grad" / "Junior" in title + structured pipeline at established firm | NOT a floor — explicit entry-level | N/A — Q1 cleared-decisively if firm has wide-funnel pipeline |
+| Staff/Principal/Senior-IC scope (compensation £200k+ band, "own the X" / "shape the Y" / "design at scale" / leadership expectations) | **HARD floor proxy** — Q1 hard-fail | **NO** |
+
+**Worked walk — XTX Markets Research Technology (hard floor, carveout does NOT fire).** Description states "5-10 years" experience required. Per the Hard-Floor Recognition Signals table, "5-10 years" with lower bound ≥ 4 is a HARD floor. The stack-concentration carveout CANNOT fire on hard floors. Even with the candidate's 9 active Rust projects clearing the carveout's volume threshold, Q1 reads hard-fail. Per the §Step 3 anchor table: Q1 hard-fail → F regardless of Q2-Q5 strength. **Grade: F.** The carveout's existence does not override the hard-floor rule — agents who lift XTX to A on stack-concentration grounds are misapplying the carveout.
+
+**Worked walk — Proton Rust SWE (soft floor + stack-specific evidence-acceptance, carveout DOES fire).** Description states "Hiring at Proton is highly selective, with less than 1% of candidates hired" — this is an implicit-selectivity floor (real-headwind). The description ALSO says "complex Rust pet projects" are explicit evidence — this is stack-specific evidence-acceptance language. Per the Hard-Floor table: implicit-selectivity floor with stack-specific evidence-acceptance is carveout-eligible. The candidate has 9 active Rust projects (≥ 5 threshold). Carveout fires; ~1.5-letter offset on the selectivity friction. Q1 reads cleared-with-friction. Per the §Step 3 anchor table: cleared-with-friction + strong Q2-Q5 → A. **Grade: A.**
+
+The Hard-Floor Recognition Signals table is the mechanical disambiguation that prevents misapplication of the carveout on roles with explicit credential floors.
+
+The carveout magnitude (once the hard-floor check has cleared the role as carveout-eligible) scales with the concentration:
 
 | Stack concentration | Effect on Q1 (within realistic pool) | Effect on Q3 | What it does NOT offset |
 |---|---|---|---|
