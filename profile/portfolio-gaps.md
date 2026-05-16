@@ -392,6 +392,58 @@ These are concrete steps that would unlock whole geographies rather than individ
 
 **No new portfolio gaps identified.** Existing gaps (cloud/DevOps, C++ proficiency, MSc/PhD, CI/CD) confirmed but no new requirements surfaced.
 
+### Batch: 1,075 jobs across all S/A/B/C companies — full pipeline re-grade post-clean-slate, 2026-05-17
+
+**1,075 jobs graded. Distribution: 7 SS, 24 A, 64 B, 236 C, 744 F (69% F-rate).** The clean-slate wipe re-ran search-jobs against all 657 companies, producing a new corpus graded from scratch under the full rubric. 7 agents ran in parallel (2 S-batch, 1 A-batch, 2 B-batch, 2 C-batch) using the grading rubric with Q1-primary aggregation, Q1-verdict taxonomy, prestige-trap rule, stack-concentration carveout, and post-graduation-boilerplate detection.
+
+**The five SS targets are unchanged but now confirmed with a fresh corpus.** Amazon SDE Graduate 2026 + Amazon SDE Intern UK (both London/Cambridge/Edinburgh), Microsoft SWE Full-Time Graduate + SWE Internship UK, Bloomberg 2026 SWE Graduate London, Google SWE University Graduate 2026, **Arm Graduate Engineer Cambridge (id=1069, closes 24 May 2026).** All pass the same double gate: wide-funnel grad-pipeline framing AND a profile that clears Q1 decisively. The Arm role is the most time-critical target in the entire pipeline — Cambridge office (A+ anchor), semiconductor pedigree, closes in 7 days from grading date.
+
+**Anthropic Fellows confirmed cleared-with-friction A (not SS) in this corpus.** Four Fellows tracks — AI Safety (id=54), AI Security (id=55), ML Systems & Performance (id=56), RL (id=57) — all graded A. The prior 2026-04-29 batch graded three of these SS (2241, 2243, 2244). The rubric-consistent verdict is A: "cleared-with-friction" Q1 (programme is highly selective despite the "regardless of experience" framing) keeps it out of the SS band. Prior SS grades were aggressive; this corpus applies the rubric more precisely. ML Systems & Performance is the best-fit workstream given Image Browser ONNX pipeline + Nyquestro HDR-histogram + burn PR.
+
+**GSR Quant Developer (id=325) is the highest-signal confirmed A in this corpus.** "Minimum of one year experience developing in Rust; will be tested" — Caner's 9 Rust projects at 14k+ LOC clears this cold. Nyquestro (BTreeMap matching engine + Coinbase WS + HDR-histogram) is the closest portfolio-to-role alignment of any job in the batch. Stack-concentration carveout applies at "portfolio evidence explicitly accepted" strength. Apply with Nyquestro as the primary narrative.
+
+**Keyrock Rust Engineer - Trading (id=509) is the rare institutional-crypto A.** "Pioneers in adopting Rust for algorithmic trading" + "welcome applications from other backgrounds." Stack-concentration carveout active on 9 Rust projects. Institutional market-making is not consumer-crypto per preferences.toml — the exclusion targets retail consumer-crypto products, not wholesale OTC liquidity provision. This is the third consecutive corpus confirming institutional-crypto-MM as a viable A-tier corridor.
+
+**Flower Labs Remote-UK (ids=1072/1073) confirm "all seniority levels welcome" as the pattern-detection signal for accessible frontier-ML roles.** Two A-grade roles (Founding Research Engineer + Founding ML Engineer) at a federated-learning AI lab. NeuroDrive handwritten PPO + tinygrad PR + burn PR APPROVED are the cited evidence. "All seniority levels welcome" appearing in a frontier-AI job description is now a reliable cleared-with-friction Q1 override — do not default-F these on seniority grounds.
+
+**Nothing Technology Full Stack Developer (id=593, A) opens a new creative-tech application corridor.** King's Cross studio (A+ lifestyle anchor), industrial design + functional prototyping team, "front-end engineering, creative coding, physical computing, or something else entirely" framing removes the years floor. Tauri 2 + React 19 + Rust portfolio (Image Browser, Tessarix) is a direct evidence match. Not a sector Caner has targeted previously — this pattern suggests other creative-tech/hardware-adjacent firms in London may warrant a dedicated discovery pass.
+
+**Encord Associate Full-Stack Engineer (id=276, A) confirms from-scratch portfolio acceptance at London ML-tooling firms.** "Personally developed and maintained multiple systems from scratch, or significantly contributed to major changes" — Cernio 14k LOC + Image Browser Tauri+React+ONNX + Tessarix Tauri+React+MDX directly satisfy this. React 19 comfortable is the stack match. Most roles at product companies require 2-4+ years; Encord's associate framing with explicit from-scratch acceptance is the exception pattern — track firms using this language.
+
+**Cambridge continued as the highest-density A/SS city outside London.** Arm (SS, Cambridge), Graphcore Drivers (A, Cambridge), Speechmatics FutureVoices ×2 (A, Cambridge + London), Squarepoint Graduate SWE (A, London). The Cambridge-only filter in preferences.toml is well-calibrated; Cambridge roles in this corpus are disproportionately hardware/systems/AI firms with strong grad pipelines.
+
+**Aveva AI/ML Graduate (id=104, A) from C-grade company is the proof that C-company grading is not monolithic.** Aveva is a C-company but the AI/ML Graduate role is a structured wide-funnel grad programme at an industrial software firm. The C-company tier signals weaker research culture and lower ceiling, not zero accessibility. Per prior guidance: "raise min_company_grade to B for future searches" — but structured graduate-labelled programmes at C-companies are the exception worth keeping.
+
+**C-grade companies confirmed low-yield: 3 A from 141 jobs (2.1%).** Contrasts with B (5 A from 184 = 2.7%), A (11 A from 93 = 11.8%), S (9 SS+A from 192 = 4.7%). The A-grade company tier is dramatically more efficient per-job than B/C. Strategic implication: increase A-tier company discovery relative to B/C in future `discover-companies` passes.
+
+**The prestige-trap rule confirmed at scale.** Jane Street, Jump Crypto, HRT (non-grad roles), Citadel/Securities intern+grad: all graded C, not A, via Q1 real-headwind + any Q2-Q5 strength → C. No exceptions. 17 Jane Street roles, 4 HRT non-grad roles all C in this corpus. The rubric's Jane Street canonical-C-anchor is load-bearing and held across all 7 agents.
+
+**Squarepoint Graduate Quant Developer + Graduate SWE (ids=847/848, both A)** confirm the quant-fund-with-explicit-grad-programme pattern. Squarepoint has a Python/C++/Rust track — the Rust track is a direct alignment. Apply to both with Nyquestro + Aurix as primary evidence.
+
+**Confirmed strengths from this batch (cite by project name when applying):**
+- **Nyquestro** — primary evidence for GSR (id=325), Keyrock (id=509), Squarepoint Quant Developer (id=847/848), B Agent's Wintermute C-grades (prestige-trap confirmed)
+- **NeuroDrive + tinygrad + burn PR triad** — primary evidence for all four Anthropic Fellows (ids=54-57), PhysicsX ML (id=666), Flower Labs (ids=1072/1073), Hiverge (confirmed from prior batch)
+- **Aurix** — primary evidence for GSA Capital (id=322, A, "no finance background required"), BNP Paribas (id=1075, A), institutional-crypto-MM corridor (Keyrock, B2C2)
+- **Image Browser + Tessarix** — primary evidence for Encord Associate (id=276), Nothing Technology (id=593)
+- **Cernio portfolio** — generalist evidence for Amazon/Microsoft/Bloomberg/Google wide-funnel SS assessments, Mistral AI Backend (id=571)
+
+**Gaps reinforced by this corpus:**
+
+1. **Cloud / Docker / Kubernetes / Terraform / CI-CD** — sixth consecutive batch. Primary blocker on 20+ roles in this corpus. Closure: Cernio Dockerfile + GitHub Actions + AWS deploy remains the highest-leverage single action in the portfolio (estimated A→B uplift on ~15 adjacent roles).
+2. **C++ proficiency (Familiar → Proficient)** — primary blocker at Graphcore Bristol cluster, Wintermute, QRT non-grad. Nyquestro demonstrates C++ concepts (lock-free, performance engineering) in Rust — the gap is the demonstrated-in-C++ evidence. Closure: take Tectra past Clock scaffold into a working feed-handler + matching loop.
+3. **Production-scale ML** — confirmed at PhysicsX (A, not S) and the Flower Labs A-not-S boundary. Closure: Lambda Labs / Vast.ai one-time GPU training experiment.
+4. **2:2-degree-class credential filter** — not newly observed here but confirmed at Squarepoint Graduate Quant Developer assessment (noted explicitly as friction-rather-than-hard-fail at quant-grad programmes). No closure path except post-degree signal.
+5. **No merged mainline OSS contribution** — burn PR APPROVED but the mainline commit is still pending. Completing the merge would lift every burn-PR-citing assessment.
+
+**New pattern: "all seniority levels welcome" is a reliable cleared-with-friction Q1 trigger.** This phrase appeared in Flower Labs, Mistral AI ("fresh graduates to senior and staff"), Encord ("personally developed and maintained multiple systems" acceptance signal), and Nothing Technology (the superpowers framing). Track this as a rubric-level detection signal, not just a per-role observation.
+
+**Application urgency for next 7 days (by deadline or opportunity-cost):**
+1. **Arm Graduate Engineer Cambridge (id=1069) — CLOSES 24 MAY 2026.** Highest priority, no negotiation.
+2. Flower Labs Founding Research Engineer + ML Engineer (ids=1072/1073) — early-stage founding team, apply before round closes.
+3. GSR Quant Developer (id=325) — Rust proficiency tested; apply while corpus is fresh.
+4. Encord Associate Full-Stack (id=276) — from-scratch signal, React match, apply with Cernio + Image Browser narrative.
+5. Mistral AI Backend London (id=571) — "all levels welcome," frontier AI lab, apply with Tokio/async-systems narrative.
+
 ---
 
 ## Patterns from Company Grading Batches
