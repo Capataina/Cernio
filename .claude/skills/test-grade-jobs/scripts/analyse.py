@@ -140,40 +140,49 @@ def extract_cluster_scope(agent_id):
 
 
 def parse_q_slots(sect):
-    """Extract Q1, Q2, Q3a, Q3b, Q4, Q5, Verdict prose from a job section."""
+    """Extract Q1, Q2, Q3a, Q3b, Q4, Q5, Verdict prose from a job section.
+
+    Robust to multiple header styles agents may use:
+      ## Q1 — ...   /  ### Q1 — ...   /  **Q1 — ...**
+    """
     slots = {f"q{n}_prose": "" for n in ["1", "2", "3a", "3b", "4", "5"]}
     slots["verdict_prose"] = ""
 
-    # ## heading variant
-    patterns = [
-        (r"^##\s*Q1\b[^\n]*\n(.+?)(?=^##\s*Q2\b|\Z)", "q1_prose"),
-        (r"^##\s*Q2\b[^\n]*\n(.+?)(?=^##\s*Q3a\b|\Z)", "q2_prose"),
-        (r"^##\s*Q3a\b[^\n]*\n(.+?)(?=^##\s*Q3b\b|\Z)", "q3a_prose"),
-        (r"^##\s*Q3b\b[^\n]*\n(.+?)(?=^##\s*Q4\b|\Z)", "q3b_prose"),
-        (r"^##\s*Q4\b[^\n]*\n(.+?)(?=^##\s*Q5\b|\Z)", "q4_prose"),
-        (r"^##\s*Q5\b[^\n]*\n(.+?)(?=^##\s*Verdict\b|\Z)", "q5_prose"),
-        (r"^##\s*Verdict\b[^\n]*\n(.+?)(?=^##|^Grade:|\Z)", "verdict_prose"),
+    # Heading-line regex: matches ##, ###, or **bold** styles
+    # for a given Q-slot name. Returns the content from the heading to the next
+    # Q-slot heading or the Grade line.
+    def heading_pattern(slot_name, next_names):
+        # Build alternation for next-section headers
+        next_alts = []
+        for n in next_names:
+            next_alts.append(rf"^#{{2,3}}\s*{re.escape(n)}\b")
+            next_alts.append(rf"^\*\*\s*{re.escape(n)}\b")
+        next_alts.append(r"^Grade\s*:")
+        next_alts.append(r"^evidence_basis\s*:")
+        next_alt_re = "|".join(next_alts)
+        # Header for this slot can be:
+        #   ##\s*Q1   /  ###\s*Q1  /  **Q1...** (bold)
+        header_re = rf"(?:^#{{2,3}}\s*{re.escape(slot_name)}\b[^\n]*\n|^\*\*\s*{re.escape(slot_name)}\b[^\n*]*\*\*\s*)"
+        return rf"{header_re}(.+?)(?={next_alt_re}|\Z)"
+
+    q_seq = [
+        ("Q1", "q1_prose", ["Q2", "Q3a", "Q3", "Verdict"]),
+        ("Q2", "q2_prose", ["Q3a", "Q3", "Q4", "Verdict"]),
+        ("Q3a", "q3a_prose", ["Q3b", "Q4", "Verdict"]),
+        ("Q3b", "q3b_prose", ["Q4", "Verdict"]),
+        ("Q3", "q3a_prose", ["Q4", "Verdict"]),  # Some agents use unified Q3
+        ("Q4", "q4_prose", ["Q5", "Verdict"]),
+        ("Q5", "q5_prose", ["Verdict"]),
+        ("Verdict", "verdict_prose", ["Summary table", "Job"]),
     ]
-    for pat, key in patterns:
+    for slot_name, key, nexts in q_seq:
+        # Only write if slot is still empty (preserve Q3a if Q3 unified parse hits later)
+        if slots.get(key):
+            continue
+        pat = heading_pattern(slot_name, nexts)
         m = re.search(pat, sect, re.M | re.S)
         if m:
             slots[key] = m.group(1).strip()
-
-    # **Bold-header variant** as fallback
-    if not any(slots.values()):
-        for key, qname in zip(
-            ["q1_prose", "q2_prose", "q3a_prose", "q3b_prose", "q4_prose", "q5_prose"],
-            ["Q1", "Q2", "Q3a", "Q3b", "Q4", "Q5"],
-        ):
-            m = re.search(
-                r"\*\*" + re.escape(qname) + r"\b[^\n*]*\*\*\s*(.+?)(?=\*\*Q|\*\*Verdict|^Grade:|\Z)",
-                sect, re.M | re.S
-            )
-            if m:
-                slots[key] = m.group(1).strip()
-        m = re.search(r"\*\*Verdict\b[^\n*]*\*\*\s*(.+?)(?=^Grade:|\*\*Grade|\Z)", sect, re.M | re.S)
-        if m:
-            slots["verdict_prose"] = m.group(1).strip()
 
     return slots
 
@@ -229,7 +238,9 @@ def parse_agent_output(path):
     sections = re.split(r"^---+\s*$", text, flags=re.M)
     assessments = []
     for sect in sections:
-        m = re.match(r"\s*##\s*Job\s+(\d+)\s*:\s*(.+?)\s*$", sect, re.M)
+        # Accept multiple Job-header styles: `## Job 592:`, `## Job 592 —`,
+        # `### Job 592:`, etc.
+        m = re.search(r"^#{2,3}\s*Job\s+(\d+)\s*[:\-—–]\s*(.+?)\s*$", sect, re.M)
         if not m:
             continue
         job_id = int(m.group(1))
@@ -435,7 +446,8 @@ def axis_d_consistency(agent_data):
     verdict_pct = verdict_grade_aligned / n_graded
     q1_pct = (q1_hardfloor_coherent / q1_hardfloor_eligible) if q1_hardfloor_eligible else 1.0
     risk_pct = (risk_engaged / risk_eligible) if risk_eligible else 1.0
-    score = (verdict_pct * 40 + q1_pct * 30 + risk_pct * 30) * 100
+    # Weights sum to 100, percentages are 0-1 → score is 0-100 directly
+    score = verdict_pct * 40 + q1_pct * 30 + risk_pct * 30
     return {
         "score": round(score, 1),
         "verdict_grade_aligned_pct": round(verdict_pct * 100, 1),
@@ -476,7 +488,8 @@ def axis_e_inter_agent(agents):
         if len(grades) >= 2:
             nums = [LETTER_TO_NUM[g] for g in grades]
             job_ranges[jid] = max(nums) - min(nums)
-    score = (exact_pct * 60 + within1_pct * 40) * 100
+    # Weights are percentages (60+40=100) and pcts are 0-1 → 0-100 directly
+    score = exact_pct * 60 + within1_pct * 40
     return {
         "score": round(score, 1),
         "exact_match_pct": round(exact_pct * 100, 1),
@@ -505,7 +518,7 @@ def axis_f_pairwise(agents):
     else:
         score = (1 - tie_rate) * 70
     return {
-        "score": round(score * 100, 1),
+        "score": round(score, 1),
         "cross_agent_agreement_pct": round(cross_pct * 100, 1) if cross_pct is not None else None,
         "shared_pairs_n": len(shared),
         "tie_rate_pct": round(tie_rate * 100, 1),
@@ -546,7 +559,8 @@ def axis_g_risk(agent_data):
     delta_normalised = 0.5
     if risk_direction_delta is not None:
         delta_normalised = max(0, min(1, (risk_direction_delta + 1) / 2))
-    score = (risk_named_pct * 40 + risks_in_q3b_pct * 30 + delta_normalised * 30) * 100
+    # Weights sum to 100; percentages are 0-1 → score is 0-100 directly
+    score = risk_named_pct * 40 + risks_in_q3b_pct * 30 + delta_normalised * 30
     return {
         "score": round(score, 1),
         "risk_named_pct": round(risk_named_pct * 100, 1),
