@@ -239,12 +239,12 @@ def parse_agent_output(path):
     assessments = []
     for sect in sections:
         # Accept multiple Job-header styles: `## Job 592:`, `## Job 592 —`,
-        # `### Job 592:`, etc.
-        m = re.search(r"^#{2,3}\s*Job\s+(\d+)\s*[:\-—–]\s*(.+?)\s*$", sect, re.M)
+        # `### Job 592:`, `## Job 750` (no separator + title on next line), etc.
+        m = re.search(r"^#{2,3}\s*Job\s+(\d+)\s*([:\-—–]\s*(.+?))?\s*$", sect, re.M)
         if not m:
             continue
         job_id = int(m.group(1))
-        header = m.group(2).strip()
+        header = (m.group(3) or "").strip()
         q_slots = parse_q_slots(sect)
         grade = parse_grade_letter(sect)
         evidence_basis = parse_evidence_basis(sect)
