@@ -24,9 +24,12 @@ struct SmartRecruitersJob {
     #[serde(rename = "experienceLevel")]
     experience_level: Option<SmartRecruitersLabel>,
     department: Option<SmartRecruitersLabel>,
-    /// URL to the public posting.
-    #[serde(rename = "ref")]
-    ref_url: Option<String>,
+    /// Public careers-page URL — `https://jobs.smartrecruiters.com/{slug}/{id}-slug`.
+    /// The sibling `ref` field exists in the response but points at the API
+    /// endpoint (`https://api.smartrecruiters.com/v1/...`), which renders as
+    /// raw JSON in a browser — never use it.
+    #[serde(rename = "postingUrl")]
+    posting_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -202,10 +205,15 @@ fn normalise(job: SmartRecruitersJob, slug: &str) -> AtsJob {
         }
     }
 
-    // Construct URL — use ref_url if available, otherwise construct from slug+id.
-    let url = job.ref_url.unwrap_or_else(|| {
-        format!("https://jobs.smartrecruiters.com/{slug}/{}", job.id)
-    });
+    // Prefer the API's postingUrl (the real public careers-page URL).
+    // Fall back to constructing from slug+id if the field is missing.
+    // Defence-in-depth: reject anything pointing at the API host, since the
+    // sibling `ref` field used to be deserialised here and stored raw JSON
+    // endpoints in the DB (32 rows had to be backfilled — see commit history).
+    let url = job
+        .posting_url
+        .filter(|u| !u.starts_with("https://api.smartrecruiters.com/"))
+        .unwrap_or_else(|| format!("https://jobs.smartrecruiters.com/{slug}/{}", job.id));
 
     AtsJob {
         external_id: job.id,
@@ -280,7 +288,7 @@ mod tests {
     // ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn normalise_basic_with_ref_url() {
+    fn normalise_basic_with_posting_url() {
         let raw = r#"{
             "totalFound": 1,
             "content": [{
@@ -291,13 +299,15 @@ mod tests {
                     "city": "London",
                     "country": "United Kingdom"
                 },
-                "ref": "https://jobs.smartrecruiters.com/acme/sr-1"
+                "postingUrl": "https://jobs.smartrecruiters.com/acme/sr-1-backend-engineer",
+                "ref": "https://api.smartrecruiters.com/v1/companies/acme/postings/sr-1"
             }]
         }"#;
         let job = parse_one(raw, "acme");
         assert_eq!(job.external_id, "sr-1");
         assert_eq!(job.title, "Backend Engineer");
-        assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-1");
+        // Must take postingUrl, never `ref` (which points at the API host).
+        assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-1-backend-engineer");
         assert_eq!(job.location.as_deref(), Some("London, United Kingdom"));
         assert!(job.all_locations.contains(&"London".to_string()));
         assert!(job.all_locations.contains(&"United Kingdom".to_string()));
@@ -306,7 +316,7 @@ mod tests {
 
     #[test]
     fn normalise_url_fallback_constructs_from_slug_and_id() {
-        // When `ref` is absent, the parser builds a URL from slug + id.
+        // When `postingUrl` is absent, the parser builds a URL from slug + id.
         let raw = r#"{
             "totalFound": 1,
             "content": [{
@@ -316,6 +326,32 @@ mod tests {
         }"#;
         let job = parse_one(raw, "acme");
         assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-2");
+    }
+
+    #[test]
+    fn normalise_rejects_api_host_url() {
+        // Regression guard: the SmartRecruiters API returns a `postingUrl`
+        // alongside a `ref` field that points at the API endpoint
+        // (`api.smartrecruiters.com/...`). The fetcher used to deserialise
+        // `ref` into the public-URL slot, which stored raw JSON endpoints
+        // in the DB and produced broken applies (Wise, L&G AM, etc.).
+        // Even if `postingUrl` is somehow set to the API host, we must
+        // reject it and fall back to the constructed form.
+        let raw = r#"{
+            "totalFound": 1,
+            "content": [{
+                "id": "sr-3",
+                "name": "Platform Engineer",
+                "postingUrl": "https://api.smartrecruiters.com/v1/companies/acme/postings/sr-3"
+            }]
+        }"#;
+        let job = parse_one(raw, "acme");
+        assert!(
+            !job.url.starts_with("https://api.smartrecruiters.com/"),
+            "url must not point at the API host; got {}",
+            job.url
+        );
+        assert_eq!(job.url, "https://jobs.smartrecruiters.com/acme/sr-3");
     }
 
     #[test]
