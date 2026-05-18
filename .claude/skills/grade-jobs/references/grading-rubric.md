@@ -42,6 +42,66 @@ The classifier-style language ("cleared-decisively", "cleared-with-friction", "r
 
 ---
 
+## Risks That Bite — Read This Before Grading Any SS or S
+
+The pattern this section establishes: when a Q-slot names a real risk, the Verdict slot weighs that risk against the strengths, and the grade letter moves to reflect the weighing. A risk acknowledged but not weighed is "risk-decoration" — the rubric calls this out as a failure mode and these worked examples are the template for risks that actually bite. **Read this section before grading any candidate role at SS or S.** The structurally most common SS-band inflation pattern is naming a risk in Q3b or Q5 but ignoring it in the Verdict; this section is the anchor against that pattern.
+
+Each example is structurally generic (no real company names, no real role titles) and shows one Q-slot naming a risk that pushes the grade DOWN one tier from where the other Q-slots alone would land it.
+
+### Example — S → A (Q3b career-axis weakness bites)
+
+A role at an elite payments-platform company. Q1 cleared (graduate-tier opening, no hard floor). Q2 strong (the company is recognised, well-funded, has a public engineering blog citing Rust adoption). Q3a strong (the JD names Go and Rust; the candidate has Rust as a primary language and Go as adjacent). Q4 moderate (payments domain — finance-adjacent, candidate has demonstrated interest in trading-adjacent systems). Q5 clean (London office, sponsor-capable).
+
+Without Q3b, this aggregates to S. With Q3b: *"The role's day-1 work is generic payments-platform feature work — adding new payment-method integrations and maintaining the existing payment-orchestration service. The systems-engineering depth Q3a established is real on the technology axis but the role's actual work is platform-product engineering, not the lock-free / low-latency / autonomy systems work the candidate's portfolio (Nyquestro, NeuroDrive) is on. This is adjacent to the target career trajectory, not on-axis."*
+
+Verdict prose: *"Strong company + good stack overlap is the pull. The pushback is that the day-1 work is off the career-axis the candidate is building toward — this would be a credibility builder, not an axis bet. In a budget of 30 applications, this makes the cut as a backup; it would not be a primary investment."*
+
+Grade: A (not S) — the Q3b weakness bit.
+
+### Example — A → B (Q5 sponsorship friction bites)
+
+A role at a mid-tier UK fintech. Q1 cleared (junior framing, no hard floor). Q2 moderate-strong (the company has decent reputation, profitable, named in industry surveys). Q3a strong (Python and TypeScript both at the candidate's Comfortable band; the JD's stack matches). Q3b adjacent (backend fintech work — not on the systems axis but credibility-positive). Q4 moderate.
+
+Without Q5, this aggregates to A. With Q5: *"The JD states 'we are not able to offer visa sponsorship for this role'. The candidate's Graduate Visa expires August 2027; sponsorship is needed by that date to continue UK employment. The role is currently viable — applying now would mean working there from start to expiry — but no path to renew. The role is a 2-year window, not a sustained career move."*
+
+Verdict prose: *"The stack and seniority make this landable; the company is decent. The sponsorship gap caps the role as a 2-year credibility builder rather than a sustained career step. In the budget of 30 applications, this drops below roles with comparable strength that also sponsor; it makes the cut only if S/A-tier sponsor-capable options are thin."*
+
+Grade: B (not A) — the Q5 friction bit the verdict.
+
+### Example — B → C (Q3b off-axis bites despite Q2 strength)
+
+A role at a well-known consumer-fintech company. Q1 cleared (junior tier, no hard floor). Q2 strong (recognised brand, public engineering culture, established hiring pipeline). Q3a moderate (the JD names React and TypeScript; the candidate has these at Comfortable band via Image Browser and Aurix). Q3b: *"The role is pure frontend — the JD's day-1 responsibilities are 'build and maintain the Inbox web client', 'work in the React/Redux codebase', 'partner with designers on UI polish'. The candidate's frontend work in Image Browser and Aurix is incidental to those projects' actual purpose (ONNX inference search; trading backtest UI on a Rust core). Pure-frontend is off the candidate's career-axis."*
+
+Q4 moderate. Q5 clean.
+
+Without Q3b, this aggregates to B (Q2 strong + Q3a moderate + Q4/Q5 fine). With Q3b: *"Stack overlap is real but the role's substance is exactly the career-axis the candidate is trying to NOT build — pure-frontend specialist progression. Strong company name doesn't compensate; a brand on a frontend resume line still routes future opportunities toward more frontend, not toward systems engineering."*
+
+Verdict prose: *"The company name is the pull. The pushback is that the day-1 work is on the wrong career axis — credibility-building for a career trajectory the candidate is not on. In the budget of 30 applications, this does not make the cut: there are roles at lower-brand companies with on-axis work that are better moves."*
+
+Grade: C (not B) — Q3b's off-axis reading bit despite strong Q2.
+
+### Example — Risk acknowledged but does NOT bite (held at original tier)
+
+Same setup as the S → A example, but with a different Q3b reading. The role's JD specifies that the engineer will own the new high-throughput payment-routing service being built from scratch. Q3b: *"While the company is payments-platform, this specific role is the from-scratch high-throughput-routing greenfield work, not maintenance of the existing orchestration service. The candidate's lock-free / low-latency portfolio (Nyquestro matching engine, Cernio async pipelines) is directly on-axis with this work. The risk that the role could be reshuffled to maintenance work post-onboarding is real but small for a named-greenfield role at this stage."*
+
+Verdict: held at S — the named risk did not bite because Q3b's prose engaged with the risk and concluded it was small enough to not change the verdict. The pattern: risks bite when the Verdict prose names them as decisive; risks held when the Verdict prose names them but concludes their weight is small.
+
+**The lesson:** the Q3b slot is often where risks-vs-strengths get weighed. Q3a and Q2 can be strong while Q3b names the career-axis pushback that drops the grade by one tier; Q5 can name a sponsorship or location friction that drops the grade by one tier. Either way, the Verdict slot is where the weighing happens explicitly in prose. A risk named only in a Q-slot and never engaged in the Verdict is risk-decoration; the grade then drifts upward by accident.
+
+---
+
+## Opposing-Signal Resolution
+
+Some JDs surface multiple signals that pull in opposite directions. The most common pattern: a quantitative-engineering title + narrow-funnel-firm context. The role's title reads as accessible (e.g. "Quant Developer", "Trading Infrastructure Engineer"), but the firm's hiring shape is narrow-funnel quant where the candidate's profile may sit outside the realistic primary-target pool.
+
+When opposing signals are present, the Q1 prose names BOTH signals and reasons in prose about which dominates **for this candidate's profile shape**, not for the candidate's CV value. The Q2 prose names the CV-value separately. The Verdict prose weighs Q1 reality against Q2 prestige and assigns the grade based on the Q1 reading.
+
+**Worked example.** A role at a multi-strategy hedge fund whose graduate quant-developer programme accepts BEng candidates but historically hires ~10 per cycle from Oxbridge / Imperial-tier programmes with competitive-programming pedigree. The title is "Graduate Quant Developer" and the JD's qualification section says "Bachelor's degree in CS, Mathematics, Physics or related field". Q1 prose: *"The JD's title and qualification section read accessible — no year floor, no credential floor visible. The opposing signal is the firm's known hiring shape: ~10 graduates per cycle from a small set of universities, with competitive-programming track records weighted heavily in screening. The candidate (BEng 2:2 from York, no IOI/ICPC pedigree per linkedin.md, strong portfolio per projects/nyquestro.md and projects/aurix.md) is in the firm's applicant pool but outside the realistic primary-target pool — conversion is sub-1%. The role is technically open but realistically a stretch lottery application."* Q2 prose names the firm's CV value separately ("a strong brand signal in the quant-trading vertical"). Verdict weighs Q1 reality ("the application is a stretch; conversion expectations should be sub-1%") against Q2 brand value ("the CV line, if won, is exceptional") and assigns the grade per the budget-of-30 question — usually C, sometimes B if Q3a and Q3b are unusually strong.
+
+The pattern generalises beyond quant: anywhere a JD's title is accessible but the firm's actual hiring shape is narrow-funnel, name both signals in Q1 and reason about which dominates for this candidate's specific profile shape. The Verdict then weighs both honestly.
+
+---
+
 ## The Core Questions
 
 For every job, answer these five questions. These are the evaluation. The dimensions provide analytical support.
@@ -404,54 +464,6 @@ The wording when it's template-boilerplate produces no Q1 friction and the role 
 **Binding obligation: every SS / S / A fit assessment names the firm's hiring-pattern signal before stating the grade.** Specifically, the assessment text identifies (1) the firm's actual hiring pattern at the entry-level — graduate intake volume, university-acceptance breadth, screening shape (algorithmic-interview competence vs competitive-programming pedigree vs PhD filter vs structured rotation), the proportion of the applicant pool that converts — and (2) the candidate's position relative to that pattern, citing specific elements of `profile/education.md`, `profile/experience.md`, and `profile/projects/` that place them in or outside the realistic primary-target pool. The Q1 reasoning is the first substantive paragraph of the assessment narrative; Q2 reputation reasoning follows it; the grade letter is consistent with the Q1 verdict the narrative names. An assessment that produces grade A or above without an explicit Q1 hiring-pattern signal, or whose grade letter contradicts its own Q1 verdict, fails this obligation regardless of how strong Q2-Q4 read.
 
 Reputation and selectivity are not the same axis; do not infer one from the other. The two axes both flow into the aggregation in Step 3 — Q1 as the primary lens, Q2 as the tiebreaker within the Q1-determined band — and the assessment's narrative makes both visible.
-
----
-
-## Worked Examples — Risks That Bite the Grade
-
-The pattern this section establishes: when a Q-slot names a real risk, the Verdict slot weighs that risk against the strengths, and the grade letter moves to reflect the weighing. A risk acknowledged but not weighed is "risk-decoration" — the rubric calls this out as a failure mode and these worked examples are the template for risks that actually bite.
-
-Each example below is structurally generic (no real company names, no real role titles) and shows one Q-slot naming a risk that pushes the grade DOWN one tier from where the other Q-slots alone would land it.
-
-### Example — S → A (Q3b career-axis weakness bites)
-
-A role at an elite payments-platform company. Q1 cleared (graduate-tier opening, no hard floor). Q2 strong (the company is recognised, well-funded, has a public engineering blog citing Rust adoption). Q3a strong (the JD names Go and Rust; the candidate has Rust as a primary language and Go as adjacent). Q4 moderate (payments domain — finance-adjacent, candidate has demonstrated interest in trading-adjacent systems). Q5 clean (London office, sponsor-capable).
-
-Without Q3b, this aggregates to S. With Q3b: *"The role's day-1 work is generic payments-platform feature work — adding new payment-method integrations and maintaining the existing payment-orchestration service. The systems-engineering depth Q3a established is real on the technology axis but the role's actual work is platform-product engineering, not the lock-free / low-latency / autonomy systems work the candidate's portfolio (Nyquestro, NeuroDrive) is on. This is adjacent to the target career trajectory, not on-axis."*
-
-Verdict prose: *"Strong company + good stack overlap is the pull. The pushback is that the day-1 work is off the career-axis the candidate is building toward — this would be a credibility builder, not an axis bet. In a budget of 30 applications, this makes the cut as a backup; it would not be a primary investment."*
-
-Grade: A (not S) — the Q3b weakness bit.
-
-### Example — A → B (Q5 sponsorship friction bites)
-
-A role at a mid-tier UK fintech. Q1 cleared (junior framing, no hard floor). Q2 moderate-strong (the company has decent reputation, profitable, named in industry surveys). Q3a strong (Python and TypeScript both at the candidate's Comfortable band; the JD's stack matches). Q3b adjacent (backend fintech work — not on the systems axis but credibility-positive). Q4 moderate.
-
-Without Q5, this aggregates to A. With Q5: *"The JD states 'we are not able to offer visa sponsorship for this role'. The candidate's Graduate Visa expires August 2027; sponsorship is needed by that date to continue UK employment. The role is currently viable — applying now would mean working there from start to expiry — but no path to renew. The role is a 2-year window, not a sustained career move."*
-
-Verdict prose: *"The stack and seniority make this landable; the company is decent. The sponsorship gap caps the role as a 2-year credibility builder rather than a sustained career step. In the budget of 30 applications, this drops below roles with comparable strength that also sponsor; it makes the cut only if S/A-tier sponsor-capable options are thin."*
-
-Grade: B (not A) — the Q5 friction bit the verdict.
-
-### Example — B → C (Q3b off-axis bites despite Q2 strength)
-
-A role at a well-known consumer-fintech company. Q1 cleared (junior tier, no hard floor). Q2 strong (recognised brand, public engineering culture, established hiring pipeline). Q3a moderate (the JD names React and TypeScript; the candidate has these at Comfortable band via Image Browser and Aurix). Q3b: *"The role is pure frontend — the JD's day-1 responsibilities are 'build and maintain the Inbox web client', 'work in the React/Redux codebase', 'partner with designers on UI polish'. The candidate's frontend work in Image Browser and Aurix is incidental to those projects' actual purpose (ONNX inference search; trading backtest UI on a Rust core). Pure-frontend is off the candidate's career-axis."*
-
-Q4 moderate. Q5 clean.
-
-Without Q3b, this aggregates to B (Q2 strong + Q3a moderate + Q4/Q5 fine). With Q3b: *"Stack overlap is real but the role's substance is exactly the career-axis the candidate is trying to NOT build — pure-frontend specialist progression. Strong company name doesn't compensate; a brand on a frontend resume line still routes future opportunities toward more frontend, not toward systems engineering."*
-
-Verdict prose: *"The company name is the pull. The pushback is that the day-1 work is on the wrong career axis — credibility-building for a career trajectory the candidate is not on. In the budget of 30 applications, this does not make the cut: there are roles at lower-brand companies with on-axis work that are better moves."*
-
-Grade: C (not B) — Q3b's off-axis reading bit despite strong Q2.
-
-### Example — Risk acknowledged but does NOT bite (held at original tier)
-
-Same setup as the S → A example, but with a different Q3b reading. The role's JD specifies that the engineer will own the new high-throughput payment-routing service being built from scratch. Q3b: *"While the company is payments-platform, this specific role is the from-scratch high-throughput-routing greenfield work, not maintenance of the existing orchestration service. The candidate's lock-free / low-latency portfolio (Nyquestro matching engine, Cernio async pipelines) is directly on-axis with this work. The risk that the role could be reshuffled to maintenance work post-onboarding is real but small for a named-greenfield role at this stage."*
-
-Verdict: held at S — the named risk did not bite because Q3b's prose engaged with the risk and concluded it was small enough to not change the verdict. The pattern: risks bite when the Verdict prose names them as decisive; risks held when the Verdict prose names them but concludes their weight is small.
-
-The lesson the worked examples establish: **the Q3b slot is often where risks-vs-strengths get weighed.** Q3a and Q2 can be strong while Q3b names the career-axis pushback that drops the grade by one tier; Q5 can name a sponsorship or location friction that drops the grade by one tier. Either way, the Verdict slot is where the weighing happens explicitly in prose. A risk named only in a Q-slot and never engaged in the Verdict is risk-decoration; the grade then drifts upward by accident.
 
 ---
 

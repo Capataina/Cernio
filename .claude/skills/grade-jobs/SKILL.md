@@ -126,11 +126,23 @@ known infrastructure patterns. Connect that fact to why Caner specifically
 would want to be there given preferences.toml + interests.md.]
 
 ## Q3a — Stack overlap
-[2-4 sentences of prose. Must quote the JD's named technologies when
-present. Must name specific Caner projects from profile/projects/ with
-specific features that map to those technologies — by file name and one-
-line evidence. Stack alignment alone is NOT enough — Q3a only answers
-"does the technology overlap?". The career-trajectory question is Q3b.]
+[2-4 sentences of prose. MUST include all three of:
+ (a) a verbatim JD substring of ≥6 chars in double-quotes naming a
+     specific technology, e.g. *the JD names "Rust 1.7+ and tokio"*;
+ (b) a profile project FILE PATH, e.g. `projects/nyquestro.md`, not
+     just the project name in prose;
+ (c) a one-line evidence of what the cited project demonstrates
+     relative to that JD technology — what specific feature of the
+     project maps to the JD's requirement.
+Stack alignment alone is NOT enough — Q3a only answers "does the
+technology overlap?". The career-trajectory question is Q3b.
+Worked example shape:
+*The JD names "Go primary, Rust adjacent". `projects/nyquestro.md`
+(active, 6.5k LOC Rust) demonstrates the lock-free / low-latency
+systems work the role describes — the HDR-histogram tail-latency
+tracking + deterministic LOB matching engine is exactly the
+performance-critical paradigm. Go is adjacent: Caner has zero Go
+projects but the conceptual surface is identical.*]
 
 ## Q3b — Career-axis match
 [2-4 sentences of prose. Answers separately from Q3a: does this role's
@@ -153,12 +165,20 @@ policy, sponsorship stance (cite visa.md timeline), deadline if any,
 salary band if disclosed. Cite the JD or careers page directly.]
 
 ## Verdict
-[3-5 sentences of plain-language summary. Name the role's strongest pull
-and its strongest pushback. Say in prose what kind of move this is —
-career-launch / axis-bet / credibility-builder / stretch / deadweight —
-and answer the budget question: in a budget of ~30 applications this
-month, does this make the cut? The verdict prose must be consistent with
-the Q1-Q5 reasoning above; the grade letter follows from the verdict.]
+[3-5 sentences of plain-language summary. MUST contain all four of:
+ (1) The role's strongest pull, named explicitly.
+ (2) The role's strongest pushback, named explicitly.
+ (3) One role-type framing from this exact list: "career launch",
+     "axis bet", "credibility builder", "stretch", "deadweight".
+     The phrase appears verbatim in the Verdict prose. Choose the
+     framing that best describes the role for THIS candidate, given
+     the Q1-Q5 reasoning above.
+ (4) An answer to the budget question — "in a budget of ~30
+     applications, does this make the cut?" — stated in prose
+     (e.g. "yes — top of the cut" / "yes if there's room" /
+     "no — does not make the cut").
+The Verdict prose must be consistent with the Q1-Q5 reasoning above;
+the grade letter follows from the Verdict.]
 
 Grade: <SS | S | A | B | C | F>
 ```
@@ -425,6 +445,9 @@ All three are read at invocation. The rubric alone without profile-context produ
 9. **Subagents receive full profile + full reference content verbatim, AND the Relativity Pass query verbatim.** Under-contextualised subagents produce shallow assessments; subagents without the Relativity Pass query cannot run step 11.
 10. **Exact SQL column names.** `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis`. The `fit_score` column was dropped from the schema — UPDATE statements that reference it will fail at execution. `evaluation_status` maps to the six-tier table in step 6; `evidence_basis` is always set ('jd' / 'semantic' / 'insufficient').
 11. **No mechanical company-to-grade or role-type-to-grade rules.** Grading is AI reasoning, not classification. The rubric does NOT contain rules like "company X = grade Y", "frontend role = max C", "junior + top brand = SS", or any threshold mapping from a single attribute to a grade. Every grade emerges from prose Q-slot reasoning plus the Verdict. If a rubric edit ever introduces such a rule, it is an inviolable-rule violation and must be reverted.
+12. **Banned strings inside Q-slot prose** (this is the enumerated list of verdict-enum labels and arrow-shorthand patterns that must NOT appear anywhere inside Q1, Q2, Q3a, Q3b, Q4, Q5, or Verdict prose): `cleared-decisively`, `cleared-with-friction`, `real-headwind`, `hard-fail`, `Q1 cleared`, `Q2 strong`, `Q2 moderate`, `Q2 weak`, `Q3 moderate`, `Q3 strong`, `Q3 weak`, `Q5 ✓`, `Q4 ✓`, `→ A`, `→ B`, `→ C`, `→ S`, `→ SS`, `→ F`, `-> A`, `-> B`, `-> C`, `-> S`, `-> SS`, `-> F`. Each is a label or shortcut that bypasses prose reasoning. The agent expresses the same content in prose without using these strings. The list is extended whenever a new shortcut pattern is observed.
+13. **Q3a includes all three citation elements.** Per the structured-prose format spec in step 5, Q3a's prose contains (a) a verbatim JD quote of ≥6 chars in double-quotes naming a technology, (b) a profile project file path (e.g. `projects/nyquestro.md`), and (c) a one-line evidence of what the project demonstrates relative to the JD technology. Q3a without all three of these is incomplete.
+14. **Verdict slot contains all four framing elements.** Per the structured-prose format spec in step 5, the Verdict prose contains (a) the strongest pull, (b) the strongest pushback, (c) one role-type framing from the enumerated list (`career launch` / `axis bet` / `credibility builder` / `stretch` / `deadweight`) stated verbatim, and (d) a prose answer to the budget-of-30 question. A Verdict missing any of these is incomplete.
 
 ---
 
@@ -461,7 +484,9 @@ The lists in this SKILL.md are non-exhaustive and may be extended on a per-run b
 
 - **The Mandatory Reads table (4 items)** is the minimum precondition set. If a future grading session needs an additional precondition (e.g. a per-job calendar-deadline read from a tracking system, recruiter context from a CRM), add a row. Existing reads stay mandatory.
 - **The 13-step workflow** is the current sequential structure. Add new steps when a new mandatory phase surfaces across multiple sessions (recurrence threshold ~3 sessions). Existing steps remain mandatory.
-- **The Inviolable Rules (11 rules)** are the current structural constraints. If a new constraint surfaces (e.g. a new data-quality invariant the grader must honour), add Rule 12 or higher. Existing rules stay inviolable.
+- **The Inviolable Rules (14 rules)** are the current structural constraints. If a new constraint surfaces (e.g. a new data-quality invariant the grader must honour), add Rule 15 or higher. Existing rules stay inviolable.
+- **The banned-strings list (Rule 12)** is the observed-in-practice set of verdict-enum labels and arrow-shorthand patterns. New shortcut patterns observed in agent output are appended — never removed.
+- **The role-type framings in Verdict (Rule 14)** are the current 5-element set (`career launch` / `axis bet` / `credibility builder` / `stretch` / `deadweight`). New framings may be added when a genuinely new role-type emerges; existing framings remain the verbatim-cite vocabulary.
 - **The Quality Checklist items** are the current verifiable obligations. New items may be added; existing items remain mandatory.
 - **The six grade tiers (SS / S / A / B / C / F) in `references/grading-rubric.md`** are the current letter system; no new letters are added as escape hatches (no "S+", no "A-stretch", no sub-tiers). See the rubric's Additive-Freedom Permission section for the full per-list permission breakdown that applies to its prescribed lists.
 - **The structured fit_assessment slots (Q1 / Q2 / Q3a / Q3b / Q4 / Q5 / Verdict)** are the current minimum set. New slots may be added when a new analytical question becomes load-bearing across multiple sessions. Existing slots remain mandatory and prose-only.
