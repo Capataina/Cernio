@@ -1,566 +1,673 @@
 #!/usr/bin/env python3
 """
-analyse.py — Ingest per-agent outputs from the test-grade-jobs run and
-compute intermediate analysis tables.
+analyse.py — Multi-axis structural measurement of grade-jobs' output.
 
-Reads:
-    /tmp/test-grade-jobs-<run-id>/agent-*.md (the 20 per-agent outputs)
-    /tmp/test-grade-jobs-<run-id>/coverage-matrix.json
-    /tmp/test-grade-jobs-<run-id>/cluster-a.json
-    /tmp/test-grade-jobs-<run-id>/cluster-b.json
-    /tmp/test-grade-jobs-<run-id>/trigger-cases.json
-    /tmp/test-grade-jobs-<run-id>/db-grades.json
-    /tmp/test-grade-jobs-<run-id>/jobs-all.json
+Parses per-agent markdown outputs from a test-grade-jobs run, extracts
+structured Q-slots and grade letters via prose parsing, and computes seven
+structural axes:
 
-Writes (consumed by the agent to compose the final report):
-    /tmp/test-grade-jobs-<run-id>/computed-per-job.json
-    /tmp/test-grade-jobs-<run-id>/computed-agreement.json
-    /tmp/test-grade-jobs-<run-id>/computed-batch-effect.json
-    /tmp/test-grade-jobs-<run-id>/computed-cluster-position.json
-    /tmp/test-grade-jobs-<run-id>/computed-trigger.json
-    /tmp/test-grade-jobs-<run-id>/computed-q1-consistency.json
-    /tmp/test-grade-jobs-<run-id>/computed-blind-comparison.json
-    /tmp/test-grade-jobs-<run-id>/computed-anchor-effect.json
-    /tmp/test-grade-jobs-<run-id>/computed-pairwise.json
+  A. Format adherence       — does output follow rubric's slot structure
+  B. Reasoning specificity  — citation density vs generic-phrase rate
+  C. Q3a/Q3b differentiation — distinctness of stack-overlap vs career-axis slots
+  D. Internal consistency   — Verdict↔Grade alignment, Q-slot coherence
+  E. Inter-agent variance   — exact-letter agreement, within-1
+  F. Pairwise consistency   — cross-agent pair agreement, transitivity
+  G. Risk acknowledgment    — risk-naming density, risk-direction correlation
 
-stdout: number of grades parsed, agents ingested, jobs covered, plus
-       any agents whose output was missing or malformed.
+None of these metrics reference any external "correct answer." The script
+does not assert which grades are right; it measures grade-jobs' own
+structural properties and reports the numbers as-is.
+
+Cross-run regression diff: if context/test-runs/baseline.json exists, the
+script computes per-axis deltas and writes the new scores to that file,
+appending the prior baseline to baseline-history.json.
+
+Usage:
+    python3 analyse.py <run-id>
+
+Writes intermediate JSONs to /tmp/test-grade-jobs-<run-id>/computed-*.json
+and updates context/test-runs/baseline.json + baseline-history.json.
+
+stdout: per-axis scores + regression-diff summary.
 """
 
-import itertools
 import json
+import os
 import re
-import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-
 LETTER_TO_NUM = {"SS": 5, "S": 4, "A": 3, "B": 2, "C": 1, "F": 0}
 NUM_TO_LETTER = {v: k for k, v in LETTER_TO_NUM.items()}
 
-Q1_VERDICTS = {"cleared-decisively", "cleared-with-friction", "real-headwind", "hard-fail"}
+# Axis A: banned strings inside Q-slot prose (per grade-jobs' no-verdict-enums rule)
+BANNED_IN_SLOT_PROSE = [
+    "cleared-decisively", "cleared decisively",
+    "cleared-with-friction", "cleared with friction",
+    "real-headwind", "real headwind",
+    "hard-fail",
+    # Arrow shorthand
+    "→ A", "→ B", "→ C", "→ S", "→ SS", "→ F",
+    "-> A", "-> B", "-> C", "-> S", "-> SS", "-> F",
+    # Label-only Q reporting
+    "Q3 moderate", "Q3 strong", "Q3 weak",
+    "Q2 strong", "Q2 moderate", "Q2 weak",
+    "Q1 cleared", "Q5 ✓", "Q4 ✓",
+]
+
+GENERIC_PHRASES = [
+    "good company", "decent fit", "relevant experience", "strong tech stack",
+    "great role", "good role", "good fit", "decent role", "solid choice",
+    "broadly relevant", "interesting role", "reasonable match",
+    "strong company", "decent company", "fine fit",
+]
+
+CAREER_AXIS_TERMS = [
+    "on-axis", "off-axis", "adjacent", "trajectory", "career-axis",
+    "career axis", "build toward", "career launch", "axis bet",
+    "specialism", "career trajectory", "kind of engineer",
+]
+
+HARD_FLOOR_PATTERNS = [
+    r"\b(5\+|6\+|7\+|8\+|9\+|10\+)\s*years\b",
+    r"\b[5-9]-\d+\s*years\b",
+    r"\bstaff-level\b", r"\bprincipal-level\b",
+    r"£200\s*-?\s*\d+k", r"£250\s*-?\s*\d+k", r"£300\s*-?\s*\d+k",
+    r"\bsenior staff\b", r"\bsenior principal\b",
+    r"\bdistinguished engineer\b",
+]
+
+VERDICT_POSITIVE = [
+    "axis bet", "career launch", "make the cut", "compelling",
+    "strong pull", "would make the cut",
+]
+VERDICT_NEGATIVE = [
+    "does not make the cut", "deadweight",
+    "not worth", "would not make the cut",
+]
+
+RISK_PHRASES = [
+    "friction", "gap", "off-axis", "stretch", "concern",
+    "headwind", "soft floor", "narrow funnel", "selectivity",
+    "credential floor", "stack mismatch", "career-axis mismatch",
+    "trade-off", "tradeoff",
+]
+
+STOPWORDS = set("the a an and or of in on for to with from by as is are was were be been being it that this its their there here have has had do does did but not no so if when while which who whom whose what where why how all any some many more most much".split())
 
 
-def parse_grading_agent(path):
-    """Parse a core / blind / anchor-injected agent's markdown output.
+def get_project_filenames():
+    project_dir = Path("profile/projects")
+    if not project_dir.exists():
+        return []
+    return [p.stem for p in project_dir.glob("*.md") if not p.stem.startswith("_")]
 
-    Looks for the summary table and per-job grade letters. Returns a list of:
-        {"job_id": int, "grade": str, "q1_verdict": str|None}
-    """
-    with open(path) as f:
-        content = f.read()
 
-    # Strategy: parse the markdown summary table at the end. It has
-    # the columns: job_id | company | title | grade | Q1-verdict | reasoning
-    # (or for blind: job_id | company | title | grade | reasoning)
-
-    grades = []
-    # Find the summary-table section
-    m = re.search(r"##\s+Summary\s+(?:table|Table)(.*?)(?:\n##|\Z)", content, re.DOTALL)
+def get_skills_entries():
+    skills_path = Path("profile/skills.md")
+    if not skills_path.exists():
+        return []
+    text = skills_path.read_text()
+    m = re.search(r"##\s*Concepts and Domains.*?(?=^##|\Z)", text, re.S | re.M)
     if not m:
-        # Fallback: try to find per-job "Grade: X" lines and Q1 tags
-        for job_match in re.finditer(
-            r"##\s+Job\s+(\d+)[:\s].*?\*\*Grade:?\*\*\s*([A-Z]{1,2})", content, re.DOTALL
-        ):
-            grades.append({
-                "job_id": int(job_match.group(1)),
-                "grade": job_match.group(2),
-                "q1_verdict": None,
-            })
-        return grades
+        return []
+    section = m.group(0)
+    entries = re.findall(r"\|\s*([A-Z][A-Za-z0-9 \-/&,]+?)\s*\|", section)
+    return list(set(e.strip() for e in entries if 4 <= len(e.strip()) <= 60))
 
-    table = m.group(1)
-    # Parse table rows like: | 2447 | HRT | SWE | C | real-headwind | ... |
-    for row in re.finditer(r"^\s*\|\s*(\d+)\s*\|([^|]+)\|([^|]+)\|\s*([A-Z]{1,2})\s*\|(.*?)\|", table, re.MULTILINE):
-        job_id = int(row.group(1))
-        grade = row.group(4).strip()
-        if grade not in LETTER_TO_NUM:
-            continue  # skip header rows or invalid grades
-        rest = row.group(5).strip().lower()
-        q1_verdict = None
-        for v in Q1_VERDICTS:
-            if v in rest:
-                q1_verdict = v
-                break
-        grades.append({
-            "job_id": job_id,
-            "grade": grade,
-            "q1_verdict": q1_verdict,
+
+def extract_batch_size(agent_id):
+    if "10job" in agent_id:
+        return 10
+    if "15job" in agent_id:
+        return 15
+    if "30job" in agent_id:
+        return 30
+    if "cross-cluster" in agent_id:
+        return 30
+    return None
+
+
+def extract_cluster_scope(agent_id):
+    if "cluster-a" in agent_id:
+        return "a-only"
+    if "cluster-b" in agent_id:
+        return "b-only"
+    if "cross-cluster" in agent_id:
+        return "cross"
+    return "unknown"
+
+
+def parse_q_slots(sect):
+    """Extract Q1, Q2, Q3a, Q3b, Q4, Q5, Verdict prose from a job section."""
+    slots = {f"q{n}_prose": "" for n in ["1", "2", "3a", "3b", "4", "5"]}
+    slots["verdict_prose"] = ""
+
+    # ## heading variant
+    patterns = [
+        (r"^##\s*Q1\b[^\n]*\n(.+?)(?=^##\s*Q2\b|\Z)", "q1_prose"),
+        (r"^##\s*Q2\b[^\n]*\n(.+?)(?=^##\s*Q3a\b|\Z)", "q2_prose"),
+        (r"^##\s*Q3a\b[^\n]*\n(.+?)(?=^##\s*Q3b\b|\Z)", "q3a_prose"),
+        (r"^##\s*Q3b\b[^\n]*\n(.+?)(?=^##\s*Q4\b|\Z)", "q3b_prose"),
+        (r"^##\s*Q4\b[^\n]*\n(.+?)(?=^##\s*Q5\b|\Z)", "q4_prose"),
+        (r"^##\s*Q5\b[^\n]*\n(.+?)(?=^##\s*Verdict\b|\Z)", "q5_prose"),
+        (r"^##\s*Verdict\b[^\n]*\n(.+?)(?=^##|^Grade:|\Z)", "verdict_prose"),
+    ]
+    for pat, key in patterns:
+        m = re.search(pat, sect, re.M | re.S)
+        if m:
+            slots[key] = m.group(1).strip()
+
+    # **Bold-header variant** as fallback
+    if not any(slots.values()):
+        for key, qname in zip(
+            ["q1_prose", "q2_prose", "q3a_prose", "q3b_prose", "q4_prose", "q5_prose"],
+            ["Q1", "Q2", "Q3a", "Q3b", "Q4", "Q5"],
+        ):
+            m = re.search(
+                r"\*\*" + re.escape(qname) + r"\b[^\n*]*\*\*\s*(.+?)(?=\*\*Q|\*\*Verdict|^Grade:|\Z)",
+                sect, re.M | re.S
+            )
+            if m:
+                slots[key] = m.group(1).strip()
+        m = re.search(r"\*\*Verdict\b[^\n*]*\*\*\s*(.+?)(?=^Grade:|\*\*Grade|\Z)", sect, re.M | re.S)
+        if m:
+            slots["verdict_prose"] = m.group(1).strip()
+
+    return slots
+
+
+def parse_grade_letter(sect):
+    m = re.search(r"^\s*\**\s*Grade:\s*\**\s*([SAFBC]{1,2})\s*\**\s*$", sect, re.M)
+    if m and m.group(1) in LETTER_TO_NUM:
+        return m.group(1)
+    m = re.search(r"Grade:\s*\**\s*([SAFBC]{1,2})\b", sect)
+    if m and m.group(1) in LETTER_TO_NUM:
+        return m.group(1)
+    if re.search(r"Grade:\s*\**\s*(NULL|N/A)\b", sect, re.I):
+        return None
+    return None
+
+
+def parse_evidence_basis(sect):
+    m = re.search(r"evidence_basis:\s*\**\s*(jd|semantic|insufficient)\b", sect, re.I)
+    if m:
+        return m.group(1).lower()
+    return None
+
+
+def parse_pairwise_output(text, agent_id):
+    pairs = []
+    sections = re.split(r"^---+\s*$", text, flags=re.M)
+    for sect in sections:
+        m = re.match(r"\s*##\s*Pair\s+(\S+)\s*:", sect, re.M)
+        if not m:
+            continue
+        pair_id = m.group(1).rstrip(":")
+        winner_m = re.search(r"\*\*Winner:?\*\*\s*([abAB]|tie)", sect)
+        winner = winner_m.group(1).lower() if winner_m else None
+        pairs.append({"pair_id": pair_id, "winner": winner, "section": sect})
+    return {
+        "agent_id": agent_id, "role": "pairwise", "batch_size": None,
+        "cluster_scope": None, "pairs": pairs, "n_pairs": len(pairs),
+    }
+
+
+def parse_agent_output(path):
+    if not path.exists():
+        return None
+    text = path.read_text()
+    agent_id = path.stem.replace("agent-", "")
+    role = "pairwise" if "pairwise" in agent_id else "core-grading"
+
+    if role == "pairwise":
+        return parse_pairwise_output(text, agent_id)
+
+    batch_size = extract_batch_size(agent_id)
+    cluster_scope = extract_cluster_scope(agent_id)
+    sections = re.split(r"^---+\s*$", text, flags=re.M)
+    assessments = []
+    for sect in sections:
+        m = re.match(r"\s*##\s*Job\s+(\d+)\s*:\s*(.+?)\s*$", sect, re.M)
+        if not m:
+            continue
+        job_id = int(m.group(1))
+        header = m.group(2).strip()
+        q_slots = parse_q_slots(sect)
+        grade = parse_grade_letter(sect)
+        evidence_basis = parse_evidence_basis(sect)
+        assessments.append({
+            "job_id": job_id, "header": header,
+            "grade": grade, "evidence_basis": evidence_basis,
+            **q_slots, "full_text": sect,
         })
 
-    # Also look for Q1 verdicts in the per-job assessments (not just the summary table)
-    # Some agents may put Q1 in the per-job section but not in the table column
-    if any(g["q1_verdict"] is None for g in grades):
-        q1_map = {}
-        for job_match in re.finditer(
-            r"##\s+Job\s+(\d+)[:\s].*?Q1:\s*([a-z-]+)", content, re.DOTALL
-        ):
-            q1_map[int(job_match.group(1))] = job_match.group(2).strip()
-        for g in grades:
-            if g["q1_verdict"] is None and g["job_id"] in q1_map:
-                g["q1_verdict"] = q1_map[g["job_id"]]
-
-    return grades
-
-
-def parse_pairwise_agent(path):
-    """Parse a pairwise agent's output.
-
-    Returns a list of:
-        {"pair_id": str, "job_a_id": int, "job_b_id": int, "winner": str}
-    """
-    with open(path) as f:
-        content = f.read()
-
-    pairs = []
-    # Look for the summary table
-    m = re.search(r"##\s+Summary\s+(?:table|Table)(.*?)(?:\n##|\Z)", content, re.DOTALL)
-    if not m:
-        return pairs
-
-    table = m.group(1)
-    # Row shape: | p001 | job_a (company, title) | job_b (company, title) | winner | decisive Q |
-    # The job-cell shape varies; we extract IDs from the per-pair sections instead
-    pair_id_to_jobs = {}
-    for pair_section in re.finditer(
-        r"##\s+Pair\s+(p\d+):.*?(?=##\s+Pair|\Z)",
-        content, re.DOTALL
-    ):
-        pid = pair_section.group(1)
-        section_text = pair_section.group(0)
-        # Look for Winner: a / b / tie
-        wm = re.search(r"\*\*Winner:?\*\*\s*([abt][a-z]*)", section_text, re.IGNORECASE)
-        if not wm:
-            continue
-        winner = wm.group(1).lower()
-        if winner.startswith("a"):
-            winner = "a"
-        elif winner.startswith("b"):
-            winner = "b"
-        elif winner.startswith("t"):
-            winner = "tie"
-
-        pair_id_to_jobs[pid] = winner
-
-    # We don't have job_id from the markdown directly; the orchestrator
-    # has the manifest, so it can cross-reference. We just return what
-    # we can parse.
-    for pid, winner in pair_id_to_jobs.items():
-        pairs.append({"pair_id": pid, "winner": winner})
-
-    return pairs
-
-
-def compute_per_job(grades_by_agent, coverage, db_grades, trigger_cases, jobs):
-    """For each job, build the grade distribution across agents that graded it."""
-    by_job = {}
-    job_info = {str(j["id"]): j for j in jobs}
-
-    for job_id_str, agent_ids in coverage.items():
-        grades = []
-        q1_verdicts = []
-        for aid in agent_ids:
-            agent_grades = grades_by_agent.get(aid, [])
-            for g in agent_grades:
-                if str(g["job_id"]) == job_id_str:
-                    grades.append(g["grade"])
-                    if g["q1_verdict"]:
-                        q1_verdicts.append(g["q1_verdict"])
-                    break
-
-        if not grades:
-            continue
-
-        # Compute mode + range + agreement %
-        try:
-            mode = Counter(grades).most_common(1)[0][0]
-        except IndexError:
-            mode = None
-
-        nums = [LETTER_TO_NUM[g] for g in grades if g in LETTER_TO_NUM]
-        if len(nums) >= 2:
-            grade_range = max(nums) - min(nums)
-        else:
-            grade_range = 0
-
-        agreement = grades.count(mode) / len(grades) if mode else 0.0
-
-        info = job_info.get(job_id_str, {})
-        by_job[job_id_str] = {
-            "job_id": int(job_id_str),
-            "company": info.get("company_name", ""),
-            "title": info.get("title", ""),
-            "db_grade": db_grades.get(job_id_str),
-            "grades_observed": grades,
-            "mode": mode,
-            "range_letters": grade_range,
-            "agreement_pct": round(agreement * 100, 1),
-            "q1_verdicts": q1_verdicts,
-            "is_trigger_case": int(job_id_str) in trigger_cases,
-        }
-
-    return by_job
-
-
-def compute_agreement(grades_by_agent, core_agent_ids):
-    """Pairwise % exact match and % within-1-letter across core grading agents."""
-    pairs = []
-    for a1, a2 in itertools.combinations(core_agent_ids, 2):
-        g1 = {g["job_id"]: g["grade"] for g in grades_by_agent.get(a1, [])}
-        g2 = {g["job_id"]: g["grade"] for g in grades_by_agent.get(a2, [])}
-        shared = set(g1.keys()) & set(g2.keys())
-        if not shared:
-            continue
-        exact = sum(1 for j in shared if g1[j] == g2[j])
-        within = sum(1 for j in shared
-                     if g1[j] in LETTER_TO_NUM and g2[j] in LETTER_TO_NUM
-                     and abs(LETTER_TO_NUM[g1[j]] - LETTER_TO_NUM[g2[j]]) <= 1)
-        pairs.append({
-            "agent_a": a1,
-            "agent_b": a2,
-            "shared_jobs": len(shared),
-            "exact_match_pct": round(exact / len(shared) * 100, 1),
-            "within_1_pct": round(within / len(shared) * 100, 1),
-        })
-
-    if not pairs:
-        return {"mean_exact": 0.0, "mean_within_1": 0.0, "pairs": []}
-
-    mean_exact = round(statistics.mean(p["exact_match_pct"] for p in pairs), 1)
-    mean_within = round(statistics.mean(p["within_1_pct"] for p in pairs), 1)
-
     return {
-        "mean_exact_match_pct": mean_exact,
-        "mean_within_1_letter_pct": mean_within,
-        "pairs": pairs,
+        "agent_id": agent_id, "role": role,
+        "batch_size": batch_size, "cluster_scope": cluster_scope,
+        "assessments": assessments, "n_assessments": len(assessments),
     }
 
 
-def compute_batch_effect(grades_by_agent, agent_meta):
-    """Mean grade per job by batch-size bucket."""
-    buckets = defaultdict(lambda: defaultdict(list))  # batch_size -> job_id -> [grades]
-    for agent_id, grades in grades_by_agent.items():
-        meta = agent_meta.get(agent_id, {})
-        if meta.get("role") != "core-grading":
-            continue
-        batch = meta.get("batch_size")
-        if not batch:
-            continue
-        for g in grades:
-            buckets[batch][g["job_id"]].append(g["grade"])
-
-    bucket_summary = {}
-    for batch, jobs in buckets.items():
-        per_job_means = []
-        for job_id, grades in jobs.items():
-            nums = [LETTER_TO_NUM[g] for g in grades if g in LETTER_TO_NUM]
-            if nums:
-                per_job_means.append(statistics.mean(nums))
-        if per_job_means:
-            bucket_summary[batch] = {
-                "mean": round(statistics.mean(per_job_means), 2),
-                "std": round(statistics.stdev(per_job_means) if len(per_job_means) > 1 else 0, 2),
-                "n_jobs": len(per_job_means),
-            }
-
-    return bucket_summary
+def quoted_substring_present(slot_text, jd, min_len=12):
+    quotes = re.findall(r'"([^"]+)"|\'([^\']+)\'', slot_text)
+    flat = [q[0] or q[1] for q in quotes]
+    for q in flat:
+        if len(q) >= min_len and q.lower() in jd.lower():
+            return True
+    return False
 
 
-def compute_cluster_position(grades_by_agent, agent_meta, cluster_a, cluster_b):
-    """For each job, compare grades from same-cluster agents vs cross-cluster agents."""
-    by_job = {}
-    a_set = set(cluster_a)
-    b_set = set(cluster_b)
+def axis_a_format(agent_data, project_names, run_dir):
+    if agent_data["role"] != "core-grading":
+        return None
+    n = len(agent_data["assessments"])
+    if n == 0:
+        return {"score": 0, "n_assessments": 0}
 
-    for agent_id, grades in grades_by_agent.items():
-        meta = agent_meta.get(agent_id, {})
-        scope = meta.get("scope")
-        for g in grades:
-            jid = g["job_id"]
-            grade_num = LETTER_TO_NUM.get(g["grade"])
-            if grade_num is None:
-                continue
-            if jid not in by_job:
-                by_job[jid] = {"same_cluster": [], "cross_cluster": [], "full": []}
+    results = Counter()
+    jobs_all_path = run_dir / "jobs-all.json"
+    jd_by_id = {}
+    if jobs_all_path.exists():
+        for j in json.loads(jobs_all_path.read_text()):
+            jd_by_id[j["id"]] = j.get("raw_description", "") or ""
 
-            if scope == "cross":
-                by_job[jid]["cross_cluster"].append(grade_num)
-            elif scope == "a-only" and jid in a_set:
-                by_job[jid]["same_cluster"].append(grade_num)
-            elif scope == "b-only" and jid in b_set:
-                by_job[jid]["same_cluster"].append(grade_num)
-            elif scope == "full":
-                by_job[jid]["full"].append(grade_num)
+    q1_quote_eligible = 0
+    q3a_quote_eligible = 0
 
-    result = {}
-    for jid, data in by_job.items():
-        if data["same_cluster"] and data["cross_cluster"]:
-            same_mean = statistics.mean(data["same_cluster"])
-            cross_mean = statistics.mean(data["cross_cluster"])
-            result[str(jid)] = {
-                "same_cluster_mean": round(same_mean, 2),
-                "cross_cluster_mean": round(cross_mean, 2),
-                "delta": round(cross_mean - same_mean, 2),
-            }
+    for asmt in agent_data["assessments"]:
+        if all(asmt.get(f"q{x}_prose") for x in ["1", "2", "3a", "3b", "4", "5"]) and asmt.get("verdict_prose"):
+            results["all_seven_slots"] += 1
+        if asmt["grade"] is not None or asmt["evidence_basis"] == "insufficient":
+            results["grade_line"] += 1
+        if asmt["evidence_basis"] in ("jd", "semantic", "insufficient"):
+            results["evidence_basis_set"] += 1
+        any_project = any(
+            p.lower() in (asmt.get("q3a_prose", "") + " " + asmt.get("q3b_prose", "")).lower()
+            for p in project_names
+        )
+        if any_project:
+            results["project_anchor"] += 1
+        slot_text = " ".join(asmt.get(f"q{x}_prose", "") for x in ["1", "2", "3a", "3b", "4", "5"])
+        slot_text += " " + asmt.get("verdict_prose", "")
+        if not any(b.lower() in slot_text.lower() for b in BANNED_IN_SLOT_PROSE):
+            results["no_banned"] += 1
+        if asmt["evidence_basis"] == "jd":
+            q1_quote_eligible += 1
+            q3a_quote_eligible += 1
+            jd = jd_by_id.get(asmt["job_id"], "")
+            if jd and quoted_substring_present(asmt.get("q1_prose", ""), jd):
+                results["q1_jd_quote"] += 1
+            if jd and quoted_substring_present(asmt.get("q3a_prose", ""), jd):
+                results["q3a_jd_quote"] += 1
 
-    return result
-
-
-def compute_trigger_correction(grades_by_agent, trigger_cases, agent_meta):
-    """% of trigger cases that aggregated to C or F across core agents."""
-    by_trigger = {}
-    for tjid in trigger_cases:
-        new_grades = []
-        for agent_id, grades in grades_by_agent.items():
-            meta = agent_meta.get(agent_id, {})
-            if meta.get("role") != "core-grading":
-                continue
-            for g in grades:
-                if g["job_id"] == tjid:
-                    new_grades.append(g["grade"])
-                    break
-        if new_grades:
-            corrected = sum(1 for g in new_grades if g in ("C", "F"))
-            by_trigger[str(tjid)] = {
-                "new_grades": new_grades,
-                "mode": Counter(new_grades).most_common(1)[0][0],
-                "corrected_count": corrected,
-                "correction_rate": round(corrected / len(new_grades), 3),
-            }
-
-    if not by_trigger:
-        return {"overall_correction_rate": None, "per_trigger": {}}
-
-    overall = round(statistics.mean(d["correction_rate"] for d in by_trigger.values()), 3)
-    return {"overall_correction_rate": overall, "per_trigger": by_trigger}
-
-
-def compute_q1_consistency(per_job):
-    """For each job, classify the (letter-agreement, Q1-agreement) cell."""
-    cells = {
-        "letter-agree_q1-agree": 0,
-        "letter-agree_q1-disagree": 0,
-        "letter-disagree_q1-agree": 0,
-        "letter-disagree_q1-disagree": 0,
+    pct = {
+        "all_seven_slots": results["all_seven_slots"] / n,
+        "grade_line": results["grade_line"] / n,
+        "project_anchor": results["project_anchor"] / n,
+        "no_banned": results["no_banned"] / n,
+        "evidence_basis": results["evidence_basis_set"] / n,
+        "q1_jd_quote": (results["q1_jd_quote"] / q1_quote_eligible) if q1_quote_eligible else 1.0,
+        "q3a_jd_quote": (results["q3a_jd_quote"] / q3a_quote_eligible) if q3a_quote_eligible else 1.0,
     }
-    examples = {k: [] for k in cells}
-
-    for jid, data in per_job.items():
-        grades = data["grades_observed"]
-        q1s = data["q1_verdicts"]
-        if not grades or not q1s:
-            continue
-        letter_agreement = len(set(grades)) == 1
-        q1_agreement = len(set(q1s)) == 1
-        cell = f"letter-{'agree' if letter_agreement else 'disagree'}_q1-{'agree' if q1_agreement else 'disagree'}"
-        cells[cell] += 1
-        if len(examples[cell]) < 5:
-            examples[cell].append({
-                "job_id": jid,
-                "company": data["company"],
-                "grades": grades,
-                "q1_verdicts": q1s,
-            })
-
-    return {"counts": cells, "examples": examples}
-
-
-def compute_blind_comparison(grades_by_agent, agent_meta):
-    """Compare rubric-blind distribution against rubric-loaded full-60 agents."""
-    blind = None
-    full60 = []
-    for agent_id, grades in grades_by_agent.items():
-        meta = agent_meta.get(agent_id, {})
-        if meta.get("role") == "rubric-blind":
-            blind = [g["grade"] for g in grades]
-        elif meta.get("role") == "core-grading" and meta.get("batch_size") == 60:
-            full60.extend(g["grade"] for g in grades)
-
-    if not blind:
-        return {"available": False, "reason": "rubric-blind agent produced no parseable output"}
-
-    blind_dist = Counter(blind)
-    full60_dist = Counter(full60)
-
-    delta = {}
-    for g in ("SS", "S", "A", "B", "C", "F"):
-        delta[g] = blind_dist.get(g, 0) - full60_dist.get(g, 0)
-
+    weights = {"all_seven_slots": 0.20, "grade_line": 0.10, "project_anchor": 0.15,
+               "no_banned": 0.20, "evidence_basis": 0.10,
+               "q1_jd_quote": 0.125, "q3a_jd_quote": 0.125}
+    score = sum(pct[k] * weights[k] for k in pct) * 100
     return {
-        "available": True,
-        "blind_distribution": dict(blind_dist),
-        "full60_distribution": dict(full60_dist),
-        "delta": delta,
+        "score": round(score, 1),
+        "details": {k: round(v * 100, 1) for k, v in pct.items()},
+        "n_assessments": n,
     }
 
 
-def compute_anchor_effect(grades_by_agent, agent_meta):
-    """Compare anchor-injected distribution against plain full-60 agents."""
-    anchor = None
-    full60 = []
-    for agent_id, grades in grades_by_agent.items():
-        meta = agent_meta.get(agent_id, {})
-        if meta.get("role") == "anchor-injected":
-            anchor = [g["grade"] for g in grades]
-        elif meta.get("role") == "core-grading" and meta.get("batch_size") == 60:
-            full60.extend(g["grade"] for g in grades)
-
-    if not anchor:
-        return {"available": False, "reason": "anchor-injected agent produced no parseable output"}
-
-    anchor_dist = Counter(anchor)
-    full60_dist = Counter(full60)
-
-    delta = {}
-    for g in ("SS", "S", "A", "B", "C", "F"):
-        delta[g] = anchor_dist.get(g, 0) - full60_dist.get(g, 0)
-
+def axis_b_specificity(agent_data, project_names, skills_entries):
+    if agent_data["role"] != "core-grading":
+        return None
+    n = len(agent_data["assessments"])
+    if n == 0:
+        return {"score": 0}
+    total_generic = 0
+    total_words = 0
+    total_specific_refs = 0
+    project_diversity = set()
+    for asmt in agent_data["assessments"]:
+        text = asmt.get("full_text", "")
+        total_words += len(re.findall(r"\b\w+\b", text))
+        for gp in GENERIC_PHRASES:
+            total_generic += text.lower().count(gp)
+        quotes = re.findall(r'"([^"]{8,})"', text)
+        total_specific_refs += len(quotes)
+        for proj in project_names:
+            if proj.lower() in text.lower():
+                total_specific_refs += 1
+                project_diversity.add(proj)
+        for entry in skills_entries:
+            if entry.lower() in text.lower():
+                total_specific_refs += 1
+    specificity_density = (total_specific_refs / total_words * 100) if total_words else 0
+    generic_per_asmt = total_generic / n
+    project_diversity_score = min(len(project_diversity) / 10.0, 1.0)
+    raw = (specificity_density * 0.6) + (project_diversity_score * 30) + (max(0, 1 - generic_per_asmt) * 10)
+    score = min(raw, 100)
     return {
-        "available": True,
-        "anchor_distribution": dict(anchor_dist),
-        "full60_distribution": dict(full60_dist),
-        "delta": delta,
+        "score": round(score, 1),
+        "specificity_density": round(specificity_density, 2),
+        "generic_per_assessment": round(generic_per_asmt, 2),
+        "project_diversity": len(project_diversity),
+        "n_assessments": n,
     }
 
 
-def compute_pairwise_consistency(pairs_by_agent, per_job):
-    """Compare pairwise winners against letter-grade ordering."""
-    disagreements = []
-    agreements = 0
-    total = 0
-
-    for agent_id, pairs in pairs_by_agent.items():
-        for p in pairs:
-            # We only have pair_id and winner from the markdown; we'd need
-            # the manifest to map pair_id to job_a/job_b ids. For now, count
-            # the parseable results and let the agent's report explain.
-            total += 1
-            # The full cross-check requires the orchestrator to load the
-            # manifest; this script just emits raw counts.
-
+def axis_c_differentiation(agent_data):
+    if agent_data["role"] != "core-grading":
+        return None
+    n_with_both = 0
+    total_overlap = 0
+    q3b_career_axis = 0
+    q3a_jd_tech = 0
+    for asmt in agent_data["assessments"]:
+        q3a = asmt.get("q3a_prose", "")
+        q3b = asmt.get("q3b_prose", "")
+        if not (q3a and q3b):
+            continue
+        n_with_both += 1
+        a_words = set(w.lower() for w in re.findall(r"\b\w{4,}\b", q3a) if w.lower() not in STOPWORDS)
+        b_words = set(w.lower() for w in re.findall(r"\b\w{4,}\b", q3b) if w.lower() not in STOPWORDS)
+        if a_words | b_words:
+            total_overlap += len(a_words & b_words) / len(a_words | b_words)
+        if any(t in q3b.lower() for t in CAREER_AXIS_TERMS):
+            q3b_career_axis += 1
+        if re.search(r'"[^"]{4,}"', q3a):
+            q3a_jd_tech += 1
+    if n_with_both == 0:
+        return {"score": 0, "n_with_both_slots": 0}
+    mean_overlap = total_overlap / n_with_both
+    q3b_career_pct = q3b_career_axis / n_with_both
+    q3a_jd_tech_pct = q3a_jd_tech / n_with_both
+    score = (1 - mean_overlap) * 40 + q3b_career_pct * 30 + q3a_jd_tech_pct * 30
     return {
-        "total_pairs_parsed": total,
-        "note": "Full letter-vs-pair cross-check is done by the report-composing agent using the manifests; this script just confirms the pairwise outputs were parseable.",
+        "score": round(score, 1),
+        "mean_overlap_jaccard": round(mean_overlap, 3),
+        "q3b_career_axis_pct": round(q3b_career_pct * 100, 1),
+        "q3a_jd_tech_pct": round(q3a_jd_tech_pct * 100, 1),
+        "n_with_both_slots": n_with_both,
+    }
+
+
+def axis_d_consistency(agent_data):
+    if agent_data["role"] != "core-grading":
+        return None
+    n = len(agent_data["assessments"])
+    if n == 0:
+        return {"score": 0}
+    verdict_grade_aligned = 0
+    q1_hardfloor_coherent = 0
+    q1_hardfloor_eligible = 0
+    risk_engaged = 0
+    risk_eligible = 0
+    n_graded = 0
+    for asmt in agent_data["assessments"]:
+        verdict = asmt.get("verdict_prose", "").lower()
+        grade = asmt["grade"]
+        if grade is None:
+            continue
+        n_graded += 1
+        verdict_pos = any(p in verdict for p in VERDICT_POSITIVE)
+        verdict_neg = any(p in verdict for p in VERDICT_NEGATIVE)
+        grade_high = grade in ("SS", "S", "A")
+        grade_low = grade in ("C", "F")
+        if (verdict_pos and grade_high) or (verdict_neg and grade_low) or (not verdict_pos and not verdict_neg):
+            verdict_grade_aligned += 1
+        q1 = asmt.get("q1_prose", "").lower()
+        if any(re.search(p, q1) for p in HARD_FLOOR_PATTERNS):
+            q1_hardfloor_eligible += 1
+            if grade == "F":
+                q1_hardfloor_coherent += 1
+        q3b = asmt.get("q3b_prose", "").lower()
+        if any(r in q3b for r in RISK_PHRASES):
+            risk_eligible += 1
+            if any(r in verdict for r in RISK_PHRASES) or any(t in verdict for t in ["pushback", "trade-off", "tradeoff"]):
+                risk_engaged += 1
+    if n_graded == 0:
+        return {"score": 0}
+    verdict_pct = verdict_grade_aligned / n_graded
+    q1_pct = (q1_hardfloor_coherent / q1_hardfloor_eligible) if q1_hardfloor_eligible else 1.0
+    risk_pct = (risk_engaged / risk_eligible) if risk_eligible else 1.0
+    score = (verdict_pct * 40 + q1_pct * 30 + risk_pct * 30) * 100
+    return {
+        "score": round(score, 1),
+        "verdict_grade_aligned_pct": round(verdict_pct * 100, 1),
+        "q1_hardfloor_coherent_pct": round(q1_pct * 100, 1),
+        "q1_hardfloor_eligible_n": q1_hardfloor_eligible,
+        "risk_engaged_pct": round(risk_pct * 100, 1),
+        "risk_eligible_n": risk_eligible,
+    }
+
+
+def axis_e_inter_agent(agents):
+    import itertools
+    core = [a for a in agents if a["role"] == "core-grading"]
+    job_grades = defaultdict(list)
+    for agent in core:
+        for asmt in agent["assessments"]:
+            if asmt["grade"]:
+                job_grades[asmt["job_id"]].append(asmt["grade"])
+    exact_matches = 0
+    within_1_matches = 0
+    total_shared_pairs = 0
+    for a1, a2 in itertools.combinations(core, 2):
+        a1_grades = {a["job_id"]: a["grade"] for a in a1["assessments"] if a["grade"]}
+        a2_grades = {a["job_id"]: a["grade"] for a in a2["assessments"] if a["grade"]}
+        shared = set(a1_grades) & set(a2_grades)
+        for j in shared:
+            total_shared_pairs += 1
+            if a1_grades[j] == a2_grades[j]:
+                exact_matches += 1
+            if abs(LETTER_TO_NUM[a1_grades[j]] - LETTER_TO_NUM[a2_grades[j]]) <= 1:
+                within_1_matches += 1
+    if total_shared_pairs == 0:
+        return {"score": 0, "total_shared_pairs": 0, "per_job_grades": {}}
+    exact_pct = exact_matches / total_shared_pairs
+    within1_pct = within_1_matches / total_shared_pairs
+    job_ranges = {}
+    for jid, grades in job_grades.items():
+        if len(grades) >= 2:
+            nums = [LETTER_TO_NUM[g] for g in grades]
+            job_ranges[jid] = max(nums) - min(nums)
+    score = (exact_pct * 60 + within1_pct * 40) * 100
+    return {
+        "score": round(score, 1),
+        "exact_match_pct": round(exact_pct * 100, 1),
+        "within_1_letter_pct": round(within1_pct * 100, 1),
+        "total_shared_pairs": total_shared_pairs,
+        "mean_per_job_range": round(sum(job_ranges.values()) / len(job_ranges), 2) if job_ranges else 0,
+        "max_per_job_range": max(job_ranges.values()) if job_ranges else 0,
+        "per_job_grades": {str(jid): grades for jid, grades in job_grades.items()},
+    }
+
+
+def axis_f_pairwise(agents):
+    pw_agents = [a for a in agents if a["role"] == "pairwise"]
+    if len(pw_agents) < 2:
+        return {"score": 0, "available": False, "reason": "fewer than 2 pairwise agents"}
+    pw1 = {p["pair_id"]: p["winner"] for p in pw_agents[0]["pairs"]}
+    pw2 = {p["pair_id"]: p["winner"] for p in pw_agents[1]["pairs"]}
+    shared = set(pw1) & set(pw2)
+    cross_agree = sum(1 for p in shared if pw1[p] == pw2[p] and pw1[p] is not None)
+    cross_pct = (cross_agree / len(shared)) if shared else None
+    total_decisions = len(pw_agents[0]["pairs"]) + len(pw_agents[1]["pairs"])
+    ties = sum(1 for a in pw_agents for p in a["pairs"] if p["winner"] == "tie")
+    tie_rate = ties / total_decisions if total_decisions else 0
+    if cross_pct is not None:
+        score = cross_pct * 70 + (1 - tie_rate) * 30
+    else:
+        score = (1 - tie_rate) * 70
+    return {
+        "score": round(score * 100, 1),
+        "cross_agent_agreement_pct": round(cross_pct * 100, 1) if cross_pct is not None else None,
+        "shared_pairs_n": len(shared),
+        "tie_rate_pct": round(tie_rate * 100, 1),
+        "total_decisions": total_decisions,
+    }
+
+
+def axis_g_risk(agent_data):
+    if agent_data["role"] != "core-grading":
+        return None
+    n = len(agent_data["assessments"])
+    if n == 0:
+        return {"score": 0}
+    asmts_with_risk = 0
+    total_risks = 0
+    risks_in_q3b = 0
+    grades_with_risk = []
+    grades_without_risk = []
+    for asmt in agent_data["assessments"]:
+        text = asmt.get("full_text", "").lower()
+        q3b = asmt.get("q3b_prose", "").lower()
+        risk_count = sum(text.count(p) for p in RISK_PHRASES)
+        total_risks += risk_count
+        if risk_count > 0:
+            asmts_with_risk += 1
+        if any(p in q3b for p in RISK_PHRASES):
+            risks_in_q3b += 1
+        if asmt["grade"] is not None:
+            if risk_count > 0:
+                grades_with_risk.append(LETTER_TO_NUM[asmt["grade"]])
+            else:
+                grades_without_risk.append(LETTER_TO_NUM[asmt["grade"]])
+    risk_named_pct = asmts_with_risk / n
+    risks_in_q3b_pct = risks_in_q3b / n
+    mean_grade_with = sum(grades_with_risk) / len(grades_with_risk) if grades_with_risk else None
+    mean_grade_without = sum(grades_without_risk) / len(grades_without_risk) if grades_without_risk else None
+    risk_direction_delta = (mean_grade_without - mean_grade_with) if (mean_grade_with is not None and mean_grade_without is not None) else None
+    delta_normalised = 0.5
+    if risk_direction_delta is not None:
+        delta_normalised = max(0, min(1, (risk_direction_delta + 1) / 2))
+    score = (risk_named_pct * 40 + risks_in_q3b_pct * 30 + delta_normalised * 30) * 100
+    return {
+        "score": round(score, 1),
+        "risk_named_pct": round(risk_named_pct * 100, 1),
+        "risks_in_q3b_pct": round(risks_in_q3b_pct * 100, 1),
+        "mean_risks_per_assessment": round(total_risks / n, 2),
+        "risk_direction_delta_letters": round(risk_direction_delta, 2) if risk_direction_delta is not None else None,
     }
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("Usage: analyse.py <run-id>", file=sys.stderr)
         sys.exit(2)
     run_id = sys.argv[1]
-    working_dir = Path(f"/tmp/test-grade-jobs-{run_id}")
-
-    if not working_dir.exists():
-        print(f"FATAL: {working_dir} not found", file=sys.stderr)
+    run_dir = Path(f"/tmp/test-grade-jobs-{run_id}")
+    if not run_dir.exists():
+        print(f"FATAL: {run_dir} not found.", file=sys.stderr)
         sys.exit(2)
 
-    # Load support files
-    with open(working_dir / "coverage-matrix.json") as f:
-        coverage = json.load(f)
-    with open(working_dir / "cluster-a.json") as f:
-        cluster_a = json.load(f)
-    with open(working_dir / "cluster-b.json") as f:
-        cluster_b = json.load(f)
-    with open(working_dir / "trigger-cases.json") as f:
-        trigger_cases = json.load(f)
-    with open(working_dir / "db-grades.json") as f:
-        db_grades = json.load(f)
-    with open(working_dir / "jobs-all.json") as f:
-        jobs = json.load(f)
+    agents = []
+    for agent_md in sorted(run_dir.glob("agent-*.md")):
+        parsed = parse_agent_output(agent_md)
+        if parsed:
+            agents.append(parsed)
+    n_grading = sum(1 for a in agents if a["role"] == "core-grading")
+    n_pairwise = sum(1 for a in agents if a["role"] == "pairwise")
+    print(f"Agents parsed: {len(agents)} ({n_grading} grading + {n_pairwise} pairwise)")
 
-    # Define agent metadata (drives the analysis)
-    agent_meta = {
-        "cluster-a-10job-1": {"role": "core-grading", "batch_size": 10, "scope": "a-only"},
-        "cluster-a-10job-2": {"role": "core-grading", "batch_size": 10, "scope": "a-only"},
-        "cluster-a-10job-3": {"role": "core-grading", "batch_size": 10, "scope": "a-only"},
-        "cluster-a-15job-1": {"role": "core-grading", "batch_size": 15, "scope": "a-only"},
-        "cluster-a-15job-2": {"role": "core-grading", "batch_size": 15, "scope": "a-only"},
-        "cluster-a-30job": {"role": "core-grading", "batch_size": 30, "scope": "a-only"},
-        "cluster-b-10job-1": {"role": "core-grading", "batch_size": 10, "scope": "b-only"},
-        "cluster-b-10job-2": {"role": "core-grading", "batch_size": 10, "scope": "b-only"},
-        "cluster-b-10job-3": {"role": "core-grading", "batch_size": 10, "scope": "b-only"},
-        "cluster-b-15job-1": {"role": "core-grading", "batch_size": 15, "scope": "b-only"},
-        "cluster-b-15job-2": {"role": "core-grading", "batch_size": 15, "scope": "b-only"},
-        "cluster-b-30job": {"role": "core-grading", "batch_size": 30, "scope": "b-only"},
-        "cross-cluster-1": {"role": "core-grading", "batch_size": 30, "scope": "cross"},
-        "cross-cluster-2": {"role": "core-grading", "batch_size": 30, "scope": "cross"},
-        "full-60-1": {"role": "core-grading", "batch_size": 60, "scope": "full"},
-        "full-60-2": {"role": "core-grading", "batch_size": 60, "scope": "full"},
-        "rubric-blind": {"role": "rubric-blind", "batch_size": 60, "scope": "full"},
-        "anchor-injected": {"role": "anchor-injected", "batch_size": 60, "scope": "full"},
-        "pairwise-1": {"role": "pairwise", "batch_size": 20, "scope": "pairs"},
-        "pairwise-2": {"role": "pairwise", "batch_size": 20, "scope": "pairs"},
-    }
+    project_names = get_project_filenames()
+    skills_entries = get_skills_entries()
+    print(f"Project anchors loaded: {len(project_names)} | Skills entries: {len(skills_entries)}")
 
-    # Parse every per-agent output file
-    grades_by_agent = {}
-    pairs_by_agent = {}
-    parse_failures = []
-
-    for agent_id, meta in agent_meta.items():
-        path = working_dir / f"agent-{agent_id}.md"
-        if not path.exists():
-            parse_failures.append({"agent_id": agent_id, "reason": "file missing"})
+    per_axis = {}
+    per_agent_scores = {}
+    for agent in agents:
+        if agent["role"] == "pairwise":
             continue
+        per_agent_scores[agent["agent_id"]] = {
+            "axis_a": axis_a_format(agent, project_names, run_dir),
+            "axis_b": axis_b_specificity(agent, project_names, skills_entries),
+            "axis_c": axis_c_differentiation(agent),
+            "axis_d": axis_d_consistency(agent),
+            "axis_g": axis_g_risk(agent),
+        }
+    for axis_key in ("axis_a", "axis_b", "axis_c", "axis_d", "axis_g"):
+        scores = [v[axis_key]["score"] for v in per_agent_scores.values()
+                  if v.get(axis_key) and v[axis_key].get("score") is not None]
+        per_axis[axis_key] = round(sum(scores) / len(scores), 1) if scores else 0
+
+    e = axis_e_inter_agent(agents)
+    per_axis["axis_e"] = e["score"]
+    f_score = axis_f_pairwise(agents)
+    per_axis["axis_f"] = f_score["score"]
+
+    composite = round(sum(per_axis.values()) / len(per_axis), 1)
+
+    with open(run_dir / "computed-per-agent.json", "w") as fh:
+        json.dump(per_agent_scores, fh, indent=2, default=str)
+    e_disk = {k: v for k, v in e.items() if k != "per_job_grades"}
+    e_disk["per_job_grades_count"] = len(e.get("per_job_grades", {}))
+    with open(run_dir / "computed-axis-e.json", "w") as fh:
+        json.dump(e_disk, fh, indent=2, default=str)
+    with open(run_dir / "computed-axis-f.json", "w") as fh:
+        json.dump(f_score, fh, indent=2, default=str)
+    with open(run_dir / "computed-axes-summary.json", "w") as fh:
+        json.dump({**per_axis, "composite": composite}, fh, indent=2)
+    with open(run_dir / "computed-per-job.json", "w") as fh:
+        json.dump(e["per_job_grades"], fh, indent=2, default=str)
+
+    baseline_path = Path("context/test-runs/baseline.json")
+    baseline_history_path = Path("context/test-runs/baseline-history.json")
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+
+    diff_summary = {}
+    if baseline_path.exists():
         try:
-            if meta["role"] == "pairwise":
-                parsed = parse_pairwise_agent(path)
-                pairs_by_agent[agent_id] = parsed
-            else:
-                parsed = parse_grading_agent(path)
-                grades_by_agent[agent_id] = parsed
-        except Exception as e:
-            parse_failures.append({"agent_id": agent_id, "reason": f"parse error: {e}"})
+            baseline = json.loads(baseline_path.read_text())
+            baseline_run_id = baseline.get("run_id", "unknown")
+            for axis_key in ("axis_a", "axis_b", "axis_c", "axis_d", "axis_e", "axis_f", "axis_g"):
+                current = per_axis.get(axis_key, 0)
+                prior = baseline.get(axis_key, 0)
+                delta = round(current - prior, 1)
+                direction = "improved" if delta > 0.5 else "regressed" if delta < -0.5 else "stable"
+                diff_summary[axis_key] = {"current": current, "prior": prior, "delta": delta, "direction": direction}
+            composite_prior = baseline.get("composite", 0)
+            diff_summary["composite"] = {
+                "current": composite, "prior": composite_prior,
+                "delta": round(composite - composite_prior, 1),
+                "direction": "improved" if composite - composite_prior > 0.5 else "regressed" if composite - composite_prior < -0.5 else "stable",
+            }
+            print(f"\nRegression diff vs baseline (run {baseline_run_id}):")
+            for k, v in diff_summary.items():
+                print(f"  {k}: {v['current']} (was {v['prior']}) Delta {v['delta']:+} [{v['direction']}]")
+            history = []
+            if baseline_history_path.exists():
+                try:
+                    history = json.loads(baseline_history_path.read_text())
+                except Exception:
+                    history = []
+            history.append(baseline)
+            with open(baseline_history_path, "w") as fh:
+                json.dump(history, fh, indent=2)
+        except Exception as exc:
+            print(f"WARNING: baseline parse failed: {exc}. Treating as first run.")
+            diff_summary = {"first_run": True}
+    else:
+        print("\nNo baseline found. This run becomes the new baseline.")
+        diff_summary = {"first_run": True}
 
-    total_grades = sum(len(g) for g in grades_by_agent.values())
-    total_pairs = sum(len(p) for p in pairs_by_agent.values())
-    unique_jobs_covered = set()
-    for grades in grades_by_agent.values():
-        for g in grades:
-            unique_jobs_covered.add(g["job_id"])
+    new_baseline = {"run_id": run_id, "composite": composite, **per_axis}
+    with open(baseline_path, "w") as fh:
+        json.dump(new_baseline, fh, indent=2)
+    with open(run_dir / "computed-regression-diff.json", "w") as fh:
+        json.dump(diff_summary, fh, indent=2)
 
-    print(f"Agents ingested: {len(grades_by_agent)} grading + {len(pairs_by_agent)} pairwise")
-    print(f"Grades parsed: {total_grades}")
-    print(f"Pairs parsed: {total_pairs}")
-    print(f"Unique jobs covered: {len(unique_jobs_covered)}")
-    if parse_failures:
-        print(f"Parse failures: {len(parse_failures)}")
-        for pf in parse_failures:
-            print(f"  - {pf['agent_id']}: {pf['reason']}")
-
-    # Run computations
-    core_agent_ids = [aid for aid, meta in agent_meta.items() if meta["role"] == "core-grading"]
-
-    per_job = compute_per_job(grades_by_agent, coverage, db_grades, trigger_cases, jobs)
-    agreement = compute_agreement(grades_by_agent, core_agent_ids)
-    batch_effect = compute_batch_effect(grades_by_agent, agent_meta)
-    cluster_position = compute_cluster_position(grades_by_agent, agent_meta, cluster_a, cluster_b)
-    trigger = compute_trigger_correction(grades_by_agent, trigger_cases, agent_meta)
-    q1_consistency = compute_q1_consistency(per_job)
-    blind = compute_blind_comparison(grades_by_agent, agent_meta)
-    anchor = compute_anchor_effect(grades_by_agent, agent_meta)
-    pairwise = compute_pairwise_consistency(pairs_by_agent, per_job)
-
-    # Write intermediate files
-    outputs = {
-        "computed-per-job.json": per_job,
-        "computed-agreement.json": agreement,
-        "computed-batch-effect.json": batch_effect,
-        "computed-cluster-position.json": cluster_position,
-        "computed-trigger.json": trigger,
-        "computed-q1-consistency.json": q1_consistency,
-        "computed-blind-comparison.json": blind,
-        "computed-anchor-effect.json": anchor,
-        "computed-pairwise.json": pairwise,
-        "computed-parse-failures.json": parse_failures,
-    }
-    for name, data in outputs.items():
-        with open(working_dir / name, "w") as f:
-            json.dump(data, f, indent=2)
-        print(f"Wrote {name}")
-
+    print(f"\n=== Per-axis scores (run {run_id}) ===")
+    for k in ("axis_a", "axis_b", "axis_c", "axis_d", "axis_e", "axis_f", "axis_g"):
+        print(f"  {k}: {per_axis[k]}")
+    print(f"  composite: {composite}")
+    print(f"\nIntermediate JSONs written to {run_dir}/computed-*.json")
+    print(f"Baseline updated at {baseline_path}")
     print("DONE.")
 
 

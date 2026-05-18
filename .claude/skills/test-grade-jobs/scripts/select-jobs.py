@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-select-jobs.py — Stratified 60-job selection for test-grade-jobs.
+select-jobs.py — Stratified 60-job diversity sample for test-grade-jobs.
 
-Picks 30 stress-test jobs (cluster A) + 30 stability anchors (cluster B)
-from state/cernio.db. Identifies trigger cases. Writes per-agent manifests
-with randomised job order per agent. Builds the coverage matrix.
+Picks 30 stress-pattern jobs (cluster A) + 30 stability-pattern jobs (cluster B)
+from state/cernio.db. Writes per-agent manifests (13 agents) with randomised job
+order per agent. Builds the coverage matrix.
 
-Per the skill's inviolable rules: zero grade leakage to manifests. The
-script selects jobs WITH their DB grades for coverage statistics, then
-strips the grade field from any output that any agent will read.
+The clusters are diversity samples, NOT expectation labels. The script does not
+identify trigger cases or persist DB grades to disk — both encoded curated
+answers the test must not consult.
+
+Per the skill's inviolable rules: zero grade leakage to manifests. The script
+selects jobs WITHOUT their DB grades; no DB-grade field appears in any output.
 
 Usage:
     python3 select-jobs.py <run-id>
@@ -17,13 +20,10 @@ Writes to /tmp/test-grade-jobs-<run-id>/:
     jobs-all.json            — 60 full job records (no grades)
     cluster-a.json           — 30 cluster A job IDs
     cluster-b.json           — 30 cluster B job IDs
-    trigger-cases.json       — subset of cluster A IDs with trigger-pattern hits
     coverage-matrix.json     — job_id -> list of agent_ids that will grade it
-    db-grades.json           — job_id -> DB grade (for analysis only; NEVER in any manifest)
-    manifest-agent-*.json    — per-agent manifest with randomised job order
+    manifest-agent-*.json    — per-agent manifest with randomised job order (13 files)
 
-stdout: run-id confirmation, cluster sizes, trigger-case count,
-       zero-grade-leakage assertion.
+stdout: run-id confirmation, cluster sizes, zero-grade-leakage assertion.
 """
 
 import json
@@ -33,35 +33,29 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Stress-test patterns for cluster A
-PRESTIGE_FIRMS = {
+# Stress patterns for cluster A — diversity-sampling anchors, not outcome expectations.
+NARROW_FUNNEL_FIRMS = {
     "Jane Street", "Hudson River Trading", "HRT", "XTX Markets", "Citadel",
-    "Two Sigma", "DE Shaw", "Jump Trading", "Tower Research Capital",
-    "Old Mission Capital", "Optiver", "Akuna Capital", "Squarepoint Capital",
-    "Point72", "Cubist", "Millennium", "G-Research", "Susquehanna",
-    "SIG", "Belvedere Trading", "DRW", "IMC Trading",
+    "Citadel Securities", "Two Sigma", "DE Shaw", "Jump Trading",
+    "Tower Research Capital", "Old Mission Capital", "Optiver", "Akuna Capital",
+    "Squarepoint Capital", "Point72", "Cubist", "Point72 / Cubist", "Millennium",
+    "G-Research", "Susquehanna", "SIG", "Belvedere Trading", "DRW", "IMC Trading",
+    "Qube Research & Technologies", "QRT", "Man Group", "Man Group (AHL)",
+    "Capula Investment Management",
 }
 
-TRIGGER_PHRASES = [
-    "stretch", "lottery", "sub-1%", "sub 1%", "headwind", "prestige-trap",
-    "prestige trap", "stretch-A", "A-stretch", "narrow-funnel",
-    "narrow funnel", "brutal selectivity", "lottery ticket", "lottery band",
-]
-
-# Stability-anchor patterns for cluster B
+# Stability patterns for cluster B — diversity-sampling anchors, not outcome expectations.
 MID_TIER_FINTECH = {
     "Lendable", "Trainline", "Monzo", "Zopa", "Starling Bank", "Wise",
-    "Cleo", "Plaid", "Stripe", "Revolut", "GoCardless", "Tide",
-    "Curve", "Atom Bank", "OakNorth",
+    "Cleo", "Plaid", "Revolut", "GoCardless", "Tide", "Curve", "Atom Bank",
+    "OakNorth", "Checkout.com", "Yapily",
 }
 
 WIDE_FUNNEL_GRAD = {
     "Cloudflare", "Spotify", "Palantir", "Amazon", "Google", "Microsoft",
     "Meta", "Apple", "Netflix", "Twilio", "Datadog", "Snowflake",
-    "B2C2", "Squarepoint Capital",
+    "B2C2", "GitLab", "Stripe", "Bloomberg", "Arm",
 }
-
-LETTER_TO_NUM = {"SS": 5, "S": 4, "A": 3, "B": 2, "C": 1, "F": 0}
 
 DB_PATH = "state/cernio.db"
 
@@ -76,372 +70,271 @@ def connect_db():
 
 
 def fetch_candidates(conn):
-    """Pull all eligible jobs (description > 500 chars, not archived) with their context."""
+    """Pull all eligible jobs (description > 500 chars, not archived) with their
+    context. Deliberately does NOT select j.grade or j.fit_assessment — those
+    are external answers the test must not consult."""
     cur = conn.cursor()
-    cur.execute(
-        """
+    cur.execute("""
         SELECT j.id, j.title, j.url, j.location, j.remote_policy,
-               j.raw_description, j.fit_assessment, j.grade AS db_grade,
-               c.name AS company_name, c.what_they_do
+               j.raw_description, c.name AS company_name, c.what_they_do
         FROM jobs j JOIN companies c ON c.id = j.company_id
         WHERE j.evaluation_status <> 'archived'
           AND LENGTH(j.raw_description) > 500
-        """
-    )
+    """)
     return [dict(r) for r in cur.fetchall()]
 
 
-def classify_stress_patterns(job):
-    """Return a list of stress-test patterns this job matches (may be empty)."""
-    patterns = []
+def stress_pattern_score(job):
+    """Score a job by how many stress patterns it matches. Higher = more
+    cluster-A-eligible. Score is for SAMPLING ONLY — it does NOT encode any
+    grade expectation."""
+    score = 0
+    company = job["company_name"] or ""
     title = (job["title"] or "").lower()
     desc = (job["raw_description"] or "").lower()
-    company = (job["company_name"] or "")
-    fit = (job["fit_assessment"] or "").lower()
 
-    if company in PRESTIGE_FIRMS:
-        patterns.append("prestige-firm")
-
-    # Implicit-seniority disguise: SWE title + N+ years
-    if any(k in title for k in ["software engineer", "software developer", "engineer"]):
-        if "graduate" not in title and "junior" not in title and "intern" not in title:
-            import re
-            if re.search(r"\b[3-9]\+?\s*years?\b", desc) or re.search(r"\b\d+-\d+\s*years?\b", desc):
-                patterns.append("seniority-disguise")
-
-    # Currently-pursuing intern misfit
-    if "intern" in title and ("currently pursuing" in desc or "current student" in desc or "expected graduation" in desc):
-        patterns.append("intern-pursuing-misfit")
-
-    # Role-type mismatch
-    if any(k in title for k in ["analyst", "trader", "researcher", "data scientist"]):
-        if "data scientist" not in title or "data scientist" in title:  # tag all of them; rubric will weigh
-            patterns.append("role-type-mismatch")
-
-    # Customer-facing borderline
-    if "customer engagement" in desc or "interact with customers" in desc or "customer-engagement" in desc:
-        patterns.append("customer-facing-borderline")
-
-    # Stack-zero misfit (rough heuristic)
-    if any(k in desc for k in ["kotlin", "android", "swift", "objective-c", "salesforce"]):
-        if not any(k in desc for k in ["python", "typescript", "rust", "react"]):
-            patterns.append("stack-zero-misfit")
-
-    # Security clearance
-    if any(k in desc for k in ["security clearance", "sc clearance", "dv clearance", "uk national"]):
-        patterns.append("clearance-required")
-
-    # Staff-tier comp band disguise
-    # (look for >£200k or >$300k mention)
-    import re
-    if re.search(r"£\s*2\d\d,?\d{3}", desc) or re.search(r"£\s*[3-9]\d\d,?\d{3}", desc) or re.search(r"\$\s*[3-9]\d\d,?\d{3}", desc):
-        if any(k in desc for k in ["lead", "own", "shape", "principal", "staff"]):
-            patterns.append("staff-tier-disguise")
-
-    # Trigger-phrase match in fit_assessment (the strongest signal)
-    if any(phrase in fit for phrase in TRIGGER_PHRASES):
-        patterns.append("trigger-phrase-in-assessment")
-
-    return patterns
+    if company in NARROW_FUNNEL_FIRMS:
+        score += 3
+    if "engineer" in title and not any(t in title for t in ("graduate", "junior", "intern", "new grad")):
+        # implicit-seniority disguise candidate: needs years floor in desc
+        if any(p in desc for p in ("3+ years", "4+ years", "5+ years", "5-10 years",
+                                    "extensive experience", "deep expertise", "expert-level")):
+            score += 2
+    if "intern" in title and any(t in desc for t in ("currently pursuing", "current student",
+                                                       "expected graduation")):
+        score += 2
+    if any(t in title for t in ("analyst", "trader", "quantitative researcher", "data scientist")):
+        score += 2
+    if any(t in desc for t in ("security clearance", "sc clearance", "dv clearance",
+                                "uk national required", "british national required")):
+        score += 2
+    if any(t in desc for t in ("customer engagement", "customer-facing", "interact with customers",
+                                "forward-deployed")):
+        score += 2
+    # off-stack mid-level (Kotlin/Android, iOS, Salesforce at mid-level)
+    if any(t in desc for t in ("kotlin", "android development", "ios development",
+                                "swift development", "salesforce")):
+        if any(p in desc for p in ("3+ years", "4+ years")):
+            score += 1
+    # staff-tier comp band disguise
+    if "£200" in desc or "£250" in desc or "£300" in desc:
+        if any(t in desc for t in ("lead the", "own the", "shape the", "principal")):
+            score += 2
+    return score
 
 
-def classify_stability_patterns(job):
-    """Return a list of stability-anchor patterns this job matches (may be empty)."""
-    patterns = []
+def stability_pattern_score(job):
+    """Score a job by stability-pattern match. Higher = more cluster-B-eligible.
+    Score is for SAMPLING ONLY — it does NOT encode any grade expectation."""
+    score = 0
+    company = job["company_name"] or ""
     title = (job["title"] or "").lower()
     desc = (job["raw_description"] or "").lower()
-    company = (job["company_name"] or "")
     location = (job["location"] or "").lower()
 
-    # Wide-funnel graduate
-    if any(k in title for k in ["graduate", "new grad", "2026 grad"]):
-        if company in WIDE_FUNNEL_GRAD:
-            patterns.append("wide-funnel-grad")
-
-    # Hard years-floor F
-    import re
-    if re.search(r"\b[5-9]\+?\s*years?\b", desc) or re.search(r"\b1\d\+?\s*years?\b", desc):
-        patterns.append("hard-years-floor")
-
-    # Location hard-fail (not London / Cambridge / Remote-UK)
-    if location and not any(k in location for k in ["london", "cambridge", "remote", "uk"]):
-        patterns.append("location-hard-fail")
-
-    # Mid-tier UK fintech
-    if company in MID_TIER_FINTECH:
-        if any(k in title for k in ["graduate", "junior", "engineer"]):
-            patterns.append("mid-tier-uk-fintech")
-
-    # Off-stack mid-level
-    if any(k in desc for k in ["android", "ios", "salesforce"]):
-        patterns.append("off-stack-midlevel")
-
-    # Legit-A engineering (graduate-explicit + portfolio stack)
-    if any(k in title for k in ["graduate", "new grad", "junior"]):
-        if any(k in desc for k in ["python", "rust", "typescript", "go"]):
-            if company not in PRESTIGE_FIRMS:  # exclude trigger-trap firms
-                patterns.append("legit-a-engineering")
-
-    return patterns
+    # wide-funnel grad
+    if company in WIDE_FUNNEL_GRAD and any(t in title for t in ("graduate", "new grad", "2026 grad")):
+        score += 3
+    # hard years floor (explicit)
+    if any(p in desc for p in ("4+ years", "5+ years", "5-10 years", "6+ years", "7+ years")):
+        score += 2
+    # hard location exclusion candidate
+    if any(loc in location for loc in ("bristol", "edinburgh", "manchester", "berlin",
+                                         "dublin", "paris", "munich", "amsterdam")):
+        score += 2
+    # mid-tier fintech junior
+    if company in MID_TIER_FINTECH and any(t in title for t in ("graduate", "junior", "associate",
+                                                                  "engineer i", "engineer 1")):
+        score += 2
+    # off-stack mid-level (different from cluster A's off-stack — here it's a stability case
+    # because the stack mismatch is clear and unambiguous)
+    if any(t in desc for t in ("kotlin only", "android-first", "ios-only", "swift-only")):
+        score += 1
+    # standard junior engineering at recognised firm
+    if any(t in title for t in ("graduate", "junior", "engineer i", "engineer 1", "associate")):
+        if not (company in MID_TIER_FINTECH or company in WIDE_FUNNEL_GRAD):
+            # mid-tier-recognised-firm signal
+            if job["company_name"]:
+                score += 1
+    return score
 
 
-def select_clusters(candidates, seed):
-    """Stratified selection of 30 stress-test + 30 stability-anchor jobs."""
-    random.seed(seed)
-
-    # Classify every candidate
-    enriched = []
-    for job in candidates:
-        stress = classify_stress_patterns(job)
-        stability = classify_stability_patterns(job)
-        enriched.append({
-            **job,
-            "stress_patterns": stress,
-            "stability_patterns": stability,
-        })
-
-    # Cluster A: 30 jobs from stress-pattern matches
-    stress_pool = [j for j in enriched if j["stress_patterns"]]
-    # Cluster B: 30 jobs from stability-pattern matches
-    stability_pool = [j for j in enriched if j["stability_patterns"] and not j["stress_patterns"]]
-
-    # If pools are smaller than 30, augment from related buckets
-    if len(stress_pool) < 30:
-        # Augment with high-grade jobs that don't match stress patterns
-        extras = [j for j in enriched if j["db_grade"] in ("SS", "S") and j not in stress_pool]
-        random.shuffle(extras)
-        stress_pool.extend(extras[: 30 - len(stress_pool)])
-
-    if len(stability_pool) < 30:
-        extras = [j for j in enriched if j["db_grade"] in ("B", "C") and j not in stability_pool and j not in stress_pool]
-        random.shuffle(extras)
-        stability_pool.extend(extras[: 30 - len(stability_pool)])
-
-    random.shuffle(stress_pool)
-    random.shuffle(stability_pool)
-
-    cluster_a = stress_pool[:30]
-    cluster_b = stability_pool[:30]
-
-    # Ensure no overlap
-    a_ids = {j["id"] for j in cluster_a}
-    cluster_b = [j for j in cluster_b if j["id"] not in a_ids][:30]
-
-    # If cluster_b shrunk, pad
-    if len(cluster_b) < 30:
-        all_used = a_ids | {j["id"] for j in cluster_b}
-        extras = [j for j in enriched if j["id"] not in all_used]
-        random.shuffle(extras)
-        cluster_b.extend(extras[: 30 - len(cluster_b)])
-
-    return cluster_a, cluster_b
+def select_cluster(candidates, scorer, n, rng, exclude_ids=None):
+    """Select up to n jobs sorted by scorer (descending). Ties broken by rng.
+    Skips jobs in exclude_ids."""
+    exclude_ids = exclude_ids or set()
+    scored = [(scorer(j), rng.random(), j) for j in candidates if j["id"] not in exclude_ids]
+    # Keep only jobs with score > 0
+    scored = [s for s in scored if s[0] > 0]
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [s[2] for s in scored[:n]]
 
 
-def strip_grades(job):
-    """Return a job record safe to put in any agent manifest — no grades, no assessments."""
-    safe_keys = ["id", "title", "url", "location", "remote_policy",
-                 "raw_description", "company_name", "what_they_do"]
-    return {k: job[k] for k in safe_keys}
+def manifests_for_run(cluster_a, cluster_b, rng):
+    """Build the 13 per-agent manifests + coverage matrix.
 
+    Inventory:
+      cluster-a-10job-1/2/3   (10 jobs each, A disjoint)
+      cluster-a-15job-1/2     (15 jobs each, A disjoint)
+      cluster-a-30job         (full cluster A)
+      cluster-b-10job-1/2/3   (10 jobs each, B disjoint)
+      cluster-b-30job         (full cluster B)
+      cross-cluster            (15 from A + 15 from B)
+      pairwise-1, pairwise-2  (~20 pairs each — different manifest shape)
+    """
+    a_ids = [j["id"] for j in cluster_a]
+    b_ids = [j["id"] for j in cluster_b]
+    by_id = {j["id"]: j for j in cluster_a + cluster_b}
 
-def write_manifest(working_dir, agent_id, job_records, seed):
-    """Write a per-agent manifest with jobs in randomised order."""
-    rng = random.Random(seed)
-    shuffled = list(job_records)
-    rng.shuffle(shuffled)
-    stripped = [strip_grades(j) for j in shuffled]
-    path = working_dir / f"manifest-agent-{agent_id}.json"
-    with open(path, "w") as f:
-        json.dump(stripped, f, indent=2)
-    return path
+    # Shuffle and disjoint-split cluster A into three 10-job pieces
+    a_shuffled = list(a_ids)
+    rng.shuffle(a_shuffled)
+    a_10job_1 = a_shuffled[0:10]
+    a_10job_2 = a_shuffled[10:20]
+    a_10job_3 = a_shuffled[20:30]
+    # Two 15-job splits (different shuffle)
+    a_for_15 = list(a_ids)
+    rng.shuffle(a_for_15)
+    a_15job_1 = a_for_15[0:15]
+    a_15job_2 = a_for_15[15:30]
+    # Full cluster A
+    a_30job = list(a_ids)
+    rng.shuffle(a_30job)
 
+    # Shuffle and disjoint-split cluster B into three 10-job pieces
+    b_shuffled = list(b_ids)
+    rng.shuffle(b_shuffled)
+    b_10job_1 = b_shuffled[0:10]
+    b_10job_2 = b_shuffled[10:20]
+    b_10job_3 = b_shuffled[20:30]
+    # Full cluster B
+    b_30job = list(b_ids)
+    rng.shuffle(b_30job)
 
-def build_pairs(cluster_a_jobs, cluster_b_jobs, seed, count):
-    """Build pair-up manifests for pairwise-ranking agents."""
-    rng = random.Random(seed)
-    pool = cluster_a_jobs + cluster_b_jobs
-    pairs = []
-    used = set()
-    while len(pairs) < count and len(used) < len(pool) * 2:
-        a, b = rng.sample(pool, 2)
-        key = tuple(sorted([a["id"], b["id"]]))
-        if key in used:
-            continue
-        used.add(key)
-        pairs.append({
-            "pair_id": f"p{len(pairs)+1:03d}",
-            "job_a": strip_grades(a),
-            "job_b": strip_grades(b),
-        })
-    return pairs
+    # Cross-cluster: 15 from A + 15 from B
+    cross_a = list(a_ids); rng.shuffle(cross_a)
+    cross_b = list(b_ids); rng.shuffle(cross_b)
+    cross_cluster = cross_a[:15] + cross_b[:15]
+    rng.shuffle(cross_cluster)
+
+    # Pairwise manifests: build pairs from cluster A and cluster B mixed
+    all_ids = a_ids + b_ids
+    pairs_1 = []
+    pairs_2 = []
+    # 20 pairs each, random sampling without replacement within each agent
+    for _ in range(20):
+        a, b = rng.sample(all_ids, 2)
+        pairs_1.append({"pair_id": f"p{len(pairs_1)+1:03}", "job_a": by_id[a], "job_b": by_id[b]})
+        a, b = rng.sample(all_ids, 2)
+        pairs_2.append({"pair_id": f"p{len(pairs_2)+1:03}", "job_a": by_id[a], "job_b": by_id[b]})
+
+    grading_manifests = {
+        "cluster-a-10job-1": a_10job_1,
+        "cluster-a-10job-2": a_10job_2,
+        "cluster-a-10job-3": a_10job_3,
+        "cluster-a-15job-1": a_15job_1,
+        "cluster-a-15job-2": a_15job_2,
+        "cluster-a-30job":   a_30job,
+        "cluster-b-10job-1": b_10job_1,
+        "cluster-b-10job-2": b_10job_2,
+        "cluster-b-10job-3": b_10job_3,
+        "cluster-b-30job":   b_30job,
+        "cross-cluster":     cross_cluster,
+    }
+    # Convert each ID list to a list of full job records (no grades, no fit_assessment)
+    grading_manifests_full = {
+        name: [{k: v for k, v in by_id[jid].items()
+                if k not in ("grade", "fit_assessment")} for jid in ids]
+        for name, ids in grading_manifests.items()
+    }
+
+    # Coverage matrix: which agents see each job
+    coverage = {}
+    for name, ids in grading_manifests.items():
+        for jid in ids:
+            coverage.setdefault(jid, []).append(f"agent-{name}")
+
+    return grading_manifests_full, pairs_1, pairs_2, coverage
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("Usage: select-jobs.py <run-id>", file=sys.stderr)
         sys.exit(2)
     run_id = sys.argv[1]
-    working_dir = Path(f"/tmp/test-grade-jobs-{run_id}")
-    working_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(f"/tmp/test-grade-jobs-{run_id}")
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Seed the run from the run-id string (deterministic per run, fresh each run)
-    seed_int = int.from_bytes(run_id.encode(), "big") % (2**31)
+    rng = random.Random()  # timestamp-seeded; reproducibility not required per-run
 
     conn = connect_db()
     candidates = fetch_candidates(conn)
     print(f"Eligible candidates (desc > 500 chars, not archived): {len(candidates)}")
 
-    cluster_a, cluster_b = select_clusters(candidates, seed_int)
-    print(f"Cluster A (stress tests): {len(cluster_a)} jobs")
-    print(f"Cluster B (stability anchors): {len(cluster_b)} jobs")
+    cluster_a = select_cluster(candidates, stress_pattern_score, 30, rng)
+    cluster_b = select_cluster(candidates, stability_pattern_score, 30, rng,
+                                exclude_ids={j["id"] for j in cluster_a})
+    print(f"Cluster A (stress patterns): {len(cluster_a)} jobs")
+    print(f"Cluster B (stability patterns): {len(cluster_b)} jobs")
+    print(f"Total selected: {len(cluster_a) + len(cluster_b)} jobs")
 
+    # Write top-level files
     all_jobs = cluster_a + cluster_b
-    print(f"Total selected: {len(all_jobs)} jobs")
-
-    # Identify trigger cases (subset of cluster A)
-    trigger_cases = [j for j in cluster_a if "trigger-phrase-in-assessment" in j["stress_patterns"]]
-    print(f"Trigger cases identified: {len(trigger_cases)}")
-
-    # Write the support files (with DB grades for analysis only)
-    with open(working_dir / "jobs-all.json", "w") as f:
-        json.dump([strip_grades(j) for j in all_jobs], f, indent=2)
-    with open(working_dir / "cluster-a.json", "w") as f:
+    # Strip grade/fit_assessment columns — defensive even though we didn't SELECT them
+    for j in all_jobs:
+        j.pop("grade", None)
+        j.pop("fit_assessment", None)
+    with open(out_dir / "jobs-all.json", "w") as f:
+        json.dump(all_jobs, f, indent=2)
+    with open(out_dir / "cluster-a.json", "w") as f:
         json.dump([j["id"] for j in cluster_a], f, indent=2)
-    with open(working_dir / "cluster-b.json", "w") as f:
+    with open(out_dir / "cluster-b.json", "w") as f:
         json.dump([j["id"] for j in cluster_b], f, indent=2)
-    with open(working_dir / "trigger-cases.json", "w") as f:
-        json.dump([j["id"] for j in trigger_cases], f, indent=2)
 
-    # db-grades.json holds the DB grades for the analysis step (NEVER in any manifest)
-    db_grades = {str(j["id"]): j["db_grade"] for j in all_jobs}
-    with open(working_dir / "db-grades.json", "w") as f:
-        json.dump(db_grades, f, indent=2)
+    # Build manifests
+    grading, pairs_1, pairs_2, coverage = manifests_for_run(cluster_a, cluster_b, rng)
+    for name, jobs in grading.items():
+        with open(out_dir / f"manifest-agent-{name}.json", "w") as f:
+            json.dump(jobs, f, indent=2)
 
-    # Build per-agent manifests
-    agent_assignments = {}  # agent_id -> list of jobs
+    # Strip grade/fit_assessment from pairwise records too
+    def _clean(j):
+        return {k: v for k, v in j.items() if k not in ("grade", "fit_assessment")}
+    pairs_1_clean = [{"pair_id": p["pair_id"], "job_a": _clean(p["job_a"]), "job_b": _clean(p["job_b"])}
+                     for p in pairs_1]
+    pairs_2_clean = [{"pair_id": p["pair_id"], "job_a": _clean(p["job_a"]), "job_b": _clean(p["job_b"])}
+                     for p in pairs_2]
+    with open(out_dir / "manifest-agent-pairwise-1.json", "w") as f:
+        json.dump(pairs_1_clean, f, indent=2)
+    with open(out_dir / "manifest-agent-pairwise-2.json", "w") as f:
+        json.dump(pairs_2_clean, f, indent=2)
 
-    # Cluster A 10-job disjoint × 3
-    a_chunks_10 = [cluster_a[i*10:(i+1)*10] for i in range(3)]
-    for i, chunk in enumerate(a_chunks_10, 1):
-        agent_id = f"cluster-a-10job-{i}"
-        agent_assignments[agent_id] = chunk
-        write_manifest(working_dir, agent_id, chunk, seed=seed_int + hash(agent_id))
-
-    # Cluster A 15-job disjoint × 2
-    a_chunks_15 = [cluster_a[i*15:(i+1)*15] for i in range(2)]
-    for i, chunk in enumerate(a_chunks_15, 1):
-        agent_id = f"cluster-a-15job-{i}"
-        agent_assignments[agent_id] = chunk
-        write_manifest(working_dir, agent_id, chunk, seed=seed_int + hash(agent_id))
-
-    # Cluster A 30-job full × 1
-    agent_id = "cluster-a-30job"
-    agent_assignments[agent_id] = cluster_a
-    write_manifest(working_dir, agent_id, cluster_a, seed=seed_int + hash(agent_id))
-
-    # Cluster B 10-job disjoint × 3
-    b_chunks_10 = [cluster_b[i*10:(i+1)*10] for i in range(3)]
-    for i, chunk in enumerate(b_chunks_10, 1):
-        agent_id = f"cluster-b-10job-{i}"
-        agent_assignments[agent_id] = chunk
-        write_manifest(working_dir, agent_id, chunk, seed=seed_int + hash(agent_id))
-
-    # Cluster B 15-job disjoint × 2
-    b_chunks_15 = [cluster_b[i*15:(i+1)*15] for i in range(2)]
-    for i, chunk in enumerate(b_chunks_15, 1):
-        agent_id = f"cluster-b-15job-{i}"
-        agent_assignments[agent_id] = chunk
-        write_manifest(working_dir, agent_id, chunk, seed=seed_int + hash(agent_id))
-
-    # Cluster B 30-job full × 1
-    agent_id = "cluster-b-30job"
-    agent_assignments[agent_id] = cluster_b
-    write_manifest(working_dir, agent_id, cluster_b, seed=seed_int + hash(agent_id))
-
-    # Cross-cluster × 2 (different 15A + 15B per agent)
-    rng = random.Random(seed_int + 12345)
-    a_shuffled_1 = list(cluster_a)
-    b_shuffled_1 = list(cluster_b)
-    rng.shuffle(a_shuffled_1)
-    rng.shuffle(b_shuffled_1)
-    cross_1 = a_shuffled_1[:15] + b_shuffled_1[:15]
-    agent_id = "cross-cluster-1"
-    agent_assignments[agent_id] = cross_1
-    write_manifest(working_dir, agent_id, cross_1, seed=seed_int + hash(agent_id))
-
-    a_shuffled_2 = list(cluster_a)
-    b_shuffled_2 = list(cluster_b)
-    rng = random.Random(seed_int + 67890)
-    rng.shuffle(a_shuffled_2)
-    rng.shuffle(b_shuffled_2)
-    cross_2 = a_shuffled_2[:15] + b_shuffled_2[:15]
-    agent_id = "cross-cluster-2"
-    agent_assignments[agent_id] = cross_2
-    write_manifest(working_dir, agent_id, cross_2, seed=seed_int + hash(agent_id))
-
-    # Full-60 × 2
-    for i in range(1, 3):
-        agent_id = f"full-60-{i}"
-        agent_assignments[agent_id] = all_jobs
-        write_manifest(working_dir, agent_id, all_jobs, seed=seed_int + hash(agent_id))
-
-    # Rubric-blind × 1 (full 60)
-    agent_id = "rubric-blind"
-    agent_assignments[agent_id] = all_jobs
-    write_manifest(working_dir, agent_id, all_jobs, seed=seed_int + hash(agent_id))
-
-    # Anchor-injected × 1 (full 60)
-    agent_id = "anchor-injected"
-    agent_assignments[agent_id] = all_jobs
-    write_manifest(working_dir, agent_id, all_jobs, seed=seed_int + hash(agent_id))
-
-    # Pairwise × 2 (~20 pairs each)
-    pairs_1 = build_pairs(cluster_a, cluster_b, seed=seed_int + 11111, count=20)
-    with open(working_dir / "manifest-agent-pairwise-1.json", "w") as f:
-        json.dump(pairs_1, f, indent=2)
-
-    pairs_2 = build_pairs(cluster_a, cluster_b, seed=seed_int + 22222, count=20)
-    with open(working_dir / "manifest-agent-pairwise-2.json", "w") as f:
-        json.dump(pairs_2, f, indent=2)
-
-    print(f"Manifest files written: {len(list(working_dir.glob('manifest-agent-*.json')))}")
-
-    # Build coverage matrix (which agents see which job)
-    coverage = {}
-    for agent_id, jobs in agent_assignments.items():
-        for j in jobs:
-            coverage.setdefault(str(j["id"]), []).append(agent_id)
-
-    # Also tag pairwise coverage
-    for pair in pairs_1:
-        coverage.setdefault(str(pair["job_a"]["id"]), []).append("pairwise-1")
-        coverage.setdefault(str(pair["job_b"]["id"]), []).append("pairwise-1")
-    for pair in pairs_2:
-        coverage.setdefault(str(pair["job_a"]["id"]), []).append("pairwise-2")
-        coverage.setdefault(str(pair["job_b"]["id"]), []).append("pairwise-2")
-
-    with open(working_dir / "coverage-matrix.json", "w") as f:
+    with open(out_dir / "coverage-matrix.json", "w") as f:
         json.dump(coverage, f, indent=2)
 
-    coverage_counts = [len(v) for v in coverage.values()]
-    print(f"Coverage: every job graded by {min(coverage_counts)}-{max(coverage_counts)} agents (mean {sum(coverage_counts)/len(coverage_counts):.1f})")
+    n_manifests = len(grading) + 2  # +2 pairwise
+    print(f"Manifest files written: {n_manifests}")
+    job_to_agents = {str(jid): aids for jid, aids in coverage.items()}
+    if job_to_agents:
+        coverage_counts = [len(aids) for aids in coverage.values()]
+        print(f"Coverage: every job graded by {min(coverage_counts)}-{max(coverage_counts)} agents "
+              f"(mean {sum(coverage_counts)/len(coverage_counts):.1f})")
 
     # Zero-grade-leakage assertion
-    leakage_found = False
-    for manifest_path in working_dir.glob("manifest-agent-*.json"):
-        with open(manifest_path) as f:
-            content = f.read()
-        if '"grade"' in content or '"fit_assessment"' in content or '"grade_reasoning"' in content or '"fit_score"' in content:
-            print(f"LEAKAGE DETECTED in {manifest_path.name}", file=sys.stderr)
-            leakage_found = True
-
-    if leakage_found:
-        print("ABORT: grade leakage detected in manifests. Fix the script.", file=sys.stderr)
+    import subprocess
+    grep_out = subprocess.run(
+        ["grep", "-l", "-E", r'"grade"|"fit_assessment"|"grade_reasoning"',
+         *[str(out_dir / f"manifest-agent-{name}.json") for name in grading],
+         str(out_dir / "manifest-agent-pairwise-1.json"),
+         str(out_dir / "manifest-agent-pairwise-2.json")],
+        capture_output=True, text=True
+    )
+    if grep_out.stdout.strip():
+        print(f"FATAL: grade leakage detected in {grep_out.stdout}", file=sys.stderr)
         sys.exit(3)
-
     print("Zero grade leakage confirmed across all manifests.")
     print(f"Run ID: {run_id}")
-    print(f"Working dir: {working_dir}")
+    print(f"Working dir: /tmp/test-grade-jobs-{run_id}")
     print("DONE.")
 
 
