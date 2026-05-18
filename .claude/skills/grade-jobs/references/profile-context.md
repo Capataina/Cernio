@@ -13,6 +13,23 @@ The candidate's profile is maintained across files in `profile/`. You must read 
 3. [Tech stack evaluation framework](#tech-stack-evaluation-framework)
 4. [What makes a job genuinely exciting vs. merely acceptable](#what-makes-a-job-genuinely-exciting-vs-merely-acceptable)
 5. [Profile elements to reference in fit assessments](#profile-elements-to-reference-in-fit-assessments)
+6. [Evidence basis — JD vs semantic vs insufficient](#evidence-basis--jd-vs-semantic-vs-insufficient)
+
+---
+
+## Evidence basis — JD vs semantic vs insufficient
+
+Every graded row carries an `evidence_basis` value in the DB, written by the same UPDATE that writes the grade. The value records which path produced the assessment so a future reader (the user, the check-integrity skill, or a downstream filter in the TUI) can audit how the row was reasoned.
+
+The three values:
+
+- **`jd`** — JD content was present (≥100 words of usable description) and the Q-slot prose quotes it for seniority (Q1) and technologies (Q3a). This is the default path and applies to the large majority of rows.
+- **`semantic`** — JD was missing, empty, or below the 100-word threshold AND the WebFetch/WebSearch fallback also failed. The agent took the semantic-reasoning path: the company is well-known publicly such that its hiring shape can be reasoned about from training data AND the role title is non-ambiguous about the work shape. The Q1 and Q3a slots substitute their JD-quote requirements with explicit "JD unavailable — reasoning from {company}'s known {pipeline-shape}" framing. The grade can be any letter the structured reasoning supports including SS. This path exists specifically so that brand-strong graduate-pipeline roles at FAANG-tier companies (Google, Amazon, Microsoft, Bloomberg, Arm) — where Cernio's automated description fetching often fails — still get defensible grades rather than disappearing from the queue.
+- **`insufficient`** — Neither path applies. JD is missing AND the company is low-signal / unknown to the agent AND the role title is opaque. The agent does NOT invent a grade. `grade = NULL`, `evaluation_status` stays `'pending'`, and the row waits for a future pass after a description fetch succeeds.
+
+**Critical invariant: a row with `evidence_basis = 'semantic'` can carry any grade including SS.** The TUI's default filter shows `jd` and `semantic` rows together. The filter exists so the user can optionally narrow to `jd`-only rows when they want strict-JD grading, OR isolate `insufficient` rows for triage — but the default keeps semantically-graded brand-strong roles visible.
+
+**Decision rule for the grader when JD is missing.** Ask in prose: "Can I reason about this role in the Q-slots without inventing facts?" If yes — name the company's known hiring shape, name the role-title's pattern, anchor the candidate's portfolio against those — write `evidence_basis = 'semantic'`. If the reasoning would require fabricating company hiring practices or role-shape claims, write `evidence_basis = 'insufficient'` with `grade = NULL`. The honest admission is preferred over a confabulated grade.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: grade-jobs
-description: "Grades ungraded jobs in the Cernio database against the user's profile using a calibration-anchored six-tier rubric (SS / S / A / B / C / F). Writes `grade`, `fit_assessment` (cites the description verbatim for seniority + technology claims), `fit_score`, `evaluation_status` ('strong_fit' / 'weak_fit' / 'no_fit'). Fetches missing descriptions via WebFetch / WebSearch before grading. Parallelised across subagents by company cluster. Updates `profile/portfolio-gaps.md` after every batch with market-pattern findings. Invoke on 'grade jobs', 'evaluate pending jobs', 'rate the next batch', 'grade ungraded', 'process pending jobs', 'evaluate the queue', 'clear the grading backlog', or when pending rows exist. Not for searching jobs (search-jobs), discovering companies (discover-companies), grading companies (grade-companies), or preparing applications (prepare-applications). Use whenever pending jobs exist, even if not named."
+description: "Grades ungraded jobs in the Cernio DB against the profile using a six-tier rubric (SS/S/A/B/C/F). Writes `grade`, `fit_assessment` as structured prose with Q1/Q2/Q3a/Q3b/Q4/Q5/Verdict slots (every slot prose with JD quotes + named profile anchors, no verdict enums), `evaluation_status`, and `evidence_basis` ('jd' / 'semantic' / 'insufficient'). Fetches missing descriptions via WebFetch / WebSearch first; failing that, takes the semantic-reasoning path for brand-strong roles from company + role-title context. Parallelised by company cluster. End-of-batch Relativity Pass: each agent reviews its rows against 3 random already-graded jobs per tier from the DB and adjusts inconsistencies. Updates `profile/portfolio-gaps.md` after every batch. Invoke on 'grade jobs', 'evaluate pending jobs', 'rate the next batch', 'grade ungraded', 'process pending jobs', 'clear the grading backlog'. Not for searching jobs, discovering companies, grading companies, or preparing applications."
 ---
 
 # Grade Jobs
@@ -80,9 +80,9 @@ Batch selection follows the prioritisation-guide's compound signal: `priority = 
 
 Do not grade in DB insertion order.
 
-### 4. Get the full job description — never grade on title alone
+### 4. Get the full job description — try description-first, fall back to semantic reasoning
 
-Grading a job without its description is unreliable. Titles lie: "AI Engineer" at Apple could be ML infrastructure or QA for AI-powered hardware accessories; "Software Engineer, Platform" could be Angular/Redux or Kubernetes/Terraform. The description is the only source of truth on responsibilities, seniority, and technical requirements.
+The default path is JD-grounded grading. The description is the most reliable source of truth on responsibilities, seniority, and technical requirements. Titles can mislead: "AI Engineer" at one firm is ML infrastructure, at another it is LLM-glue prompting; "Software Engineer, Platform" can be React/Redux or Kubernetes/Terraform.
 
 **If `raw_description` is NULL, empty, under 100 words, or vague:**
 
@@ -92,64 +92,152 @@ Grading a job without its description is unreliable. Titles lie: "AI Engineer" a
    UPDATE jobs SET raw_description = ? WHERE id = ?;
    ```
 3. If the page is behind a login wall or returns no useful content, `WebSearch` for `"{job title}" "{company}"` to find the listing on LinkedIn / Indeed / Glassdoor / other aggregators.
-4. If after all attempts no description can be found, leave the job at `pending` and flag it in the batch report. A title-only grade is worse than no grade — a false SS wastes the user's time and a false F hides a perfect opportunity.
+4. If after both attempts no description can be found, **do not silently default to brand-stamp grading and do not blanket-flag as un-gradable.** Instead, take one of two paths:
 
-### 5. Evaluate against the rubric
+   **(a) Semantic-reasoning path (`evidence_basis = 'semantic'`).** Use this when the company + role title together carry enough signal to ground a defensible grade without the JD. Specifically: wide-funnel established-firm graduate / intern / new-grad pipelines at companies whose hiring shape is well-known publicly (the agent can reason from training data about how the company hires at this band) AND a role title that is non-ambiguous about the work shape ("Software Engineer, University Graduate 2026" is non-ambiguous; "Engineer" alone is not). The Q3a slot in the fit assessment must explicitly state *"JD unavailable — reasoning from company hiring-pipeline pattern + role-title shape"* and the Q3a/Q3b prose must reference what the agent knows publicly about the company's grad pipeline AND the candidate's portfolio that maps to it. The grade can be any letter the structured reasoning supports including SS.
 
-Read the full description. Evaluate against every dimension in `grading-rubric.md`, with particular attention to the two critical-dimension F-forcers: career ceiling and seniority match.
+   **(b) Insufficient-evidence path (`evidence_basis = 'insufficient'`, `grade = NULL`, `evaluation_status = 'pending'`).** Use this when neither the description nor company+title context support reasoning. Specifically: unknown / low-signal company AND opaque role title ("Engineer" / "Developer" at an unknown firm). Leave the grade NULL — do not invent one. The row stays in the pending queue for a future pass after a description fetch succeeds.
 
-**Mandatory: the fit assessment cites the description verbatim for seniority and technology claims.** This proves the description was read. For seniority, the assessment states what the description actually says about experience:
+   When semantic reasoning is used (path a), the fit_assessment is identical in shape to a JD-grounded assessment — Q1 through Verdict slots, all prose — but Q3a names the missing-JD substitution and the reasoning is anchored on the company-pipeline pattern rather than a JD quote. A semantically-graded Google graduate role is not lesser-evidence than a JD-graded Google graduate role; both produce defensible reasoning, evidence_basis distinguishes them so the user can filter if they want to. The default TUI filter keeps semantic-graded rows visible.
 
-- *"Description states: '3–5 years of hands-on experience' — hard seniority mismatch, F"*
-- *"Description states: 'no specific years required, looking for strong problem solvers' — achievable"*
-- *"Description states: '2+ years preferred' — stretch but potentially achievable given portfolio depth"*
-- *"No experience requirements mentioned in description — likely accessible"*
+### 5. Evaluate against the rubric — structured prose output, no verdict enums
 
-An assessment that writes "entry-accessible" without citing what the description actually says about seniority is unreliable. The Thought Machine SS-grade failure happened because an agent wrote "entry-accessible" when the description literally said "3–5 years of hands-on experience." Citation prevents that class of error entirely.
+Read the full description (or, on the semantic-reasoning path, the company + role-title pattern). Evaluate against every dimension in `grading-rubric.md`. The fit_assessment is a **structured prose document** with named slots; every slot is prose, not a label or category-pick. The format below is the contract — every slot must be present, and every slot must be reasoned, not labelled.
+
+**The structure** (each slot's target length is a floor, not a ceiling — write more when the case warrants):
+
+```
+## Q1 — Seniority and realistic landability
+[2-4 sentences of prose. Must include a verbatim JD quote about experience /
+qualifications / seniority band when JD is present (e.g. "the description
+states: '2+ years of commercial Go experience'"). Must connect to Caner's
+specific evidence — years from experience.md, project names from
+projects/*.md, contributions from skills.md — by name. Concludes with the
+agent's reasoned read on whether the gate is a hard floor, an artefact of
+HR boilerplate, or a wide-funnel signal. On the semantic-reasoning path,
+the JD quote slot is replaced with "JD unavailable — reasoning from
+{company}'s known {grad / new-grad / intern / lateral} hiring pipeline shape".]
+
+## Q2 — Company motivation
+[2-4 sentences of prose. Must name at least one specific fact about the
+company beyond brand recognition — funding stage, engineering reputation,
+recent technical work, hiring practices, public engineering blog posts,
+known infrastructure patterns. Connect that fact to why Caner specifically
+would want to be there given preferences.toml + interests.md.]
+
+## Q3a — Stack overlap
+[2-4 sentences of prose. Must quote the JD's named technologies when
+present. Must name specific Caner projects from profile/projects/ with
+specific features that map to those technologies — by file name and one-
+line evidence. Stack alignment alone is NOT enough — Q3a only answers
+"does the technology overlap?". The career-trajectory question is Q3b.]
+
+## Q3b — Career-axis match
+[2-4 sentences of prose. Answers separately from Q3a: does this role's
+day-1 work build toward Caner's target career trajectory? Reference what
+kind of engineer Caner is becoming per profile/preferences.toml and the
+active-status projects in profile/projects/. Reason in prose — "on-axis"
+/ "adjacent" / "off-axis" is the agent's conclusion-in-prose, NOT a label
+to pick from a list. The same technology stack can be on-axis at one
+company and off-axis at another; the prose explains which it is here.]
+
+## Q4 — Domain
+[2-3 sentences of prose. What is the company building, who pays for it,
+why does it matter to Caner specifically. If the domain is incidental
+("a payments company that happens to have a frontend role"), name that.]
+
+## Q5 — Logistics
+[2-3 sentences of prose. Office location (cite a specific neighbourhood
+when known and weigh against lifestyle-preferences.md anchors), hybrid
+policy, sponsorship stance (cite visa.md timeline), deadline if any,
+salary band if disclosed. Cite the JD or careers page directly.]
+
+## Verdict
+[3-5 sentences of plain-language summary. Name the role's strongest pull
+and its strongest pushback. Say in prose what kind of move this is —
+career-launch / axis-bet / credibility-builder / stretch / deadweight —
+and answer the budget question: in a budget of ~30 applications this
+month, does this make the cut? The verdict prose must be consistent with
+the Q1-Q5 reasoning above; the grade letter follows from the verdict.]
+
+Grade: <SS | S | A | B | C | F>
+```
+
+**Banned satisficing patterns** (each is a failure mode the format exists to prevent):
+
+- Verdict enums in Q1-Q5 slots: *"Q1 cleared-decisively"*, *"Q3 moderate"*, *"Q5 ✓"*. Every slot is prose; pick-from-list output fails.
+- Arrow-shorthand derivations: *"Q2 strong, Q4 ✓ → A"*. The Verdict slot does the aggregation in prose; arrows skip the aggregation.
+- Skill-band labels as evidence: *"Caner's React Comfortable level"* with no project named. The Comfortable-band label is profile metadata, not evidence; name the project.
+- Boilerplate Q4/Q5 fills: *"Q5 clean"* / *"Q4 London ✓"* identical across rows. If Q4 and Q5 are written identically across the batch, the agent is template-filling, not reasoning.
+- Invented categories: *"Standard B for accessible junior SE at mid-tier fintech"*. There is no "standard B" — the grade follows from the Verdict prose, which follows from Q1-Q5.
+- Risk-decoration: naming a risk in Q3b but the Verdict + Grade unchanged. Acknowledged risks bite the grade (the worked examples in `grading-rubric.md` §Worked Examples include risks-bite templates).
+
+The skill's job is to push the agent into reasoning, not classification. Anything that reduces to a multiple-choice pick is a satisficing slot the format intentionally removes.
 
 ### 6. Assign grade and write to the DB
 
 ```sql
 UPDATE jobs
-SET grade = ?, fit_assessment = ?, fit_score = ?, evaluation_status = ?
+SET grade = ?,
+    fit_assessment = ?,
+    evaluation_status = ?,
+    evidence_basis = ?
 WHERE id = ?;
 ```
 
-| Grade | `evaluation_status` | `fit_score` range |
-|-------|---|---|
-| SS | `strong_fit` | 0.90 – 1.00 |
-| S | `strong_fit` | 0.75 – 0.89 |
-| A | `weak_fit` | 0.60 – 0.74 |
-| B | `weak_fit` | 0.40 – 0.59 |
-| C | `no_fit` | 0.20 – 0.39 |
-| F | `no_fit` | 0.00 – 0.19 |
+| Grade | `evaluation_status` |
+|-------|---|
+| SS | `strong_fit` |
+| S | `strong_fit` |
+| A | `weak_fit` |
+| B | `weak_fit` |
+| C | `no_fit` |
+| F | `no_fit` |
 
-**Column contract:** `grade`, `fit_assessment`, `fit_score`, `evaluation_status`. Exact names, no variants. Escape single quotes by doubling (`it''s`). Single-line UPDATE, semicolon-terminated.
+| `evidence_basis` | When to write it |
+|---|---|
+| `jd` | JD content present (≥100 words) and used in the Q-slot reasoning |
+| `semantic` | No usable JD; graded from company + role-title context. Grade can be any letter the structured reasoning supports including SS. |
+| `insufficient` | No JD AND no usable semantic context. **Grade is NULL; evaluation_status stays at `pending`.** |
 
-### 7. Assessment-content standards by grade tier
+**Column contract:** `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis`. Exact names, no variants. The legacy `fit_score` column was dropped from the schema — do not write it; including `fit_score` in any UPDATE will fail. Escape single quotes by doubling (`it''s`). Single-line UPDATE, semicolon-terminated.
 
-**SS / S assessments include all of:**
+### 7. Per-tier assessment substance (within the structured format)
 
-- **Profile alignment** — name specific projects from `profile/projects/`. Example: *"Your Nyquestro matching engine demonstrates exactly the lock-free, low-latency systems thinking this role demands."* Not *"you have relevant experience."*
-- **Technology match** — name specific technologies from `profile/skills.md` that the job requires. *"Requires Rust — your primary language at proficient level."* Not *"good tech stack match."*
-- **Gap analysis** — name specific gaps from `profile/portfolio-gaps.md` or skills the job wants that the profile lacks. *"Heavy Kubernetes usage — currently a gap, but your Docker experience from NeuroDrive provides a foundation."*
-- **Sponsorship analysis** — cite `profile/visa.md`: current status, timeline, whether the company can sponsor when needed.
-- **Career trajectory** — reference long-term targets from `profile/preferences.toml`.
-- **Application narrative** — a 1–2 sentence pitch for why the candidate's application would be compelling for this specific role.
+The structured format from step 5 is the same shape for every grade. What changes per tier is the *substance* the Q-slots carry. Use this as a calibration check after writing the assessment — does the substance match the grade letter?
 
-**A / B assessments include:**
+**SS / S — the assessment should let the reader feel why the role makes a fixed budget of 30 applications:**
 
-- At least one specific profile project or technology that aligns
-- The primary reason it falls short of S-tier
-- Whether it is worth pursuing if higher-grade options are scarce
+- Q3a names ≥2 specific projects from `profile/projects/` with active-status anchors, each tied to a JD-quoted technology or paradigm.
+- Q3b reasons concretely about career trajectory — "this role builds the [systems / ML / autonomy / quant-dev] axis Caner is on" with reference to the active projects that establish that axis.
+- Q2 names a concrete fact about the company beyond brand recognition — a recent technical blog, an open-source contribution pattern, a known infrastructure choice, an engineering-led culture signal.
+- Q5 cites visa.md sponsorship status against the company's known sponsor stance.
+- Verdict answers the budget-of-30 question with "yes" and names the strongest pull.
 
-**C / F assessments include:**
+**A — the assessment should explain why the role is worth applying but is not S/SS:**
 
-- The specific dealbreaker or primary weakness. Example: *"Requires 5+ years production experience — hard seniority mismatch"* or *"Solutions engineering role disguised by title — 60% customer-facing, excluded by preferences."*
+- Q3a or Q3b (one of them) is moderate-strong, not strong. Q3b naming an "adjacent" career-axis match with prose reasoning is the typical pattern.
+- At least one slot names a friction (e.g. "Q1 cleared-with-friction because the description mentions '2+ years preferred', clearable by portfolio depth but not decisively") — the friction is named in prose.
+- Verdict answers the budget-of-30 question with "yes if there's room" — credibility builder, not career launch.
 
-**Unacceptable (real example of what fails this standard):** *"Good role at a strong company. Decent fit with the profile. Worth considering."*
+**B — the assessment should explain why the role is landable but mediocre:**
 
-**Acceptable:** *"SS. Graduate Infrastructure Engineer at Cloudflare's London office. The role builds and operates edge network infrastructure handling millions of requests/second — directly aligned with your systems engineering focus. Your Nyquestro matching engine demonstrates the exact lock-free, performance-critical thinking this team values. NeuroDrive's distributed multi-agent simulation shows you can reason about distributed systems at scale. Rust is mentioned as a 'bonus' language — your primary language and strongest differentiator. Cloudflare is a confirmed Skilled Worker sponsor with an established graduate programme, addressing the sponsorship timeline from your Graduate visa (expires Aug 2027). Career ceiling is exceptional — clear IC track to Principal Engineer, compensation reaches your long-term targets. The only gap: no production operations experience, but the graduate programme explicitly provides mentorship and on-call onboarding. Application narrative: your matching engine project + Rust proficiency + systems thinking make you a standout among graduates, most of whom have only web application experience."*
+- Q3b is "off-axis" or only adjacent, reasoned in prose.
+- Q3a stack overlap exists but doesn't pull the role up by itself.
+- Q2 may be strong (good company) but the role's substance keeps it at B — the Verdict prose makes this trade-off explicit.
+
+**C — the assessment should name what makes the role low-signal even though it's not F:**
+
+- Q1 has named selectivity friction OR the role is structurally narrow / off-axis / weak ceiling.
+- Verdict: budget-of-30 answer is "no" but the row is preserved for visibility.
+
+**F — the assessment should name the specific dealbreaker by JD quote (or by company-context reasoning on the semantic path):**
+
+- A hard floor cited by JD quote: *"the description states: 'minimum 5 years of production experience' — hard floor, no portfolio substitute available at this seniority"*.
+- A hard preference exclusion: *"role is 60% customer-facing per the JD's responsibilities list — excluded by preferences.toml.hard.exclude_role_types"*.
+- A hard location/sector exclusion.
+
+**Unacceptable (any tier):** *"Good role at a strong company. Decent fit with the profile. Worth considering."* — no JD quote, no project name, no career-axis reasoning, no Verdict prose. Every Q-slot must carry its own load.
 
 ### 8. Parallel grading
 
@@ -170,10 +258,15 @@ Subagents that do not receive these files produce shallow, generic assessments. 
 **Subagent output format — exact SQL:**
 
 ```sql
-UPDATE jobs SET grade = 'X', evaluation_status = 'strong_fit', fit_assessment = 'reasoning', fit_score = 0.85 WHERE id = NNN;
+UPDATE jobs
+SET grade = 'X',
+    evaluation_status = 'strong_fit',
+    fit_assessment = 'structured prose with Q1/Q2/Q3a/Q3b/Q4/Q5/Verdict slots',
+    evidence_basis = 'jd'
+WHERE id = NNN;
 ```
 
-The orchestrator collects SQL from all agents and executes in one batch.
+Do NOT include `fit_score` — the column has been dropped from the schema; any UPDATE containing `fit_score = ...` will fail. `evidence_basis` is always set: 'jd' when the JD was used, 'semantic' when company+title reasoning was used, 'insufficient' when neither (in which case `grade` is NULL and `evaluation_status` stays 'pending'). The orchestrator collects SQL from all agents and executes in one batch.
 
 ### 9. Batch discipline
 
@@ -210,7 +303,73 @@ Also update "Known Gaps" (new gaps identified, gaps closed by recent additions) 
 
 Even a null result deserves a dated note — *"No new portfolio gap patterns in this batch — checked 2026-04-20."*
 
-### 11. Report batch results
+### 11. Relativity Pass — review just-graded rows against DB-sampled anchors
+
+After the batch's UPDATE statements have been executed and before the batch report is written, each agent (or the orchestrator, if grading was serial) runs the relativity pass against the DB. The purpose is to catch within-batch inconsistencies — an agent grading 30 jobs in sequence can drift, calibrate against the wrong neighbours, or apply a fix from job 5 to job 25 without realising the cases differ.
+
+**Step 11.1 — Sample 3 random already-graded jobs per grade tier from the DB.** Run this query verbatim (the agent receives it pre-filled in its prompt):
+
+```sql
+WITH ranked AS (
+    SELECT j.id, j.title, c.name AS company_name, c.grade AS company_grade,
+           j.grade, j.fit_assessment,
+           ROW_NUMBER() OVER (
+               PARTITION BY j.grade
+               ORDER BY RANDOM()
+           ) AS rn
+    FROM jobs j
+    JOIN companies c ON c.id = j.company_id
+    WHERE j.grade IS NOT NULL
+      AND j.evaluation_status <> 'archived'
+      AND j.id NOT IN (<the IDs just graded in this batch>)
+)
+SELECT * FROM ranked WHERE rn <= 3
+ORDER BY CASE grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
+                    WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6 END, rn;
+```
+
+The result is up to 18 reference rows (3 × 6 tiers). Tiers with fewer than 3 graded rows return what they have; do not pad with cross-tier substitutes.
+
+**Step 11.2 — Compare each just-graded row against the reference set.** For each row the agent just wrote, ask:
+
+- Are there reference rows at the same grade whose Q1-Q5 reasoning is structurally weaker than this row's? (If yes, this row may belong one tier higher.)
+- Are there reference rows one tier higher whose reasoning is structurally weaker than this row's? (If yes, this row likely belongs at that higher tier.)
+- Are there reference rows at the same grade whose reasoning is structurally much stronger than this row's? (If yes, this row may belong one tier lower.)
+
+"Structurally stronger/weaker" is reasoned in prose: the Verdict slot of the reference is more decisive, the Q3b career-axis match is more direct, the Q1 friction is named more sharply. The relativity pass is not a numeric comparison.
+
+**Step 11.3 — Adjust grades and rewrite affected slots.** When the relativity pass reveals an inconsistency, the agent:
+
+1. Re-reads the just-graded row's structured assessment.
+2. Identifies which Q-slot's reasoning is out of step with the reference cohort.
+3. Rewrites that slot to either justify the original grade (if the original is correct and the prose was just imprecise) OR adjusts the grade and updates the Verdict to reflect the new aggregation.
+4. Issues a follow-up UPDATE for that row.
+
+**Step 11.4 — Emit the relativity delta summary.** Before the batch report, the agent writes:
+
+```
+## Relativity Pass
+
+Reviewed N just-graded rows against 18 DB-sampled reference rows
+(3 per tier).
+
+Adjustments: M grades changed.
+- job_id=NNN: B → A, reason: "Q3b career-axis match is direct
+  (Nyquestro lock-free + Cernio async pipelines on the same axis
+  as the role's stated platform work) — reference B rows are
+  off-axis adjacent fits, this is on-axis."
+- job_id=NNN: SS → S, reason: "Reference SS rows cite ≥2 active
+  projects per Q3a; this row only cites 1. Adjustments here move
+  the row to S; Q3a rewritten to name the second project."
+
+Confirmations: K grades reviewed and held.
+- The remaining (N - M - K) rows were not flagged by the
+  comparison and were held without explicit review.
+```
+
+If M = 0 (no adjustments made), the section still emits with `Adjustments: 0 grades changed` plus a one-line confirmation that the comparison was run. Silent omission of the section fails Inviolable Rule 9.
+
+### 12. Report batch results
 
 Present results grouped by grade for scannability:
 
@@ -233,11 +392,11 @@ Present results grouped by grade for scannability:
 
 For SS and S roles, the full `fit_assessment` is available on request. Inline the full text if the batch is small; offer per-row details if the batch is large.
 
-Flag any jobs graded without descriptions (should be zero — step 4 is a hard gate). Report the portfolio-gaps update — what was added, what was null. Ask the user whether to continue with the remaining queue or stop.
+Flag the evidence_basis breakdown: how many rows graded via `jd`, how many via `semantic`, how many `insufficient`. Report the portfolio-gaps update — what was added, what was null. Report the Relativity Pass delta (adjustments made vs grades held). Ask the user whether to continue with the remaining queue or stop.
 
-### 12. Declare what was skipped
+### 13. Declare what was skipped
 
-Close the batch report with a "What I did not do" section covering: jobs left at `pending` because no description could be fetched; jobs the orchestrator deferred to a later batch (with reason — low company grade + generic title + weak role-type alignment); portfolio-gap patterns the orchestrator noticed but did not write to `portfolio-gaps.md` because they appeared only once (single occurrences are not patterns); any subagent that returned incomplete output (missing SQL for assigned jobs, assessments failing the citation rule). If every assigned job was graded and every portfolio-gap pattern was written, say so explicitly.
+Close the batch report with a "What I did not do" section covering: jobs left at `pending` with `evidence_basis = 'insufficient'` (no JD AND no usable semantic context, grade NULL); jobs the orchestrator deferred to a later batch (with reason — low company grade + generic title + weak role-type alignment); portfolio-gap patterns the orchestrator noticed but did not write to `portfolio-gaps.md` because they appeared only once (single occurrences are not patterns); rows the Relativity Pass flagged for review that were held without adjustment (with reason); any subagent that returned incomplete output (missing SQL for assigned jobs, assessments with missing Q-slots). If every assigned job was graded, every Q-slot is populated, and every portfolio-gap pattern was written, say so explicitly.
 
 ---
 
@@ -255,14 +414,17 @@ All three are read at invocation. The rubric alone without profile-context produ
 
 ## Inviolable Rules
 
-1. **Never grade on title alone.** If `raw_description` is missing / under 100 words / vague, fetch via WebFetch or WebSearch before grading. If no description can be found, leave at `pending` — do not assign any grade.
-2. **The fit assessment cites the description verbatim for seniority and technology claims.** Not paraphrase, not interpretation — quoted text from the description. Guards against the Thought Machine class of misgrade.
-3. **SS / S / A fit assessments name specific profile elements by name.** Projects from `profile/projects/`, technologies from `skills.md`, visa facts from `visa.md`, career targets from `preferences.toml`. Generic phrases fail the standard.
-4. **Profile is read fresh every invocation.** No caching, no embedded snapshots.
-5. **Grades are calibrated against DB anchors, not the current batch.** A batch of genuinely excellent jobs produces excellent grades — no distribution flattening.
-6. **`profile/portfolio-gaps.md` is updated after every batch.** Even a null update ("no new patterns this batch") is written — silent skipping breaks the career-coaching loop.
-7. **Subagents receive full profile + full reference content verbatim.** Under-contextualised subagents produce shallow assessments.
-8. **Exact SQL column names.** `grade`, `fit_assessment`, `fit_score`, `evaluation_status`. `evaluation_status` maps to the six-tier table above.
+1. **Try a JD-grounded grade first; fall back to the semantic-reasoning path explicitly.** If `raw_description` is missing / under 100 words / vague, fetch via WebFetch or WebSearch. If still no description, the row takes either the semantic-reasoning path (`evidence_basis = 'semantic'`, brand-strong roles graded from company + role-title context, Q3a names the JD substitution explicitly) or the insufficient-evidence path (`evidence_basis = 'insufficient'`, grade NULL, evaluation_status stays 'pending'). The skill does NOT silently brand-stamp grades from company name alone — every grade is anchored on either a JD quote or an explicit semantic-context substitution.
+2. **The fit assessment is structured prose, not a paragraph.** Every row has Q1, Q2, Q3a, Q3b, Q4, Q5, and Verdict slots, in that order. Each slot is prose (2-4 sentences; Q3a+Q3b are the load-bearing slots and may be longer; Verdict is 3-5 sentences). On the JD path, Q1 includes a verbatim JD quote about seniority, and Q3a includes a verbatim JD quote about technology. On the semantic path, those quote slots are replaced by an explicit "JD unavailable — reasoning from {company}'s known {pipeline-shape}". Single-paragraph fit_assessments fail this rule.
+3. **No verdict enums anywhere in the assessment.** "Q1 cleared-decisively", "Q3 moderate", "Q5 ✓", arrow-shorthand derivations like "Q2 strong → A", invented categories like "Standard B for mid-tier fintech junior" — all fail. Every Q-slot is prose reasoning; the grade letter follows from the Verdict prose, not from a label-string aggregation. The skill's purpose is to push the agent into reasoning, not classification.
+4. **SS / S / A fit assessments name specific profile elements by name in their Q-slots.** Projects from `profile/projects/` with file names and active-status anchors, technologies from `skills.md`, visa facts from `visa.md`, career targets from `preferences.toml`. Profile skill-band labels ("React Comfortable level") are profile metadata, not evidence — name the project that demonstrates the skill.
+5. **Q3 is split into two slots: Q3a stack overlap and Q3b career-axis match.** Q3a answers "does the technology overlap?". Q3b answers separately "does this role build toward the engineer Caner is becoming?". Conflating them is the failure mode that produced the pure-frontend / data-analyst / generic-data-engineer-in-B problem. Q3b reasons in prose about career trajectory; "on-axis" / "adjacent" / "off-axis" is the agent's conclusion-in-prose, never a label to pick.
+6. **Profile is read fresh every invocation.** No caching, no embedded snapshots.
+7. **Grades are calibrated against DB anchors, not the current batch.** A batch of genuinely excellent jobs produces excellent grades — no distribution flattening. The Relativity Pass (step 11) is the structural defence: after grading, each agent compares its rows against 3 random DB-sampled jobs per tier and adjusts inconsistencies.
+8. **`profile/portfolio-gaps.md` is updated after every batch.** Even a null update ("no new patterns this batch") is written — silent skipping breaks the career-coaching loop.
+9. **Subagents receive full profile + full reference content verbatim, AND the Relativity Pass query verbatim.** Under-contextualised subagents produce shallow assessments; subagents without the Relativity Pass query cannot run step 11.
+10. **Exact SQL column names.** `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis`. The `fit_score` column was dropped from the schema — UPDATE statements that reference it will fail at execution. `evaluation_status` maps to the six-tier table in step 6; `evidence_basis` is always set ('jd' / 'semantic' / 'insufficient').
+11. **No mechanical company-to-grade or role-type-to-grade rules.** Grading is AI reasoning, not classification. The rubric does NOT contain rules like "company X = grade Y", "frontend role = max C", "junior + top brand = SS", or any threshold mapping from a single attribute to a grade. Every grade emerges from prose Q-slot reasoning plus the Verdict. If a rubric edit ever introduces such a rule, it is an inviolable-rule violation and must be reverted.
 
 ---
 
@@ -275,20 +437,21 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **`cernio format` run at step 0** — the row-count summary appears in chat before step 1. If zero rows were touched, the "already clean" declaration is stated explicitly; silence fails this item.
 - [ ] **Calibration anchors pulled from the DB** — cite the SQL query run and reproduce the rows returned (2–3 per tier); the same block appears in every subagent's prompt.
 - [ ] **Every subagent prompt embeds the full profile + three reference files verbatim** — verifiable by inspecting the prompt contents in the transcript.
-- [ ] **No title-only grades** — for every graded job, the transcript shows the description was read (fetched or already present, ≥100 words). Jobs that could not satisfy this remain at `pending` and appear in step 12.
-- [ ] **SS / S / A fit assessments name specific profile elements** — each such assessment cites at least one project from `profile/projects/`, one technology from `skills.md`, one fact from `visa.md`, one career target from `preferences.toml`, AND one lifestyle anchor from `lifestyle-preferences.md` for the office area (named anchor like Kings Cross / Nine Elms / Canary Wharf / Croydon — generic phrases like "good area" do not satisfy this). The specific element name from each file appears in the assessment text.
-- [ ] **SS / S / A assessments lead the narrative with Q1 reasoning, then Q2** — per `references/grading-rubric.md` §Evidence Standards §"Aggregation verification". The assessment's first substantive paragraph names the firm's hiring-pattern signal (graduate intake volume, university-acceptance breadth, screening shape, conversion-rate signal) AND the candidate's position relative to that signal, citing the specific profile elements that place them in or outside the realistic primary-target pool. Q2 reputation reasoning follows in the second paragraph; Q3-Q5 close. The grade letter is consistent with the Q1 verdict the narrative names — an assessment opening with "Q1 is a real headwind, sub-1% conversion" cannot close at grade A or higher; an assessment opening with "Q1 is cleared decisively" cannot close at grade C unless Q5 names a hard exclusion. Conflating reputation (Q2) with selectivity (Q1), or producing a grade letter that contradicts the narrative's Q1 verdict, fails this item per `references/grading-rubric.md` §"Common Grading Errors / Grade inflation from prestige".
-- [ ] **Seniority quote present** — every fit assessment contains a quoted fragment from the description about experience / years / seniority, or the exact phrase "No experience requirements mentioned in description" when the description is silent on seniority.
-- [ ] **Technology quote present** — SS / S / A assessments contain a quoted fragment from the description naming a required technology or stack element that matches a `profile/skills.md` entry.
-- [ ] **Concept-fit citation structurally specific** — SS / S / A fit assessments cite at least TWO paradigms from `profile/skills.md` §Concepts and Domains by their exact entry name (the verbatim string from the skills.md section, not a paraphrase), AND for each named paradigm cite at least one specific project from `profile/projects/` that demonstrates it (with the file name and the project's `status:` frontmatter value). Format the citation explicitly, e.g. *"Concept-fit: skills.md §Concepts and Domains lists 'Low-latency real-time systems' (Proficient, anchored on `projects/nyquestro.md` status:active, HDR-histogram tail-latency tracking) — matches the role's 'low-latency order routing' requirement; AND 'Distributed simulation' (Comfortable, anchored on `projects/neurodrive.md` status:active) — matches 'multi-agent distributed training' requirement."* Stack-fit alone (naming the role's primary language) is insufficient. Generic paradigm names without skills.md verbatim entry + project anchor fail this item. Per `references/grading-rubric.md` §Q3 decomposition: Concept-fit is load-bearing, Stack-fit is the tiebreaker.
-- [ ] **Post-graduation intern-boundary detection applied** — for any role with "currently pursuing a degree" or analogous student-status wording, the assessment explicitly states the structural-filter reading (template-boilerplate OR explicit-filter) and cites the description signals supporting that reading. Per `references/grading-rubric.md` §Common Grading Errors §"Post-graduation candidates and new-grad / intern pipelines — boilerplate vs structural filter".
-- [ ] **Sponsorship citation present** — every graded-job assessment either cites the company's sponsorship evidence (sponsor register, description language, prior evidence in the DB) or explicitly names the sponsorship question as open and flags the job as needing verification before application.
-- [ ] **SS / S assessments have all six components** — alignment, tech match, gap analysis, sponsorship, trajectory, application narrative. Each is identifiable as its own paragraph or sentence cluster. A missing component downgrades to A.
-- [ ] **C / F assessments cite the specific dealbreaker** — named quoted text from the description (seniority gap, technology mismatch, role-type exclusion). "Bad fit" without citation fails this item.
-- [ ] **Column mapping correct** — `evaluation_status` maps exactly to tier (SS/S → `strong_fit`; A/B → `weak_fit`; C/F → `no_fit`); `fit_score` is within the tier's band. Cite a spot-check row (id + grade + evaluation_status + fit_score) per subagent.
-- [ ] **`profile/portfolio-gaps.md` updated** — the diff to `portfolio-gaps.md` is cited (either new patterns with counts + role names + companies, or a dated null-result note for this batch). Silent omission of the update is a skill-failure per Inviolable Rule 6.
-- [ ] **Batch report includes breakdown + highlights + flagged jobs** — count by tier, SS / S highlights with company names, explicit list of any job flagged as no-description (should be zero after step 4).
-- [ ] **Step 12 "What I did not do" declaration emitted** — names deferred jobs, pattern-threshold misses, or subagent-output issues, or explicitly states none.
+- [ ] **Every graded row has either a JD-grounded grade or an explicit semantic-reasoning grade** — for `evidence_basis = 'jd'` rows, the transcript shows the description was read (fetched or already present, ≥100 words). For `evidence_basis = 'semantic'` rows, the Q3a slot of the fit_assessment explicitly states "JD unavailable — reasoning from {company}'s known {pipeline-shape}" and the Q-slot reasoning anchors on that pipeline-shape plus the candidate's matching portfolio. Rows that cannot satisfy either path are written with `evidence_basis = 'insufficient'`, `grade = NULL`, `evaluation_status = 'pending'` — and are listed in step 13.
+- [ ] **Every fit_assessment is structured prose with all seven slots populated** — Q1, Q2, Q3a, Q3b, Q4, Q5, Verdict. Single-paragraph assessments, missing slots, or label-only slots ("Q3 moderate", "Q5 ✓") fail this item. Verify by grepping a sample of assessments for the slot headers and confirming each carries prose.
+- [ ] **No verdict-enum strings inside Q-slots** — grep the batch's fit_assessments for the banned strings: "cleared-decisively", "cleared-with-friction", "real-headwind", "hard-fail", "Q1 cleared", "Q2 strong", "Q3 moderate", "Q5 ✓", and arrow-shorthand patterns like "→ A". Any hit indicates a slot has degenerated from prose to label; rewrite the affected slot.
+- [ ] **SS / S / A fit assessments name specific profile elements in their Q-slots** — each SS / S / A assessment names at least one project from `profile/projects/` (with file name), one technology from `skills.md`, one fact from `visa.md`, one career target from `preferences.toml`, AND one lifestyle anchor from `lifestyle-preferences.md` (named neighbourhood like Kings Cross / Nine Elms / Canary Wharf / Croydon — "good area" does not satisfy). The specific element name appears in the prose, not a profile-band label.
+- [ ] **Seniority JD quote present (or semantic substitution)** — every JD-path fit_assessment's Q1 slot contains a quoted JD fragment about experience / years / seniority OR the literal phrase "No experience requirements mentioned in the description". Semantic-path assessments substitute with "JD unavailable — reasoning from {company}'s known {pipeline-shape}".
+- [ ] **Technology JD quote present in Q3a (or semantic substitution)** — every JD-path SS / S / A assessment's Q3a slot contains a quoted JD fragment naming a required technology or stack element. Semantic-path assessments substitute with the company-pipeline reasoning.
+- [ ] **Q3b career-axis reasoning is separate from Q3a** — every SS / S / A assessment has a Q3b slot that reasons in prose about the role's career-trajectory match (on-axis / adjacent / off-axis is the conclusion-in-prose, NOT a label pick). Q3b cannot be empty or reduce to "see Q3a".
+- [ ] **Sponsorship citation present in Q5** — every Q5 slot either cites the company's sponsorship evidence (sponsor register, description language, prior DB evidence) or names the sponsorship question as open and flags the job as needing verification.
+- [ ] **Verdict slot reads as a budget-of-30 answer** — the Verdict prose names the strongest pull AND strongest pushback, classifies the role-type (career-launch / axis-bet / credibility-builder / stretch / deadweight in prose, not by label), and answers whether the role makes the budget cut. The grade letter follows the Verdict.
+- [ ] **C / F assessments cite the specific dealbreaker** — named quoted JD text (seniority gap, technology mismatch, role-type exclusion) or the company-context dealbreaker on the semantic path. "Bad fit" without citation fails.
+- [ ] **Column mapping correct** — UPDATE statements set `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis` exactly. `evaluation_status` maps SS/S → `strong_fit`, A/B → `weak_fit`, C/F → `no_fit`. `evidence_basis` is one of 'jd' / 'semantic' / 'insufficient'. No UPDATE includes `fit_score = ...` — the column has been dropped and including it fails the statement.
+- [ ] **Relativity Pass ran and the delta summary was emitted** — step 11's section is present in the batch output. The DB-sampled reference rows query was run; adjustments are listed by job_id with reason, or `Adjustments: 0 grades changed` is stated explicitly with a one-line confirmation that the comparison was run.
+- [ ] **`profile/portfolio-gaps.md` updated** — the diff to `portfolio-gaps.md` is cited (new patterns with counts + role names + companies, or a dated null-result note). Silent omission fails Inviolable Rule 8.
+- [ ] **Batch report includes evidence_basis breakdown** — counts of `jd` / `semantic` / `insufficient` rows in this batch, plus the standard tier breakdown and SS / S highlights.
+- [ ] **Step 13 "What I did not do" declaration emitted** — names rows left at `insufficient_evidence`, deferred jobs, pattern-threshold misses, Relativity-Pass-flagged-but-held rows, or subagent-output issues, or explicitly states none.
 
 ---
 
@@ -296,10 +459,12 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 
 The lists in this SKILL.md are non-exhaustive and may be extended on a per-run basis when a specific batch's shape calls for an addition the skill's author did not anticipate. Additions are pure-additive — they raise the floor of the skill's rigour, never weaken it.
 
-- **The Mandatory Reads table (5 items)** is the minimum precondition set. If a future grading session needs an additional precondition (e.g. a per-job calendar-deadline read from a tracking system, recruiter context from a CRM), add a row. Existing reads stay mandatory.
-- **The 12-step workflow** is the current sequential structure. Add new steps when a new mandatory phase surfaces across multiple sessions (recurrence threshold ~3 sessions). Existing steps remain mandatory.
-- **The Inviolable Rules (8 rules)** are the current structural constraints. If a new constraint surfaces (e.g. a new data-quality invariant the grader must honour), add Rule 9 or higher. Existing rules stay inviolable.
+- **The Mandatory Reads table (4 items)** is the minimum precondition set. If a future grading session needs an additional precondition (e.g. a per-job calendar-deadline read from a tracking system, recruiter context from a CRM), add a row. Existing reads stay mandatory.
+- **The 13-step workflow** is the current sequential structure. Add new steps when a new mandatory phase surfaces across multiple sessions (recurrence threshold ~3 sessions). Existing steps remain mandatory.
+- **The Inviolable Rules (11 rules)** are the current structural constraints. If a new constraint surfaces (e.g. a new data-quality invariant the grader must honour), add Rule 12 or higher. Existing rules stay inviolable.
 - **The Quality Checklist items** are the current verifiable obligations. New items may be added; existing items remain mandatory.
 - **The six grade tiers (SS / S / A / B / C / F) in `references/grading-rubric.md`** are the current letter system; no new letters are added as escape hatches (no "S+", no "A-stretch", no sub-tiers). See the rubric's Additive-Freedom Permission section for the full per-list permission breakdown that applies to its prescribed lists.
+- **The structured fit_assessment slots (Q1 / Q2 / Q3a / Q3b / Q4 / Q5 / Verdict)** are the current minimum set. New slots may be added when a new analytical question becomes load-bearing across multiple sessions. Existing slots remain mandatory and prose-only.
+- **The three `evidence_basis` values ('jd' / 'semantic' / 'insufficient')** are the current set. New values may be added when a new evidence-quality category genuinely emerges (e.g. 'partial_jd' for descriptions that loaded but were truncated). Existing values keep their semantics.
 
 For all five lists above, additions are **strictly additive** — they may not introduce conditionals that gate existing requirements, weaken any existing item, or create escape hatches that let the grader skip prescribed work. Document the addition in the next commit's message so future readers can see the extension trail.

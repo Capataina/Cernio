@@ -64,11 +64,12 @@ If the new grade is C, also set `status = 'archived'`.
 UPDATE jobs
 SET grade = ?,
     fit_assessment = ?,
-    fit_score = ?,
     evaluation_status = ?,
-    graded_at = datetime('now')
+    evidence_basis = ?
 WHERE id = ?;
 ```
+
+(The legacy `fit_score` column was dropped from the schema in May 2026; including it in any UPDATE will fail. `evidence_basis` is 'jd', 'semantic', or 'insufficient' per the grade-jobs evidence-basis rules. The `jobs` table has no `graded_at` column — staleness is detected by `evaluation_status` plus profile-mtime comparison, not a per-row timestamp.)
 
 ---
 

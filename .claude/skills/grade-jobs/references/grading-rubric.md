@@ -36,22 +36,9 @@ Grading happens in five steps. Each step informs the next. The grade letter is t
 
 The fit assessment written to the database should be the output of this process — the actual reasoning, not a summary. Q1 reasoning leads the assessment narrative; Q2 reasoning follows; Q3-Q5 close. This ordering surfaces the dominant axis in the visible text so the grade letter and the narrative cannot drift apart.
 
-**Q-pattern → letter mapping anchors (load-bearing default mapping).** The §Step 3 anchor rows are load-bearing: when the candidate's Q1 verdict and Q2-Q5 profile match a row, the row's letter is the default. Deviating from a row's letter requires the assessment to name the deviation explicitly in the form *"Anchor row would produce X, but this case differs because [specific reason], so the letter is Y."* Silent deviation from a matching anchor row is a Q-pattern application error. The table is the legibility mechanism for the aggregation — a future reader (the user, another grader, the `check-integrity` skill) should be able to map the assessment's Q1-Q5 reasoning to a specific anchor row and verify the letter matches.
+**The aggregation is prose reasoning in the Verdict slot, not a table lookup.** Earlier versions of this rubric carried a Q-pattern-to-letter mapping table here; it was removed because the table itself became a satisficing slot — agents pattern-matched the Q1 verdict label to a row instead of reasoning about the specific role. The current shape is different: every Q-slot (Q1, Q2, Q3a, Q3b, Q4, Q5) is prose without any verdict label or category-pick, and the Verdict slot is also prose that names the strongest pull and pushback, classifies the role-type in prose ("career launch" / "axis bet" / "credibility builder" / "stretch" / "deadweight"), and answers in prose whether the role makes a fixed budget of ~30 applications. The grade letter follows the Verdict.
 
-| Q1 verdict | Q2-Q5 profile | Letter |
-|---|---|---|
-| cleared-decisively | all four strong (≥3 of 4 strong + the fourth at least moderate) | SS |
-| cleared-decisively | mostly strong (Q2 strong + Q3-Q5 moderate-strong, no weak axis) | S |
-| cleared-decisively | Q2 strong + at least one Q3/Q4/Q5 with a notable weakness | A |
-| cleared-decisively | Q2-Q5 moderate across the board (no notable strength, no notable weakness) | A or B per which side dominates |
-| cleared-decisively | Q2-Q5 weak across the board (small company, narrow scope, weak ceiling, stack mismatch) | B |
-| cleared-with-friction | strong Q2-Q5 | A — friction is the cap, S is not reachable |
-| cleared-with-friction | moderate Q2-Q5 | A or B |
-| cleared-with-friction | weak Q2-Q5 | B or C |
-| real-headwind | any Q2-Q5 strength | C — prestige-trap aggregation, cannot reach above C |
-| hard-fail | any | F |
-
-These rows are anchors, not lookups. The assessment may land between two rows (e.g., Q1 cleared-decisively, Q2 strong, Q3 moderate, Q4 strong, Q5 clean — between the SS and S rows). When it does, name the closest anchor and justify the deviation in the assessment narrative. The role of the anchors is to make the aggregation legible to a future reader, not to override the grader's judgement on edge cases.
+The classifier-style language ("cleared-decisively", "cleared-with-friction", "real-headwind", "hard-fail") is BANNED from Q-slot prose for the same reason: it is a label-pick, not reasoning. Express the same content in prose: *"The JD states '2+ years of commercial Go experience'. Caner has 1 year of professional experience at Crucible plus 8 substantial side projects including Nyquestro and Cernio, both 6k+ LOC Rust. The 2-year floor is a soft floor — the JD's qualification section says 'or equivalent demonstrated ability' — and the portfolio depth genuinely substitutes. The gate is realistically clearable for this candidate."* That's the Q1 shape. No labels.
 
 ---
 
@@ -85,22 +72,19 @@ Read `experience.md` for formal work history and the per-project files in `profi
 
 The detection rule for the grader: when reasoning about Q1, ignore Q2's signal entirely. Q2 answers "would this look good on a CV?" Q1 answers "does this firm hire people who look like this candidate, in volumes that make conversion plausible?" Conflating them is the exact failure mode the realism semantic exists to prevent.
 
-**Q1 Verdict Detection Signals (mechanical mapping from description patterns to Q1 verdict).** The Q1 verdict is the load-bearing input to the §Step 3 anchor table. Reading variance across graders on the Q1 verdict produces letter-disagreement downstream regardless of how sharp the aggregation rules are. This table makes the Q1 reading mechanical for the common patterns; the verdict is the most-restrictive signal when multiple patterns apply:
+**Patterns to recognise when reasoning about Q1 (signal recognition, not verdict labelling).** Earlier versions of this rubric mapped description patterns to Q1 verdict labels in a lookup table. The table was removed because it pushed graders into label-picking instead of reasoning. The patterns below are recognition-anchors — when one of these signals appears in the description, the Q1 slot reasons in prose about what it means for *this candidate* and *this role*, rather than picking a verdict from a list. The conclusion is the prose itself, not a label.
 
-| Description / firm signal | Q1 verdict |
-|---|---|
-| Wide-funnel established-firm graduate/intern programme (Cloudflare, Amazon, Palantir, Stripe, Spotify, etc. with explicit "Graduate" / "New Grad" / "Intern" title + structured pipeline) accepting BEng 2:2 degree class | **cleared-decisively** |
-| Mid-tier UK firm with explicit graduate/junior framing, no hard credential floor (Lendable, Trainline, Monzo, Yapily, B2C2, Squarepoint graduate-programme roles) | **cleared-decisively** |
-| Role with "personal projects accepted" or "or equivalent demonstrated ability" framing + no explicit X+ year floor | **cleared-decisively** if firm is wide-funnel; **cleared-with-friction** if firm is narrow-funnel with stack-specific evidence-acceptance |
-| Soft floor: 2-year-experience requirement, "in commercial setting" language, "production environment" language without years number | **cleared-with-friction** |
-| Post-graduation candidate + "currently pursuing" template-boilerplate at wide-funnel firm (per §Common Grading Errors §"Post-graduation candidates and new-grad / intern pipelines") | **cleared-with-friction** (NOT hard-fail) |
-| Post-graduation candidate + "currently pursuing" with explicit graduation-year cutoff (e.g. "Spring 2027 or later") | **hard-fail** |
-| Implicit-selectivity Q1: narrow-funnel firm (HFT/quant prop trader / brand-AI research lab) + no stack-specific evidence-acceptance language | **real-headwind** |
-| Explicit hard floor: "X+ years" with X ≥ 3, "X-Y years" with X ≥ 4, "significant experience" / "deep expertise" / "extensive experience" / "expert-level" | **hard-fail** |
-| Hard Q5 exclusion: role-type on `preferences.toml.hard.exclude_role_types`, location outside `preferences.toml.hard.locations`, sector on `exclude_sectors` | **hard-fail** |
-| Staff/Principal/Senior-IC scope (compensation £200k+, "own the X" / "shape the Y" / "design at scale" / leadership expectations) | **hard-fail** |
+- **Wide-funnel graduate / new-grad / intern programmes at established firms** (the role title explicitly says "Graduate" / "New Grad" / "Intern", the firm has a structured pipeline, no hard credential floor visible). Q1 prose should reason about whether the firm's pipeline shape matches the candidate's profile shape — degree class, sponsorship, application timing — and conclude in prose whether the candidate is in the realistic primary-target pool.
+- **Mid-tier firms with graduate / junior framing**, no hard credential floor. Same shape — reason in prose, conclude in prose.
+- **"Or equivalent demonstrated ability" language paired with no explicit year floor.** The Q1 prose names the qualification text by JD quote, reasons about whether the candidate's portfolio meets the equivalence bar (citing project names), and concludes in prose.
+- **Soft-floor language**: a 2-year-experience requirement, "in commercial setting" language, "production environment" framing without years numbers. Q1 prose names the soft floor and reasons about whether portfolio depth substitutes; concludes in prose with the gate's realistic clearability.
+- **Post-graduation candidate vs "currently pursuing" template boilerplate.** Q1 prose distinguishes (a) explicit graduation-year cutoff that excludes the candidate from (b) template language that does not actually filter, citing the JD's specific language. See §Common Grading Errors §"Post-graduation candidates" for the distinction shape.
+- **Narrow-funnel firms with implicit selectivity** (HFT / quant prop traders / brand-AI research labs without stack-specific evidence-acceptance language). Q1 prose names the selectivity signal, names the candidate's position relative to the firm's actual hire profile, and concludes in prose whether the role is realistically landable.
+- **Explicit hard floors**: "X+ years" with X ≥ 3, "significant experience" / "deep expertise" / "extensive experience" / "expert-level". Q1 prose quotes the JD's floor, names the gap, and concludes in prose whether the candidate can clear it (usually they cannot, but the conclusion is reasoned not categorical).
+- **Hard Q5 exclusions** (role-type on `preferences.toml.hard.exclude_role_types`, location outside hard.locations, sector on exclude_sectors). Q1 prose names which exclusion fires and quotes the JD text that establishes it.
+- **Staff/Principal/Senior-IC scope** ("own the X" / "shape the Y" / leadership expectations, compensation £200k+). Q1 prose names the seniority signal and reasons about why the candidate is or is not in the applicant pool for the band.
 
-**Most-restrictive-signal rule.** When the description has multiple signals, the most-restrictive signal determines Q1. A role with both "Graduate" title AND a 5+ years floor is **hard-fail** (the floor dominates the title). A role with both "wide-funnel firm" AND "sub-1% hire rate stated explicitly" is **real-headwind** (the explicit selectivity dominates the firm-class default). The Q1 detection table is the floor for Q1 reading consistency — graders may add nuance to the verdict's phrasing but the verdict letter (cleared-decisively / cleared-with-friction / real-headwind / hard-fail) is constrained to the most-restrictive matching row.
+**The signal-recognition list is non-exhaustive.** New patterns may surface in specific JDs; the Q1 slot reasons about whatever signals are visible in the description (or, on the semantic-reasoning path, what the agent knows about the company's hiring shape) without trying to fit each signal into a labelled bucket. The output is always prose.
 
 **If the answer to Q1 is clearly no — whether through an explicit credential floor (hard 5+ years requirement, staff/principal scope, leadership expectations, PhD required) or through implicit selectivity that puts the candidate sub-1% on realistic conversion — the grade is F or C depending on how brutal the gap is. No other question matters when Q1 fails.** This is the only question that can unilaterally determine the grade. A role where Q1 reads as a real headwind (genuine non-zero conversion but the candidate is outside the realistic primary-target pool) aggregates down to C through the Q1-primary lens described in §How to Grade a Job Step 3, regardless of how strong Q2-Q4 read in the absolute frame — see the §Grade Scale §A and §C definitions below for how the aggregation produces the letter without sub-categories.
 
@@ -231,6 +215,63 @@ These add precision to the question-based reasoning. They are not a replacement 
 
 ---
 
+## Semantic-Reasoning Path (when JD is missing)
+
+The default grading path is JD-grounded: the Q-slots quote the description for seniority and technologies, and the reasoning anchors on what the JD names. When `raw_description` is missing, empty, or under 100 words AND the WebFetch/WebSearch fallback also failed, the agent does NOT default to brand-stamp grading. Two paths are available:
+
+**Path A — Semantic-reasoning grading (`evidence_basis = 'semantic'`).** Use this when company + role title together carry enough signal to ground a defensible grade. The conditions:
+
+1. The company is well-known publicly such that the agent can reason from training data about its hiring shape — graduate intake volume, university-acceptance breadth, screening style, sponsorship stance.
+2. The role title is non-ambiguous about the work — "Software Engineer, University Graduate 2026" or "Software Development Engineer Intern" are non-ambiguous; "Engineer" or "Developer" alone are not.
+
+When both conditions hold, the fit_assessment is identical in shape to a JD-grounded one — same Q1 through Verdict slots, all prose — but the JD-quote slots are substituted:
+
+- **Q1 slot**: instead of quoting the JD, name the company's known seniority-band pattern at this role-title. Example shape: *"JD unavailable. Microsoft's University Graduate programme is a wide-funnel structured pipeline accepting candidates from a broad range of universities and degree classes; the band corresponds to entry-level SDE work with on-call shadow rotations after onboarding. Caner's profile — 1 year of professional experience at Crucible plus 8 substantial Rust / TypeScript / Python side projects including Nyquestro (deterministic LOB matching engine) — is in the realistic applicant pool for the band."*
+- **Q3a slot**: instead of quoting the JD's named technologies, name what the agent knows about the company's typical engineering stack at this role-band. Example: *"JD unavailable. Microsoft's graduate SDE programme is stack-flexible (Windows team uses C++/C#, Azure uses Go/Rust increasingly, M365 uses TypeScript, Bing uses C++); Caner's Rust + TypeScript + Python coverage maps to multiple internal teams. Specific anchor: Nyquestro (active, 6.5k LOC Rust) demonstrates the systems-engineering depth Microsoft values in its Rust-adopting teams."*
+- **Other slots**: Q2, Q3b, Q4, Q5, Verdict — reason normally, anchored on company-context knowledge rather than JD quotes.
+
+The grade can be any letter the structured reasoning supports including SS. A semantically-graded Google graduate role is not lesser-evidence than a JD-graded Google graduate role; both produce defensible reasoning, and `evidence_basis` makes the difference auditable. The default TUI filter keeps `semantic` rows visible — they are NOT filtered out.
+
+**Path B — Insufficient evidence (`evidence_basis = 'insufficient'`, `grade = NULL`, `evaluation_status = 'pending'`).** Use this when neither path is defensible:
+
+- Unknown / low-signal company that the agent cannot reason about confidently from training data, AND
+- Opaque role title that does not carry work-shape signal ("Engineer" or "Developer" or "Software Engineer" alone at an unknown company).
+
+The row stays in the pending queue for a future pass after a description fetch succeeds. The agent does NOT invent a grade.
+
+**Decision rule for the grader.** When the JD is missing, ask: "Can I reason about this role in prose for Q-slots without inventing facts?" If yes, Path A. If the reasoning would require fabricating company hiring practices or role-shape claims, Path B. The honest admission ("I don't have a usable signal for this company + this title") is preferred over a confabulated grade.
+
+---
+
+## Relativity Pass (end-of-batch self-review)
+
+After each agent's grading batch completes — but before the batch report is written — the agent runs the relativity pass. The purpose is to catch within-batch drift: an agent grading 30 jobs in sequence can calibrate against the wrong neighbours, apply a fix from job 5 to job 25 without realising the cases differ, or land on a within-batch consistent grade that conflicts with the broader DB calibration.
+
+The pass has four steps:
+
+**Step 1 — Sample 3 random already-graded jobs per grade tier from the DB.** The query is provided in the SKILL.md (workflow step 11.1). The result is up to 18 reference rows (3 × 6 tiers). Tiers with fewer than 3 graded rows return what they have; do not pad with cross-tier substitutes.
+
+**Step 2 — Compare each just-graded row against the reference set.** For each row the agent wrote in this batch, ask in prose:
+
+- Are there reference rows at the same grade whose Q1-Q5 reasoning is structurally weaker than this row's? (If yes, this row may belong one tier higher.)
+- Are there reference rows one tier higher whose reasoning is structurally weaker than this row's? (If yes, this row likely belongs at that higher tier.)
+- Are there reference rows at the same grade whose reasoning is structurally much stronger than this row's? (If yes, this row may belong one tier lower.)
+
+"Structurally stronger/weaker" is reasoned in prose: the Verdict slot of the reference is more decisive, the Q3b career-axis match is more direct, the Q1 friction is named more sharply, the Q2 company-quality signal is more concrete. The relativity pass is not a numeric comparison.
+
+**Step 3 — Adjust grades and rewrite affected slots.** When the relativity pass reveals an inconsistency, the agent re-reads the just-graded row's structured assessment, identifies which Q-slot's reasoning is out of step with the reference cohort, and either:
+
+- Rewrites the slot to justify the original grade (when the original is correct but the prose was imprecise), OR
+- Adjusts the grade and updates the Verdict slot to reflect the new aggregation.
+
+Either way the agent issues a follow-up UPDATE for that row.
+
+**Step 4 — Emit the relativity delta summary.** The summary lists per-row adjustments by job_id with prose reasoning. If no adjustments were needed, the section still emits with `Adjustments: 0 grades changed` plus a one-line confirmation that the comparison was run.
+
+The relativity pass is the structural defence against batch-calibration drift. It is not optional — silent omission fails the skill's inviolable rules.
+
+---
+
 ## Cross-referencing and Relative Grading
 
 **Mandatory after every batch.** Do not write grades to the database without completing this.
@@ -297,23 +338,21 @@ The same career-stage factors that affect company grading affect job grading, bu
 
 The asymmetry: when a candidate's portfolio is **concentrated in a specific stack** (multiple substantive projects at Proficient band in `profile/skills.md`, several per-project files in `profile/projects/` all using the same primary language), stack alignment with the role's primary stack flips a marginal applicant into a competitive one inside the realistic applicant pool. The portfolio's evidence base directly anchors to the role's technical requirements.
 
-**Hard-Floor Recognition Signals — when the carveout CANNOT fire.** Before the stack-concentration magnitude table applies, the grader classifies the role's floor language. The carveout offsets implicit-selectivity friction only; it never offsets hard credential floors or hard exclusions. This table is the mechanical disambiguation for which floor language counts as which class:
+**Hard-Floor Recognition Signals — when the carveout CANNOT fire.** Before the stack-concentration carveout applies, the grader reads the role's floor language. The carveout modulates implicit-selectivity friction only; it never offsets hard credential floors or hard exclusions. The patterns below are signal-recognition anchors — the Q1 slot reasons in prose about what each pattern means for this candidate, with the conclusion-in-prose:
 
-| Description / firm signal | Floor class | Carveout offset eligible? |
-|---|---|---|
-| Explicit "X+ years" with X ≥ 3 | **HARD floor** — Q1 hard-fail | **NO** — carveout cannot fire regardless of stack-concentration |
-| Explicit "X+ years" with X = 2 | Soft floor — Q1 cleared-with-friction (borderline-clearable via portfolio) | **NO offset** but Q1 doesn't drop to real-headwind solely on the 2-year floor |
-| "X-Y years" range with floor X ≥ 4 (e.g. "5-10 years", "8-12 years") | **HARD floor** — Q1 hard-fail | **NO** |
-| "significant experience" / "deep expertise" / "expert-level" / "extensive experience" / "demonstrable production experience" | **HARD floor proxy** — Q1 real-headwind to hard-fail | **NO** |
-| "in a commercial setting" / "in a production environment" without years number | Soft floor — Q1 cleared-with-friction | Partial offset for ≥5 stack-concentration ONLY when description ALSO has stack-specific evidence-acceptance language ("complex Rust pet projects accepted", "or equivalent demonstrated ability") |
-| "less than 1% hired" / "highly selective" / named narrow-funnel firm (HFT/quant prop trader / brand-AI lab) | **Implicit-selectivity floor** — Q1 real-headwind | Partial offset (~1.5 letters per the magnitude table below) for ≥5 stack-concentration ONLY when description has stack-specific evidence-acceptance language |
-| "personal projects accepted" / "or equivalent demonstrated ability" / "complex pet projects" / "side projects valid" | NOT a floor — explicit portfolio-evidence-acceptance | N/A — Q1 cleared-with-friction at worst; this language is the carveout's primary trigger |
-| "Graduate" / "New Grad" / "Junior" in title + structured pipeline at established firm | NOT a floor — explicit entry-level | N/A — Q1 cleared-decisively if firm has wide-funnel pipeline |
-| Staff/Principal/Senior-IC scope (compensation £200k+ band, "own the X" / "shape the Y" / "design at scale" / leadership expectations) | **HARD floor proxy** — Q1 hard-fail | **NO** |
+- **Explicit "X+ years" with X ≥ 3.** Hard credential floor. Q1 prose names the floor as a decisive gate the candidate cannot clear via portfolio. The carveout cannot fire regardless of stack-concentration.
+- **Explicit "X+ years" with X = 2.** Soft floor. Q1 prose names the 2-year floor and reasons in prose about whether the portfolio's depth substitutes (frequently it does at this band, but not decisively). No carveout offset; the candidate's position is portfolio-clearable but with friction.
+- **"X-Y years" range with floor X ≥ 4** (e.g. "5-10 years", "8-12 years"). Hard credential floor. Same shape as the X ≥ 3 row above — Q1 prose concludes the role is not realistically landable.
+- **"significant experience" / "deep expertise" / "expert-level" / "extensive experience" / "demonstrable production experience"** language. Hard-floor proxy. Q1 prose names the language as a senior-band signal and reasons about whether the candidate's portfolio carries that depth; usually it does not at this band. Carveout cannot fire.
+- **"in a commercial setting" / "in a production environment"** language without a years number. Soft floor. Q1 prose names the production-environment expectation, reasons about whether the candidate's portfolio depth substitutes, and concludes in prose. Partial carveout offset when ≥5 stack-concentration AND the description ALSO has stack-specific evidence-acceptance language ("complex Rust pet projects accepted", "or equivalent demonstrated ability").
+- **"less than 1% hired" / "highly selective" / named narrow-funnel firm** (HFT/quant prop trader / brand-AI lab). Implicit-selectivity floor. Q1 prose names the selectivity signal, names the candidate's profile shape relative to the firm's actual hire profile, and concludes in prose whether the role is realistically landable. Partial carveout offset for ≥5 stack-concentration ONLY when description has stack-specific evidence-acceptance language.
+- **"personal projects accepted" / "or equivalent demonstrated ability" / "complex pet projects" / "side projects valid"**. Not a floor — explicit portfolio-evidence-acceptance. Q1 prose names the acceptance clause and connects it to the candidate's portfolio. This language is the carveout's primary trigger.
+- **"Graduate" / "New Grad" / "Junior" in title + structured pipeline at established firm.** Not a floor — explicit entry-level. Q1 prose reasons about whether the candidate's profile is in the realistic primary-target pool for the firm's graduate pipeline shape.
+- **Staff/Principal/Senior-IC scope** (compensation £200k+ band, "own the X" / "shape the Y" / "design at scale" / leadership expectations). Hard-floor proxy. Q1 prose names the seniority signal and concludes the role is not in the candidate's realistic band.
 
-**Worked walk — XTX Markets Research Technology (hard floor, carveout does NOT fire).** Description states "5-10 years" experience required. Per the Hard-Floor Recognition Signals table, "5-10 years" with lower bound ≥ 4 is a HARD floor. The stack-concentration carveout CANNOT fire on hard floors. Even with the candidate's 9 active Rust projects clearing the carveout's volume threshold, Q1 reads hard-fail. Per the §Step 3 anchor table: Q1 hard-fail → F regardless of Q2-Q5 strength. **Grade: F.** The carveout's existence does not override the hard-floor rule — agents who lift XTX to A on stack-concentration grounds are misapplying the carveout.
+**Worked walk — XTX Markets Research Technology (hard floor, carveout does NOT fire).** Description states "5-10 years" experience required. The "5-10 years" range with lower bound ≥ 4 is a hard credential floor. The stack-concentration carveout cannot fire on hard floors. Q1 prose: *"The JD states '5-10 years of experience'. The candidate has 1 year of professional experience plus a strong Rust portfolio (9 active projects), but the floor's lower bound is a structural gate, not a soft preference — a 5-year band cannot be cleared on portfolio depth alone. The role is not realistically landable for this candidate at this seniority."* Verdict concludes the role does not make the budget cut. **Grade: F.**
 
-**Worked walk — Proton Rust SWE (soft floor + stack-specific evidence-acceptance, carveout DOES fire).** Description states "Hiring at Proton is highly selective, with less than 1% of candidates hired" — this is an implicit-selectivity floor (real-headwind). The description ALSO says "complex Rust pet projects" are explicit evidence — this is stack-specific evidence-acceptance language. Per the Hard-Floor table: implicit-selectivity floor with stack-specific evidence-acceptance is carveout-eligible. The candidate has 9 active Rust projects (≥ 5 threshold). Carveout fires; ~1.5-letter offset on the selectivity friction. Q1 reads cleared-with-friction. Per the §Step 3 anchor table: cleared-with-friction + strong Q2-Q5 → A. **Grade: A.**
+**Worked walk — Proton Rust SWE (soft floor + stack-specific evidence-acceptance, carveout DOES fire).** Description states "Hiring at Proton is highly selective, with less than 1% of candidates hired" — this is an implicit-selectivity signal. The description ALSO says "complex Rust pet projects" are explicit evidence — stack-specific evidence-acceptance language. The candidate has 9 active Rust projects (≥ 5 threshold). The carveout fires: the selectivity friction is offset by the stack-concentration AND the role's own stated evidence-acceptance clause. Q1 prose: *"Proton's hiring rate of <1% reads as a strong selectivity signal at face value. However, the JD also says 'complex Rust pet projects' count as evidence. The candidate's 9 active Rust projects — including Nyquestro (deterministic LOB matching engine, HDR-histogram tail-latency tracking), Cernio (this codebase, ~14k LOC Rust), and a merged tinygrad PR — are exactly the portfolio shape the JD names as credential-substitute. The candidate is plausibly inside Proton's realistic primary-target pool; the role is landable with friction."* Verdict balances strong Q2-Q5 against the named friction. **Grade: A.**
 
 The Hard-Floor Recognition Signals table is the mechanical disambiguation that prevents misapplication of the carveout on roles with explicit credential floors.
 
@@ -368,10 +407,60 @@ Reputation and selectivity are not the same axis; do not infer one from the othe
 
 ---
 
+## Worked Examples — Risks That Bite the Grade
+
+The pattern this section establishes: when a Q-slot names a real risk, the Verdict slot weighs that risk against the strengths, and the grade letter moves to reflect the weighing. A risk acknowledged but not weighed is "risk-decoration" — the rubric calls this out as a failure mode and these worked examples are the template for risks that actually bite.
+
+Each example below is structurally generic (no real company names, no real role titles) and shows one Q-slot naming a risk that pushes the grade DOWN one tier from where the other Q-slots alone would land it.
+
+### Example — S → A (Q3b career-axis weakness bites)
+
+A role at an elite payments-platform company. Q1 cleared (graduate-tier opening, no hard floor). Q2 strong (the company is recognised, well-funded, has a public engineering blog citing Rust adoption). Q3a strong (the JD names Go and Rust; the candidate has Rust as a primary language and Go as adjacent). Q4 moderate (payments domain — finance-adjacent, candidate has demonstrated interest in trading-adjacent systems). Q5 clean (London office, sponsor-capable).
+
+Without Q3b, this aggregates to S. With Q3b: *"The role's day-1 work is generic payments-platform feature work — adding new payment-method integrations and maintaining the existing payment-orchestration service. The systems-engineering depth Q3a established is real on the technology axis but the role's actual work is platform-product engineering, not the lock-free / low-latency / autonomy systems work the candidate's portfolio (Nyquestro, NeuroDrive) is on. This is adjacent to the target career trajectory, not on-axis."*
+
+Verdict prose: *"Strong company + good stack overlap is the pull. The pushback is that the day-1 work is off the career-axis the candidate is building toward — this would be a credibility builder, not an axis bet. In a budget of 30 applications, this makes the cut as a backup; it would not be a primary investment."*
+
+Grade: A (not S) — the Q3b weakness bit.
+
+### Example — A → B (Q5 sponsorship friction bites)
+
+A role at a mid-tier UK fintech. Q1 cleared (junior framing, no hard floor). Q2 moderate-strong (the company has decent reputation, profitable, named in industry surveys). Q3a strong (Python and TypeScript both at the candidate's Comfortable band; the JD's stack matches). Q3b adjacent (backend fintech work — not on the systems axis but credibility-positive). Q4 moderate.
+
+Without Q5, this aggregates to A. With Q5: *"The JD states 'we are not able to offer visa sponsorship for this role'. The candidate's Graduate Visa expires August 2027; sponsorship is needed by that date to continue UK employment. The role is currently viable — applying now would mean working there from start to expiry — but no path to renew. The role is a 2-year window, not a sustained career move."*
+
+Verdict prose: *"The stack and seniority make this landable; the company is decent. The sponsorship gap caps the role as a 2-year credibility builder rather than a sustained career step. In the budget of 30 applications, this drops below roles with comparable strength that also sponsor; it makes the cut only if S/A-tier sponsor-capable options are thin."*
+
+Grade: B (not A) — the Q5 friction bit the verdict.
+
+### Example — B → C (Q3b off-axis bites despite Q2 strength)
+
+A role at a well-known consumer-fintech company. Q1 cleared (junior tier, no hard floor). Q2 strong (recognised brand, public engineering culture, established hiring pipeline). Q3a moderate (the JD names React and TypeScript; the candidate has these at Comfortable band via Image Browser and Aurix). Q3b: *"The role is pure frontend — the JD's day-1 responsibilities are 'build and maintain the Inbox web client', 'work in the React/Redux codebase', 'partner with designers on UI polish'. The candidate's frontend work in Image Browser and Aurix is incidental to those projects' actual purpose (ONNX inference search; trading backtest UI on a Rust core). Pure-frontend is off the candidate's career-axis."*
+
+Q4 moderate. Q5 clean.
+
+Without Q3b, this aggregates to B (Q2 strong + Q3a moderate + Q4/Q5 fine). With Q3b: *"Stack overlap is real but the role's substance is exactly the career-axis the candidate is trying to NOT build — pure-frontend specialist progression. Strong company name doesn't compensate; a brand on a frontend resume line still routes future opportunities toward more frontend, not toward systems engineering."*
+
+Verdict prose: *"The company name is the pull. The pushback is that the day-1 work is on the wrong career axis — credibility-building for a career trajectory the candidate is not on. In the budget of 30 applications, this does not make the cut: there are roles at lower-brand companies with on-axis work that are better moves."*
+
+Grade: C (not B) — Q3b's off-axis reading bit despite strong Q2.
+
+### Example — Risk acknowledged but does NOT bite (held at original tier)
+
+Same setup as the S → A example, but with a different Q3b reading. The role's JD specifies that the engineer will own the new high-throughput payment-routing service being built from scratch. Q3b: *"While the company is payments-platform, this specific role is the from-scratch high-throughput-routing greenfield work, not maintenance of the existing orchestration service. The candidate's lock-free / low-latency portfolio (Nyquestro matching engine, Cernio async pipelines) is directly on-axis with this work. The risk that the role could be reshuffled to maintenance work post-onboarding is real but small for a named-greenfield role at this stage."*
+
+Verdict: held at S — the named risk did not bite because Q3b's prose engaged with the risk and concluded it was small enough to not change the verdict. The pattern: risks bite when the Verdict prose names them as decisive; risks held when the Verdict prose names them but concludes their weight is small.
+
+The lesson the worked examples establish: **the Q3b slot is often where risks-vs-strengths get weighed.** Q3a and Q2 can be strong while Q3b names the career-axis pushback that drops the grade by one tier; Q5 can name a sponsorship or location friction that drops the grade by one tier. Either way, the Verdict slot is where the weighing happens explicitly in prose. A risk named only in a Q-slot and never engaged in the Verdict is risk-decoration; the grade then drifts upward by accident.
+
+---
+
 ## Worked Examples
 
 > [!important] Calibrate to the reasoning, not to the letter.
-> The letters in these examples are the OUTPUTS of the aggregation, not pre-set anchors that override the principle-based grading. Each worked example shows how Q1-Q5 reasoning + the §Step 3 anchor table produce the letter; the letter at the end of each example is the visible OUTCOME of that walk, not a calibration target for memorisation. Two roles that share a letter in this section are not necessarily "the same" — they reached that letter through different Q1-Q5 patterns. When grading a real job, do not pattern-match on the surface-similar worked example and copy its letter; run the candidate's actual Q1-Q5 reasoning against the §Step 3 anchor table and let the letter emerge from the aggregation.
+> The letters in these examples are the OUTPUTS of the structured Verdict reasoning, not pre-set anchors that override the prose-based grading. Each worked example shows how the Q1-Q5 prose + the Verdict prose produce the letter; the letter at the end of each example is the visible OUTCOME of that walk, not a calibration target for memorisation. Two roles that share a letter in this section are not necessarily "the same" — they reached that letter through different Q1-Q5 patterns. When grading a real job, do not pattern-match on the surface-similar worked example and copy its letter; run the candidate's actual Q1-Q5 prose, write the Verdict prose, and let the letter emerge from the Verdict.
+
+> [!note] Some of the examples below predate the structured-prose format and use verdict-label phrasing (e.g. "Q1 cleared-decisively", "real-headwind") in their aggregation lines. These are kept as historical worked-walks — the underlying reasoning is correct. New assessments must NOT use those labels; the Q1-Q5 slots are prose without enums, and the Verdict slot does the aggregation in prose. Treat the aggregation lines in the examples below as "what an older Verdict slot looked like"; write current Verdict slots in the new format described in §How to Grade a Job Step 3.
 
 ### Worked Aggregation: Graduate SWE, Infrastructure @ Cloudflare
 
