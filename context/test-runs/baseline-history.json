@@ -31,5 +31,27 @@
     "axis_g": 62.5,
     "axis_e": 80.4,
     "axis_f": 70
+  },
+  {
+    "run_id": "2026-05-18-1920-iter2-rep",
+    "composite": 70.4,
+    "axis_a": 75.4,
+    "axis_b": 33.2,
+    "axis_c": 87.7,
+    "axis_d": 87.9,
+    "axis_g": 60.2,
+    "axis_e": 78.7,
+    "axis_f": 70
+  },
+  {
+    "run_id": "2026-05-18-2030-rep2",
+    "composite": 65.0,
+    "axis_a": 66.1,
+    "axis_b": 31.3,
+    "axis_c": 77.8,
+    "axis_d": 79.6,
+    "axis_g": 51.5,
+    "axis_e": 78.4,
+    "axis_f": 70
   }
 ]

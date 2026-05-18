@@ -1,11 +1,11 @@
 {
-  "run_id": "2026-05-18-1920-iter2-rep",
-  "composite": 70.4,
-  "axis_a": 75.4,
-  "axis_b": 33.2,
-  "axis_c": 87.7,
-  "axis_d": 87.9,
-  "axis_g": 60.2,
-  "axis_e": 78.7,
+  "run_id": "2026-05-18-2200-iter3",
+  "composite": 77.1,
+  "axis_a": 93.6,
+  "axis_b": 39.2,
+  "axis_c": 94.2,
+  "axis_d": 95.6,
+  "axis_g": 59.8,
+  "axis_e": 87.3,
   "axis_f": 70
 }
