@@ -472,7 +472,8 @@ Reputation and selectivity are not the same axis; do not infer one from the othe
 > [!important] Calibrate to the reasoning, not to the letter.
 > The letters in these examples are the OUTPUTS of the structured Verdict reasoning, not pre-set anchors that override the prose-based grading. Each worked example shows how the Q1-Q5 prose + the Verdict prose produce the letter; the letter at the end of each example is the visible OUTCOME of that walk, not a calibration target for memorisation. Two roles that share a letter in this section are not necessarily "the same" — they reached that letter through different Q1-Q5 patterns. When grading a real job, do not pattern-match on the surface-similar worked example and copy its letter; run the candidate's actual Q1-Q5 prose, write the Verdict prose, and let the letter emerge from the Verdict.
 
-> [!note] Some of the examples below predate the structured-prose format and use verdict-label phrasing (e.g. "Q1 cleared-decisively", "real-headwind") in their aggregation lines. These are kept as historical worked-walks — the underlying reasoning is correct. New assessments must NOT use those labels; the Q1-Q5 slots are prose without enums, and the Verdict slot does the aggregation in prose. Treat the aggregation lines in the examples below as "what an older Verdict slot looked like"; write current Verdict slots in the new format described in §How to Grade a Job Step 3.
+> [!warning] The examples below are EXPLANATORY NARRATIONS, not Q-slot prose templates.
+> The headings "Q1 — Can they get it?", "Aggregation outcome", etc. are rubric-internal narration the rubric uses to walk a reader through how reasoning aggregates. They are NOT the Q-slot prose the agent writes when grading. The agent writes Q1 / Q2 / Q3a / Q3b / Q4 / Q5 / Verdict slot prose per the structured-prose format in `SKILL.md`, and **NEVER** copies the rubric's narration vocabulary into its own Q-slot prose. In particular, the agent's Q-slot prose never contains: `cleared decisively`, `cleared with friction`, `real headwind`, `hard fail`, `Q1 cleared`, `Q2 strong / moderate / weak`, `Q3 strong / moderate / weak`, `Q5 ✓`, arrow-shorthand `→ A` / `→ S` / `→ SS` / `→ B` / `→ C` / `→ F`, or any other label-pick or formula-shorthand. The rubric uses these tokens to teach; the agent expresses the same content as prose reasoning. Per Inviolable Rule 12, presence of any of these tokens in the agent's slot prose is a parse failure. Read the worked examples for the SHAPE of the reasoning (what makes a Q1 cleared, what makes a Q3b off-axis), not for the SURFACE TOKENS to copy.
 
 ### Worked Aggregation: Graduate SWE, Infrastructure @ Cloudflare
 
@@ -488,7 +489,7 @@ Reputation and selectivity are not the same axis; do not infer one from the othe
 
 **Dimensions confirm:** All critical and high-weight dimensions strong. No weaknesses.
 
-**Aggregation outcome: SS.** Every question has a strong answer. Dimensions confirm. The Rust + infrastructure + systems alignment with the strongest projects in the portfolio makes this a standout. Per the §Step 3 anchor table: Q1 cleared-decisively + all four Q2-Q5 strong → SS.
+**Aggregation outcome: SS.** Every question has a strong answer. Dimensions confirm. The Rust + infrastructure + systems alignment with the strongest projects in the portfolio makes this a standout. The candidate is in the realistic primary-target pool (Q1) AND all four refining questions land strong, so the aggregation lands at the top of the scale.
 
 ### Worked Aggregation: SDE-I, New Grad @ Amazon (reputable AND realistic)
 
@@ -506,7 +507,7 @@ This example exists to make the reputation × selectivity decoupling explicit. A
 
 **Dimensions confirm:** All critical and high-weight dimensions strong. Q1 cleared genuinely.
 
-**Aggregation outcome: SS.** Reputation is strong AND realistic conversion is strong. Per the §Step 3 anchor table: Q1 cleared-decisively + all four Q2-Q5 strong → SS. This is the load-bearing distinction the realism semantic exists to make: Amazon's wide-funnel grad pipeline + university acceptance breadth + standard-screen shape make Q1 genuinely cleared. Reputable does not mean hard. Compare with the Jane Street example immediately below — same FAANG-tier-or-above CV signal, opposite Q1 reading.
+**Aggregation outcome: SS.** Reputation is strong AND realistic conversion is strong. The candidate is in the realistic primary-target pool, and all four refining questions confirm in the absolute frame. This is the load-bearing distinction the realism semantic exists to make: Amazon's wide-funnel grad pipeline + university acceptance breadth + standard-screen shape put the candidate inside the genuine applicant pool. Reputable does not mean hard. Compare with the Jane Street example immediately below — same FAANG-tier-or-above CV signal, opposite Q1 reading.
 
 ### Worked Aggregation: Software Engineer @ Jane Street (London) (reputable BUT brutal)
 
@@ -522,7 +523,7 @@ This example exists to make the prestige-trap pattern visible. A reputable name 
 
 **Q5 — Practical constraints?** Solved. London, established Skilled Worker sponsorship.
 
-**Aggregation outcome: C.** Per the §Step 3 anchor table: Q1 real-headwind + any Q2-Q5 strength → C (prestige-trap aggregation, cannot reach above C). The firm's narrow-funnel pipeline filters on credentials the candidate does not have, the sub-1% conversion makes the application a lottery rather than a primary target. Through the §How to Grade a Job Step 3 aggregation, the Q1 headwind dominates: strong Q2 + strong Q3 + strong Q4 refine *which* below-the-line letter the role lands at, but cannot lift it back across the line into A or above. The aggregation lands at C — the lottery / Q1-headwind band where the application is worth firing only when the rest of the pipeline is thin enough that lottery tickets are worth the time cost. The fit assessment explicitly names the Q1 hiring-pattern signal so the grade is auditable.
+**Aggregation outcome: C.** The candidate is outside the realistic primary-target pool (Q1 reads as a real headwind on selectivity grounds), so the prestige-trap aggregation applies and the role cannot reach above C regardless of how strong Q2-Q4 read in the absolute frame. The firm's narrow-funnel pipeline filters on credentials the candidate does not have, the sub-1% conversion makes the application a lottery rather than a primary target. Through the §How to Grade a Job Step 3 aggregation, the Q1 headwind dominates: strong Q2 + strong Q3 + strong Q4 refine *which* below-the-line letter the role lands at, but cannot lift it back across the line into A or above. The aggregation lands at C — the lottery band where the application is worth firing only when the rest of the pipeline is thin enough that lottery tickets are worth the time cost. The fit assessment explicitly names the Q1 hiring-pattern signal so the grade is auditable.
 
 The contrast with the Amazon example above is the load-bearing point of this rubric's aggregation semantic: same FAANG-or-above CV signal in both, but Amazon's wide-funnel pipeline genuinely accepts the candidate's profile shape (Q1 cleared, aggregates to SS) while Jane Street's narrow-funnel pipeline filters on credentials and pedigree the candidate does not have (Q1 a real headwind, aggregates to C despite identical Q2/Q3/Q4 strength). Reputation and selectivity are independent axes; do not conflate them. The aggregation handles the rest.
 
@@ -538,13 +539,13 @@ The contrast with the Amazon example above is the load-bearing point of this rub
 
 **Q5 — Practical constraints?** All solved. London, guaranteed sponsor, established hiring.
 
-**Aggregation outcome: A.** Per the §Step 3 anchor table: Q1 cleared-decisively + Q2 strong + Q3 moderate + Q4 moderate + Q5 strong → A (cleared-decisively + Q2 strong + at least one Q3/Q4 with notable weakness). The brand signal + sponsorship + engineering depth make this solidly A despite the tech stack and domain being adjacent rather than core.
+**Aggregation outcome: A.** The candidate is genuinely in the applicant pool (Q1), the firm's brand signal is real (Q2), the stack overlap is partial rather than direct (Q3), the work is real-engineering-but-not-passion (Q4), and the practical constraints are clean (Q5). The brand signal + sponsorship + engineering depth make this solidly A despite the tech stack and domain being adjacent rather than core.
 
 ### Worked Aggregation: Graduate Backend Engineer @ a mid-tier UK fintech (landable-but-mediocre)
 
 This example exists to make the landable-but-mediocre case explicit. The aggregation in Step 3 produces B for roles where Q1 is genuinely cleared but Q2-Q4 collectively land in the lower-quality band. These roles previously drifted to C under the old "achievable but limited career value" framing; the revised aggregation keeps them at B, where they belong as backup applications worth firing when the SS/S/A pipeline is thin.
 
-**Q1 — Can they get it?** Yes, cleared decisively. The role is a graduate programme at a 200-person UK fintech with a structured intake, no specific university filter, screens on standard algorithmic-interview competence. The description states verbatim "open to graduates from any 2:2-and-above degree" — the candidate's degree class clears the gate. Realistic conversion is non-trivial; the firm hires ~10 graduates per cycle from a pool of a few hundred applicants.
+**Q1 — Can they get it?** Yes. The role is a graduate programme at a 200-person UK fintech with a structured intake, no specific university filter, screens on standard algorithmic-interview competence. The description states verbatim "open to graduates from any 2:2-and-above degree" — the candidate's degree class clears the gate. Realistic conversion is non-trivial; the firm hires ~10 graduates per cycle from a pool of a few hundred applicants. The candidate is in the realistic primary-target pool.
 
 **Q2 — Good first CV line?** Moderate. The fintech is recognised within the UK payments industry but not a household name; "Graduate Backend Engineer at [B-tier fintech]" opens doors at adjacent fintech firms but does not carry the broad credential signal of a FAANG / top-tier line.
 
@@ -556,13 +557,13 @@ This example exists to make the landable-but-mediocre case explicit. The aggrega
 
 **Aggregation.** Q1 is cleared, so the role is in the landable band. Q2-Q4 are collectively in the "decent on most dimensions, no single weakness that downgrades to C, no single strength that elevates to A" zone — moderate CV value, adjacent stack, moderate engagement. The aggregation lands at B: a landable backup application worth firing when the SS/S/A pipeline is thin, not a top priority but not a dismissal either.
 
-**Aggregation outcome: B.** Per the §Step 3 anchor table: Q1 cleared-decisively + Q2 moderate + Q3 moderate + Q4 moderate + Q5 strong → A or B per which side dominates (here B, because the moderate Q2-Q4 collectively outweighs the single strong Q5). The role is genuinely landable AND genuinely mediocre on quality; B captures both. Compare with the Monzo example above (also A) — Monzo's "Software Engineer at a strong-brand UK fintech" Q2 signal is enough to lift it to A; this role's lesser-known fintech Q2 signal is not, and the aggregation correctly separates them. The contrast also makes the rubric's landability-first aggregation visible: both roles clear Q1, but Q2-Q4 differentiate the letter within the Q1-cleared band.
+**Aggregation outcome: B.** The candidate is in the applicant pool (Q1) and the practical constraints are clean (Q5), but the CV value, stack overlap, and work engagement are all merely moderate, with no single strength compelling enough to lift the role into A. Here B is the right landing because the moderate Q2-Q4 collectively outweighs the single strong Q5. The role is genuinely landable AND genuinely mediocre on quality; B captures both. Compare with the Monzo example above (A) — Monzo's "Software Engineer at a strong-brand UK fintech" Q2 signal is enough to lift it to A; this role's lesser-known fintech Q2 signal is not, and the aggregation correctly separates them. The contrast also makes the rubric's landability-first aggregation visible: both roles are in their primary-target pool, but Q2-Q4 differentiate the letter within the landable band.
 
 ### Worked Aggregation: Senior Staff Platform Engineer @ Unknown Corp
 
 **Q1 — Can they get it?** No. Description requires "8+ years of production experience, led platform teams of 5+, principal-level architecture ownership." Hard seniority mismatch per `experience.md`.
 
-**Aggregation outcome: F.** Per the §Step 3 anchor table: Q1 hard-fail → F (any Q2-Q5 profile). Question 1 fails decisively; no other questions matter.
+**Aggregation outcome: F.** Q1 fails on an explicit credential floor — the seniority gap is unconditional and no refinement from Q2-Q5 can lift it. Question 1 fails decisively; no other questions matter.
 
 ### Worked Aggregation: "Software Engineer" @ Well-funded Startup — Actually Solutions Engineering
 
@@ -576,7 +577,7 @@ This example exists to make the landable-but-mediocre case explicit. The aggrega
 
 **Q5 — Practical constraints?** Fails. Customer-facing roles are a hard exclusion in `preferences.toml`.
 
-**Aggregation outcome: F.** Q5 hard exclusion triggered (customer-facing role type per `preferences.toml`). Per the §Step 3 anchor table: Q5 hard-fail produces F regardless of Q2-Q4 strength. Title said "Software Engineer" but description reveals solutions engineering.
+**Aggregation outcome: F.** Q5 hard exclusion triggered (customer-facing role type per `preferences.toml`). The role-type exclusion is unconditional — no Q2-Q4 strength can override it. Title said "Software Engineer" but description reveals solutions engineering.
 
 ---
 
@@ -612,7 +613,7 @@ The aggregation Step 3 names Q1 as the primary lens; the fit assessment's narrat
 
 4. **Closing line: the grade letter and the one-sentence aggregation summary.** The summary connects the grade letter back to the Q1 verdict named in paragraph 1. If the grade is A or above, the closing sentence cites the Q1-cleared element; if the grade is B, C, or F, the closing sentence cites the Q1 headwind or hard exclusion.
 
-**Consistency obligation.** The grade letter is consistent with the Q1 verdict the narrative names. An assessment that opens with "Q1 is a real headwind — sub-1% conversion at this firm's narrow grad pipeline" cannot close at grade A or higher. An assessment that opens with "Q1 is cleared decisively — this firm's structured graduate intake hires hundreds per cycle from the candidate's degree band" cannot close at grade C or F unless Q5 names a hard exclusion (location, sector, role-type) that overrides everything else. When the letter contradicts the narrative, the grader re-runs Step 3 aggregation rather than reaching for a categorical override.
+**Consistency obligation.** The grade letter is consistent with the Q1 verdict the narrative names. An assessment that opens by naming a sub-1% conversion at the firm's narrow graduate pipeline cannot close at grade A or higher. An assessment that opens by naming the firm's wide-funnel structured graduate intake and the candidate's place inside that pool cannot close at grade C or F unless Q5 names a hard exclusion (location, sector, role-type) that overrides everything else. When the letter contradicts the narrative, the grader re-runs Step 3 aggregation rather than reaching for a categorical override.
 
 **Why this obligation exists.** The earlier audit identified that the grader's narrative could correctly diagnose a Q1 headwind ("prestige-trap, lottery, sub-1% conversion") while the letter still landed at A because A's previous definition explicitly permitted that split. The aggregation revision in §Grade Scale removed the permission. The narrative-structure obligation here makes the new aggregation visible to anyone reading the assessment — the user reviewing the grade, a future grader pulling calibration anchors, the `check-integrity` skill auditing stale assessments — so the grade letter cannot drift from the Q1 reasoning that produced it.
 
