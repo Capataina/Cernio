@@ -20,5 +20,16 @@
     "axis_g": 55.0,
     "axis_e": 67.2,
     "axis_f": 70
+  },
+  {
+    "run_id": "2026-05-18-1830-iter2",
+    "composite": 76.4,
+    "axis_a": 88.7,
+    "axis_b": 39.7,
+    "axis_c": 95.1,
+    "axis_d": 98.2,
+    "axis_g": 62.5,
+    "axis_e": 80.4,
+    "axis_f": 70
   }
 ]
