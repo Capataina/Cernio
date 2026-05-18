@@ -103,7 +103,11 @@ pub async fn probe(client: &reqwest::Client, slug: &str) -> Option<SlugProbeResu
 }
 
 /// Fetch all jobs from a SmartRecruiters board.
-/// Handles pagination (max 100 per page).
+/// Handles pagination (max 100 per page). After collecting the list, fetches
+/// each job's full description via the detail endpoint and populates the
+/// `description` field. Detail fetches are best-effort: a failure on one job
+/// leaves its description as None but does not fail the whole batch — same
+/// contract as workable / lever / ashby which embed descriptions inline.
 pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<AtsJob>, reqwest::Error> {
     let mut all_jobs = Vec::new();
     let mut offset: u64 = 0;
@@ -125,11 +129,21 @@ pub async fn fetch_all(client: &reqwest::Client, slug: &str) -> Result<Vec<AtsJo
         }
     }
 
+    // Populate descriptions via detail-endpoint fetches. SmartRecruiters'
+    // posting-list endpoint omits the description field entirely; the only
+    // way to get it is a per-job GET to /postings/{id}. Without this loop the
+    // raw_description column ends up NULL for every smartrecruiters job, and
+    // grade-jobs falls back to brand-only reasoning.
+    for job in all_jobs.iter_mut() {
+        if let Ok(Some(desc)) = fetch_detail(client, slug, &job.external_id).await {
+            job.description = Some(desc);
+        }
+    }
+
     Ok(all_jobs)
 }
 
 /// Fetch the full description for a single SmartRecruiters posting.
-#[allow(dead_code)]
 pub async fn fetch_detail(
     client: &reqwest::Client,
     slug: &str,

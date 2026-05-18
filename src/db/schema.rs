@@ -46,6 +46,7 @@ impl Database {
         self.migrate_004_add_last_searched_at()?;
         self.migrate_005_add_archived_at()?;
         self.migrate_006_add_application_packages()?;
+        self.migrate_007_drop_fit_score_add_insufficient_evidence()?;
         Ok(())
     }
 
@@ -286,6 +287,100 @@ impl Database {
         Ok(())
     }
 
+    /// Migration 007: Drop fit_score; add evidence_basis column.
+    ///
+    /// Why fit_score goes: numeric scores forced incommensurable role-types
+    /// onto a 1D ordering (graduate analyst and systems engineer at the same
+    /// score were treated as equivalent — they aren't). Grade letter +
+    /// structured fit_assessment carry differentiation now.
+    ///
+    /// Why evidence_basis arrives: grade-jobs should grade Google/Bloomberg/
+    /// FAANG graduate roles even when the JD couldn't be fetched, by
+    /// reasoning from company brand + role title (semantic-context grading).
+    /// We need to mark which path produced the grade so the user can filter
+    /// out unreliable evidence cases without losing brand-strong rows.
+    ///
+    /// Values written by the grade-jobs skill:
+    ///   'jd'           — JD text was used (default, most rows)
+    ///   'semantic'     — no JD; graded via company+title context reasoning
+    ///   'insufficient' — no JD AND no usable context; grade may be NULL
+    ///
+    /// Critical invariant: a row can have grade='SS' AND evidence_basis='semantic'
+    /// simultaneously. The TUI filter hides 'insufficient' by default but NEVER
+    /// filters 'semantic' rows out — that's where the Google grad-role grades live.
+    fn migrate_007_drop_fit_score_add_insufficient_evidence(&self) -> Result<()> {
+        let has_fit_score: bool = self
+            .conn
+            .prepare("SELECT fit_score FROM jobs LIMIT 0")
+            .is_ok();
+
+        let has_evidence_basis: bool = self
+            .conn
+            .prepare("SELECT evidence_basis FROM jobs LIMIT 0")
+            .is_ok();
+
+        if !has_fit_score && has_evidence_basis {
+            return Ok(());
+        }
+
+        // Add evidence_basis with a plain ADD COLUMN when possible.
+        if !has_evidence_basis {
+            self.conn.execute_batch(
+                "ALTER TABLE jobs ADD COLUMN evidence_basis TEXT
+                 CHECK (evidence_basis IS NULL OR evidence_basis IN ('jd','semantic','insufficient'));",
+            )?;
+        }
+
+        if has_fit_score {
+            // Drop fit_score via table rebuild (SQLite < 3.35 fallback).
+            self.conn.execute_batch("
+                PRAGMA foreign_keys = OFF;
+                DROP TABLE IF EXISTS jobs_new;
+                CREATE TABLE jobs_new (
+                    id                  INTEGER PRIMARY KEY,
+                    company_id          INTEGER NOT NULL REFERENCES companies(id),
+                    portal_id           INTEGER REFERENCES company_portals(id),
+                    title               TEXT NOT NULL,
+                    url                 TEXT NOT NULL UNIQUE,
+                    location            TEXT,
+                    remote_policy       TEXT,
+                    posted_date         TEXT,
+                    raw_description     TEXT,
+                    parsed_tags         TEXT,
+                    evaluation_status   TEXT NOT NULL DEFAULT 'pending'
+                                        CHECK (evaluation_status IN (
+                                            'pending', 'evaluating',
+                                            'strong_fit', 'weak_fit', 'no_fit',
+                                            'archived'
+                                        )),
+                    fit_assessment      TEXT,
+                    grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+                    discovered_at       TEXT NOT NULL,
+                    archived_at         TEXT,
+                    evidence_basis      TEXT CHECK (evidence_basis IS NULL OR evidence_basis IN ('jd','semantic','insufficient'))
+                );
+                INSERT INTO jobs_new (
+                    id, company_id, portal_id, title, url, location, remote_policy,
+                    posted_date, raw_description, parsed_tags, evaluation_status,
+                    fit_assessment, grade, discovered_at, archived_at, evidence_basis
+                )
+                SELECT id, company_id, portal_id, title, url, location, remote_policy,
+                       posted_date, raw_description, parsed_tags, evaluation_status,
+                       fit_assessment, grade, discovered_at, archived_at, evidence_basis
+                FROM jobs;
+                DROP TABLE jobs;
+                ALTER TABLE jobs_new RENAME TO jobs;
+                CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
+                CREATE INDEX IF NOT EXISTS idx_jobs_evaluation_status ON jobs(evaluation_status);
+                CREATE INDEX IF NOT EXISTS idx_jobs_grade ON jobs(grade);
+                CREATE INDEX IF NOT EXISTS idx_jobs_evidence_basis ON jobs(evidence_basis);
+                PRAGMA foreign_keys = ON;
+            ")?;
+        }
+
+        Ok(())
+    }
+
     /// Get a reference to the underlying connection.
     /// Used by other modules that need to run queries directly.
     pub fn conn(&self) -> &Connection {
@@ -354,12 +449,17 @@ CREATE TABLE IF NOT EXISTS jobs (
     parsed_tags         TEXT,
 
     evaluation_status   TEXT NOT NULL DEFAULT 'pending'
-                        CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit')),
+                        CHECK (evaluation_status IN (
+                            'pending', 'evaluating',
+                            'strong_fit', 'weak_fit', 'no_fit',
+                            'archived'
+                        )),
     fit_assessment      TEXT,
-    fit_score           REAL,
     grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+    evidence_basis      TEXT CHECK (evidence_basis IS NULL OR evidence_basis IN ('jd','semantic','insufficient')),
 
-    discovered_at       TEXT NOT NULL
+    discovered_at       TEXT NOT NULL,
+    archived_at         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS user_decisions (

@@ -79,7 +79,14 @@ pub async fn probe_with_extra(
     })
 }
 
-/// Fetch all jobs from a Workday board. Handles pagination.
+/// Fetch all jobs from a Workday board. Handles pagination, then enriches each
+/// posting with the full description via the per-job detail endpoint.
+///
+/// The list endpoint returns only short `bulletFields` (often empty), so without
+/// the detail-fetch pass every Workday job in the DB ends up with no usable
+/// description, which forces grade-jobs into semantic-only reasoning. Detail
+/// fetches are best-effort: a failure leaves the description at whatever the
+/// list endpoint returned (usually nothing) rather than failing the batch.
 pub async fn fetch_all_with_extra(
     client: &reqwest::Client,
     _slug: &str,
@@ -115,7 +122,52 @@ pub async fn fetch_all_with_extra(
         }
     }
 
+    // Best-effort detail enrichment: fetch the full description per job.
+    // The detail endpoint is:
+    //   {base}/{external_path}  where base is the same /wday/cxs/.../jobs prefix
+    // and external_path starts with '/'. The response shape varies by tenant;
+    // we look for `jobPostingInfo.jobDescription` as the most common field.
+    for job in all_jobs.iter_mut() {
+        let detail_url = format!("{url}{}", job.external_id);
+        if let Some(desc) = fetch_detail(client, &detail_url).await {
+            job.description = Some(desc);
+        }
+    }
+
     Ok(all_jobs)
+}
+
+/// Fetch a single job's full description from Workday's detail endpoint.
+/// Returns None on any failure (network error, missing field, parse error).
+/// The detail endpoint is a GET on `{base}/{externalPath}`.
+async fn fetch_detail(client: &reqwest::Client, url: &str) -> Option<String> {
+    let resp = client.get(url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    // Most Workday tenants put the HTML description at jobPostingInfo.jobDescription.
+    let html = v
+        .get("jobPostingInfo")?
+        .get("jobDescription")?
+        .as_str()?;
+    Some(strip_workday_html(html))
+}
+
+/// Minimal HTML strip — Workday descriptions are HTML fragments.
+fn strip_workday_html(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    // Collapse runs of whitespace.
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 // ── Normalisation ────────────────────────────────────────────────

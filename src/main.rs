@@ -240,7 +240,7 @@ fn cmd_unarchive(args: &[String]) {
                 // Unarchive all jobs — reset to pending for full re-grading.
                 conn.execute(
                     "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
-                     fit_assessment = NULL, fit_score = NULL,
+                     fit_assessment = NULL,
                      discovered_at = datetime('now'), archived_at = NULL
                      WHERE evaluation_status = 'archived'",
                     [],
@@ -276,7 +276,7 @@ fn cmd_unarchive(args: &[String]) {
             let jobs = conn
                 .execute(
                     "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
-                     fit_assessment = NULL, fit_score = NULL,
+                     fit_assessment = NULL,
                      discovered_at = datetime('now'), archived_at = NULL
                      WHERE evaluation_status = 'archived'",
                     [],

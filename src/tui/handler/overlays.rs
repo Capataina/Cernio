@@ -174,6 +174,7 @@ fn filter_set_mut<'a>(
         FilterAxis::Decision => &mut app.filters.decisions,
         FilterAxis::Package => &mut app.filters.package,
         FilterAxis::Archive => &mut app.filters.archive,
+        FilterAxis::Evidence => &mut app.filters.evidence,
     }
 }
 

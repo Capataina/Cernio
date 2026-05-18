@@ -331,14 +331,6 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    if let Some(score) = j.fit_score {
-        lines.push(detail_row(
-            t,
-            "Fit Score",
-            Span::raw(format!("{score:.1}")),
-        ));
-    }
-
     // ── Fit Assessment ──
     if let Some(assessment) = &j.fit_assessment {
         lines.push(Line::from(""));

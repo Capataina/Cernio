@@ -284,6 +284,7 @@ fn active_set_for<'a>(app: &'a App, axis: FilterAxis) -> &'a std::collections::H
         FilterAxis::Decision => &app.filters.decisions,
         FilterAxis::Package => &app.filters.package,
         FilterAxis::Archive => &app.filters.archive,
+        FilterAxis::Evidence => &app.filters.evidence,
     }
 }
 

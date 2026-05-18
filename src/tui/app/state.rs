@@ -87,8 +87,8 @@ pub struct JobRow {
     pub posted_date: Option<String>,
     pub evaluation_status: String,
     pub fit_assessment: Option<String>,
-    pub fit_score: Option<f64>,
     pub grade: Option<String>,
+    pub evidence_basis: Option<String>,
     pub raw_description: Option<String>,
     pub decision: Option<String>,
     pub has_package: bool,
@@ -159,18 +159,32 @@ pub struct JobFilters {
     /// Archive filter — "archived" / "active". Default {"active"} preserves
     /// the historical hide-archived-by-default behaviour.
     pub archive: HashSet<String>,
+    /// Evidence-basis filter — "jd" / "semantic" / "insufficient". Empty = all.
+    /// 'jd' = grade derived from JD content; 'semantic' = grade from company+
+    /// title reasoning when JD missing; 'insufficient' = could not grade at all.
+    /// Default {"jd","semantic"} hides only the truly-ungradable rows but keeps
+    /// semantically-graded brand-strong roles visible.
+    pub evidence: HashSet<String>,
 }
 
 impl Default for JobFilters {
     fn default() -> Self {
         let mut archive = HashSet::new();
         archive.insert("active".to_string());
+        let mut evidence = HashSet::new();
+        evidence.insert("jd".to_string());
+        evidence.insert("semantic".to_string());
+        // 'insufficient' deliberately omitted from the default set so genuinely-
+        // ungradable rows are hidden by default. 'semantic' is included so
+        // brand-strong grad-role grades (e.g. Google SS via context reasoning)
+        // remain visible.
         Self {
             grades: HashSet::new(),
             ats: HashSet::new(),
             decisions: HashSet::new(),
             package: HashSet::new(),
             archive,
+            evidence,
         }
     }
 }
@@ -183,6 +197,7 @@ impl JobFilters {
             + self.decisions.len()
             + self.package.len()
             + self.archive.len()
+            + self.evidence.len()
     }
 
     /// Returns true iff every axis is at its default state.
@@ -193,6 +208,9 @@ impl JobFilters {
             && self.package.is_empty()
             && self.archive.len() == 1
             && self.archive.contains("active")
+            && self.evidence.len() == 2
+            && self.evidence.contains("jd")
+            && self.evidence.contains("semantic")
     }
 
     /// Reset every axis to default.
@@ -207,6 +225,7 @@ impl JobFilters {
         self.decisions.clear();
         self.package.clear();
         self.archive.clear();
+        self.evidence.clear();
     }
 }
 
@@ -219,15 +238,17 @@ pub enum FilterAxis {
     Decision,
     Package,
     Archive,
+    Evidence,
 }
 
 impl FilterAxis {
-    pub const ALL: [FilterAxis; 5] = [
+    pub const ALL: [FilterAxis; 6] = [
         FilterAxis::Grade,
         FilterAxis::Ats,
         FilterAxis::Decision,
         FilterAxis::Package,
         FilterAxis::Archive,
+        FilterAxis::Evidence,
     ];
 
     pub fn label(self) -> &'static str {
@@ -237,6 +258,7 @@ impl FilterAxis {
             FilterAxis::Decision => "Decision",
             FilterAxis::Package => "Package",
             FilterAxis::Archive => "Archive",
+            FilterAxis::Evidence => "Evidence",
         }
     }
 
@@ -256,6 +278,7 @@ impl FilterAxis {
             FilterAxis::Decision => &["applied", "watching", "interview", "rejected", "none"],
             FilterAxis::Package => &["prepared", "not-prepared"],
             FilterAxis::Archive => &["archived", "active"],
+            FilterAxis::Evidence => &["jd", "semantic", "insufficient"],
         }
     }
 }

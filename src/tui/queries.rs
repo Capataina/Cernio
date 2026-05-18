@@ -160,16 +160,38 @@ pub fn fetch_jobs(
         _ => String::new(),
     };
 
+    // ── Evidence axis ──
+    // Empty set = no filter (show all). Otherwise show only rows whose
+    // evidence_basis is in the set. NULL is treated as 'jd' for back-compat
+    // with rows graded before evidence_basis existed.
+    let evidence_filter = if filters.evidence.is_empty() {
+        String::new()
+    } else {
+        let mut vals: Vec<&str> = filters.evidence.iter().map(|s| s.as_str()).collect();
+        vals.sort();
+        let quoted = vals
+            .iter()
+            .map(|v| format!("'{}'", v))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut clause = format!(" AND j.evidence_basis IN ({quoted})");
+        if filters.evidence.contains("jd") {
+            // Treat legacy NULL rows as 'jd' so pre-migration grades remain visible.
+            clause = format!(" AND (j.evidence_basis IN ({quoted}) OR j.evidence_basis IS NULL)");
+        }
+        clause
+    };
+
     let base = format!("
         SELECT j.id, j.company_id, c.name, j.title, j.url, j.location,
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
-               j.fit_score, j.grade, j.raw_description,
+               j.grade, j.evidence_basis, j.raw_description,
                (SELECT ud.decision FROM user_decisions ud
                 WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1),
                (SELECT 1 FROM application_packages ap WHERE ap.job_id = j.id) IS NOT NULL
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}");
+        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "
@@ -200,8 +222,8 @@ pub fn fetch_jobs(
             posted_date: row.get(7)?,
             evaluation_status: row.get(8)?,
             fit_assessment: row.get(9)?,
-            fit_score: row.get(10)?,
-            grade: row.get(11)?,
+            grade: row.get(10)?,
+            evidence_basis: row.get(11)?,
             raw_description: row.get(12)?,
             decision: row.get(13)?,
             has_package: row.get::<_, bool>(14).unwrap_or(false),
