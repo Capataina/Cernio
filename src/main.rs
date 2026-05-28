@@ -156,18 +156,111 @@ fn cmd_stats() {
     println!();
     println!("  Jobs:       {total_jobs} total");
     println!("    pending:  {pending_jobs}  graded: {graded_jobs}");
+    println!();
+
+    // Lane-aware breakdown — added by the lane-based-relativity refactor
+    // (cernio-full-refactor.md §6). Companies and jobs that carry the new
+    // lanes column are surfaced here per lane. NULL-lanes rows (un-tagged)
+    // get summed into the "(untagged)" row.
+    let mut company_lanes: Vec<(String, i64)> = conn
+        .prepare("SELECT COALESCE(lanes, '(untagged)') AS l, COUNT(*) FROM companies GROUP BY l ORDER BY 2 DESC")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+    company_lanes.retain(|(_l, c)| *c > 0);
+
+    let mut job_lanes: Vec<(String, i64)> = conn
+        .prepare("SELECT COALESCE(lanes, '(untagged)') AS l, COUNT(*) FROM jobs GROUP BY l ORDER BY 2 DESC")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+    job_lanes.retain(|(_l, c)| *c > 0);
+
+    let sponsor_yes: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM companies WHERE sponsors_uk = 'yes'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let sponsor_unknown: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM companies WHERE sponsors_uk = 'unknown' OR sponsors_uk IS NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    if !company_lanes.is_empty() {
+        println!("  Companies per lane:");
+        for (l, c) in &company_lanes {
+            println!("    {l:<32} {c}");
+        }
+        println!();
+    }
+
+    if !job_lanes.is_empty() {
+        println!("  Jobs per lane:");
+        for (l, c) in &job_lanes {
+            println!("    {l:<32} {c}");
+        }
+        println!();
+    }
+
+    println!("  Sponsor status:");
+    println!("    sponsors_uk='yes':    {sponsor_yes}");
+    println!("    sponsors_uk=unknown:  {sponsor_unknown}");
 }
 
 /// Show pending (ungraded) jobs.
+///
+/// Flags:
+///   --count            Print only the count (no per-row listing)
+///   --lane <key>       Filter to jobs/companies tagged with the given lane
+///                      (e.g. `cernio pending --lane hft`)
+///   --sponsor-only     Restrict to companies with sponsors_uk = 'yes'
+///                      (default behaviour post-refactor, but the flag is
+///                      retained for explicitness)
 fn cmd_pending(args: &[String]) {
     let db = open_db();
     let conn = db.conn();
 
     let count_only = args.iter().any(|a| a == "--count");
+    let sponsor_only = args.iter().any(|a| a == "--sponsor-only");
+
+    // --lane <key> filter — added by the lane-based-relativity refactor
+    // (cernio-full-refactor.md §6). Filters jobs whose `lanes` JSON array
+    // contains the requested lane key.
+    let lane_filter: Option<String> = args
+        .iter()
+        .position(|a| a == "--lane")
+        .and_then(|i| args.get(i + 1).cloned());
+
+    let lane_clause = match &lane_filter {
+        Some(lane) => format!(" AND j.lanes LIKE '%\"{}\"%'", lane.replace("'", "''")),
+        None => String::new(),
+    };
+    let sponsor_clause = if sponsor_only {
+        " AND c.sponsors_uk = 'yes'"
+    } else {
+        ""
+    };
 
     let pending: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM jobs WHERE grade IS NULL",
+            &format!(
+                "SELECT COUNT(*) FROM jobs j
+                 JOIN companies c ON c.id = j.company_id
+                 WHERE j.grade IS NULL{lane_clause}{sponsor_clause}"
+            ),
             [],
             |r| r.get(0),
         )
@@ -178,31 +271,39 @@ fn cmd_pending(args: &[String]) {
         return;
     }
 
-    println!("{pending} jobs pending grading\n");
+    let filter_desc = match (&lane_filter, sponsor_only) {
+        (Some(l), true) => format!(" (lane={l}, sponsor-only)"),
+        (Some(l), false) => format!(" (lane={l})"),
+        (None, true) => " (sponsor-only)".to_string(),
+        (None, false) => String::new(),
+    };
+    println!("{pending} jobs pending grading{filter_desc}\n");
 
     if pending > 0 {
-        let mut stmt = conn
-            .prepare(
-                "SELECT j.title, c.name, c.grade
-                 FROM jobs j
-                 JOIN companies c ON c.id = j.company_id
-                 WHERE j.grade IS NULL
-                 ORDER BY
-                     CASE c.grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 ELSE 4 END,
-                     c.name, j.title
-                 LIMIT 50",
-            )
-            .expect("failed to prepare");
+        let sql = format!(
+            "SELECT j.title, c.name, c.grade, j.lanes
+             FROM jobs j
+             JOIN companies c ON c.id = j.company_id
+             WHERE j.grade IS NULL{lane_clause}{sponsor_clause}
+             ORDER BY
+                 CASE c.grade WHEN 'S' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 ELSE 4 END,
+                 c.name, j.title
+             LIMIT 50"
+        );
+        let mut stmt = conn.prepare(&sql).expect("failed to prepare");
 
-        let rows: Vec<(String, String, Option<String>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        let rows: Vec<(String, String, Option<String>, Option<String>)> = stmt
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
             .expect("failed to query")
             .filter_map(|r| r.ok())
             .collect();
 
-        for (title, company, grade) in &rows {
+        for (title, company, grade, lanes) in &rows {
             let g = grade.as_deref().unwrap_or("—");
-            println!("  [{g}] {title} @ {company}");
+            let l = lanes.as_deref().unwrap_or("[]");
+            println!("  [{g}] {title} @ {company} · {l}");
         }
 
         if pending > 50 {

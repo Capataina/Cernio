@@ -69,6 +69,7 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         Cell::from("Status"),
         Cell::from("Jobs"),
         Cell::from("ATS"),
+        Cell::from("Lanes"),
     ])
     .style(t.header)
     .height(1);
@@ -102,12 +103,34 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                     "—"
                 });
 
+            // Lane column — display the JSON array as a compact, comma-separated
+            // list of lane keys for the lane-aware grading semantic per
+            // cernio-full-refactor.md §7. Strips JSON brackets and quotes for
+            // visual density; truncates long multi-lane lists.
+            let lanes_display = match c.lanes.as_deref() {
+                Some(raw) => {
+                    let cleaned: String = raw
+                        .replace(['[', ']', '"'], "")
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    if cleaned.len() > 22 {
+                        format!("{}…", &cleaned[..21])
+                    } else {
+                        cleaned
+                    }
+                }
+                None => "—".to_string(),
+            };
+
             let mut row = Row::new(vec![
                 Cell::from(format!("{}{grade:<2}", if is_multi { "▪" } else { " " })).style(grade_style),
                 Cell::from(c.name.as_str()),
                 Cell::from(c.status.as_str()).style(status_style),
                 Cell::from(jobs_display),
                 Cell::from(ats),
+                Cell::from(lanes_display),
             ]);
             if is_multi {
                 row = row.style(Style::default().fg(Color::Cyan));
@@ -122,6 +145,7 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Length(10),
         Constraint::Length(8),
         Constraint::Length(14),
+        Constraint::Length(24),  // lanes column — wide enough for multi-tag
     ];
 
     let highlight = if focused {

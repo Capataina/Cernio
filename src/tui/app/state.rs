@@ -73,6 +73,12 @@ pub struct CompanyRow {
     pub ats_slug: Option<String>,
     pub job_count: i64,
     pub fit_count: i64,
+    /// Lane tags for the company per the lane-based-relativity refactor
+    /// (cernio-full-refactor.md §3 + migration_008). JSON array stored
+    /// in the DB as TEXT; displayed compactly in the TUI companies view.
+    /// None means the company has no lane tag yet (should be rare post-
+    /// migration; cernio clean deletes no-lane companies).
+    pub lanes: Option<String>,
 }
 
 #[allow(dead_code)]

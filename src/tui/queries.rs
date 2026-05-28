@@ -13,7 +13,8 @@ pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow
                 WHERE p.company_id = c.id AND p.is_primary = 1 LIMIT 1),
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id),
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id
-                AND j.grade IN ('SS', 'S', 'A'))
+                AND j.grade IN ('SS', 'S', 'A')),
+               c.lanes
         FROM companies c
         {archive_filter}
         ORDER BY
@@ -45,6 +46,7 @@ pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow
             ats_slug: row.get(12)?,
             job_count: row.get(13)?,
             fit_count: row.get(14)?,
+            lanes: row.get(15)?,
         })
     })
     .map(|rows| rows.filter_map(|r| r.ok()).collect())
