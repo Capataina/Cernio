@@ -12,6 +12,37 @@ description: "Expands the Cernio company universe via parallel subagents (one pe
 > 2. **Sponsor-only filter**: verify each discovered company sponsors UK Skilled Worker (Gov.uk Skilled Worker register OR direct careers-page evidence). Non-sponsors dropped before import — never enter the DB.
 > 3. **Reads `profile/career-goals.md`** for the 8 active lanes and sponsor rule.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Per-lane parallel discovery
+
+- Input: existing universe (companies table) for dedup + 8 active lanes from career-goals.md
+- Process: 8 parallel Opus background agents (one per active lane)
+- Per-agent context includes verbatim:
+  - The lane key + role-shape description
+  - Lane-specific source heuristics (HFT: prop-trading registries, kdb+/q job boards, low-latency conference sponsors. Crypto MM: on-chain DEX maker backtracing, crypto-conference sponsors. AI/ML: AI Safety org lists, arXiv-affiliated startups, accelerator demo days. Bank Strats: bank careers pages, e-trading vendor partnerships, alumni LinkedIn patterns. Systems/Infra: OSS-foundation sponsor lists, DB-vendor directories. Devtools: HN Show HN tracking, YC devtools cohorts. Fintech: UK fintech accelerator graduates, FCA-authorised firm lists. Big-Tech: established sources)
+  - The existing universe (skip-list) for dedup
+  - The visa + location constraints from profile/career-goals.md
+- Each agent writes findings to `companies/discovery-{lane}-{date}.md` (markdown table)
+
+### Phase 2 — Sponsor verification + dedup
+
+- Input: discovery markdown files from Phase 1
+- Process: orchestrator + verification subagents
+- Per candidate company:
+  - Cross-check against Gov.uk Skilled Worker sponsor register
+  - Verify careers-page evidence (jobs page mentions sponsorship, or open visa-required positions)
+  - Dedup against existing companies.name + companies.website
+- Drop non-sponsors entirely (don't import into DB)
+- Mark verified-yes vs verified-unknown (cernio resolve fallback for unknowns)
+
+### Phase 3 — Import + cascade to populate-db
+
+- Bulk INSERT validated companies into companies table with status='potential'
+- Set lanes, sponsors_uk fields at import time
+- Cascade to populate-db skill (cernio resolve + AI fallback for ATS slug resolution)
+- After resolution, cascade to grade-companies Phase 1+2 for lane + pinnacle assignment
+
 Expands the Cernio company universe. Mass-market aggregators surface the same obvious names to everyone; this skill finds the 60-person startup doing brilliant infrastructure work, the company that just raised a Series B and is hiring its first engineers in a profile-aligned niche, the firm whose engineering blog describes exactly the kind of work the profile's flagship projects demonstrate. The universe is the foundation of every downstream step — the quality of companies tracked determines the quality of jobs found, evaluations written, and applications prepared.
 
 Discovery runs parallel subagents by territory. One agent per sector (territories derived from the profile on this invocation, not a hardcoded list) plus one agent dedicated to non-obvious sources (source-type territory: VC portfolios, OSS contributors, conference sponsors, engineering blog rolls). Each agent reads the profile, receives the existing universe for deduplication, performs real web searches, and writes its finds to its own file. The orchestrator imports the files and the DB's unique website-URL constraint handles dedup.

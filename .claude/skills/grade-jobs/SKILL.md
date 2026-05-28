@@ -14,6 +14,54 @@ description: "Grades ungraded jobs in the Cernio DB against the profile using a 
 > 4. **Realism semantic preserved**: brand alone never determines grade. SS still requires Q1-cleared-decisively + strong Q2-Q5. Pinnacle-of-lane firms with narrow pipelines cap at A-stretch. Phase 2 cross-check compares on combined Q1-Q5 evidence, never on pinnacle status alone.
 > 5. **Reads `profile/career-goals.md`** for the 8 active lanes (`big-tech`, `ai-ml`, `hft`, `crypto-mm`, `bank-strats`, `systems-infra`, `devtools`, `fintech`) and the hard rules.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Initial parallel grading
+
+- Input: all jobs where `grade IS NULL` (or all jobs if --regrade flag passed)
+- Process: 10–20 parallel Opus agents, each handling ~50 jobs
+- Per agent:
+  - Read JD via WebFetch; fall back to semantic reasoning if JD unavailable
+  - Read parent company record (sponsors_uk, lanes, pinnacle_status_per_lane)
+  - Read profile/career-goals.md for active lanes + hard rules
+  - Read profile/skills/* per-group files for evidence
+  - Assign job lanes (multi-tag JSON array; primary lane first)
+  - Q1 — Lane assignment + JD-quoted reasoning
+  - Q2 — Role-truth-at-hire (function locked at hire? auto-downgrade cross-function-transition hopes per career-goals.md)
+  - Q3 — Within-lane pinnacle position (read company's pinnacle_status_per_lane)
+  - Q4 — Profile fit within lane (cite specific project anchors from profile/skills/)
+  - Q5 — Visa + soft-preference (sponsors_uk check, Tier 1/2/3 location, office-frequency)
+  - Initial grade SS/S/A/B/C/F **lane-relative to the primary lane**
+- Output: job rows with lanes, grade, fit_assessment (Q1–Q5 + Verdict prose), evidence_basis
+
+### Phase 2 — Within-lane relativity cross-check
+
+- Input: all jobs graded in Phase 1, grouped by primary lane
+- Process: ~10 parallel agents, each pulls a random sample of ~100 jobs from across lanes
+- Per agent:
+  - Compare within-lane pairs: do similar-pinnacle-position roles have similar grades?
+  - Apply realism semantic guard: pinnacle status alone never determines grade; combined Q1–Q5 evidence does
+  - Adjust grades where peers diverge without justified reason
+  - Do NOT collapse to pinnacle-only scoring
+- Output: refined grades, drift-corrected within-lane
+
+### Phase 3 — Per-lane portfolio-gaps regeneration
+
+- Input: all jobs in DB, grouped by primary lane
+- Process: 8 parallel agents (one per active lane)
+- Per agent:
+  - Read all jobs in lane
+  - Extract patterns: what the lane wants that the profile lacks; what the profile has that the lane explicitly values
+  - **Rewrite `profile/portfolio-gaps/<lane>.md` in place** with: open gaps, confirmed strengths, closure prescriptions, pinnacle-relevant evidence, lane-internal calibration notes
+- Final coordinator agent: rewrite `profile/portfolio-gaps/_Overview.md`
+- Closed gaps move to `profile/portfolio-gaps/closed.md` with closure-date stamp and lane tag
+
+### Phase 4 — Verification + commit
+
+- `cernio check` lane + sponsor coherence
+- `cernio format` to normalise fit_assessment formatting
+- Commit summary with per-lane grade-distribution shift versus prior batch
+
 Grades individual jobs in the Cernio database. Company grading determines what gets searched; job grading determines what gets applied to. Every grade emerges from reasoning about this specific role for this specific candidate — the role's actual requirements (from the description, not the title), the candidate's flagship projects and technologies, the sponsorship timeline, and the calibration anchors already graded in the database.
 
 Grades are not permanent. They reflect the current profile state. When the profile changes — a new project, a closed gap, a shifted preference — prior grades become potentially stale and the `check-integrity` skill surfaces them for re-grading.

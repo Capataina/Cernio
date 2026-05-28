@@ -13,6 +13,35 @@ description: "Synchronises Cernio's profile/ folder from LifeOS as the canonical
 > 3. **NEVER touches `profile/portfolio-gaps/` folder** — that's maintained by `grade-jobs`.
 > 4. **Legacy `profile/skills.md`** (flat file) should be detected and migrated to the folder structure on next run, or surfaced as orphan if folder structure already exists.
 
+## Phased Structure for profile/skills/ Folder (canonical, post-refactor)
+
+The original 8-phase workflow (Phases 0–8 below) remains intact. Phase 4 (OSS aggregation) and Phase 5 (Skills derivation) are extended for the folder-structure target:
+
+### Phase 5 (extended) — Per-group skills folder generation
+
+Instead of writing a single `profile/skills.md`, the skills-derivation subagent now writes a folder:
+
+- `profile/skills/_Overview.md` — per-group taxonomy + lane-relevance map
+- `profile/skills/languages.md` — Programming Languages with per-skill project anchors
+- `profile/skills/frameworks.md` — Frameworks (Tauri, React, Bevy, Ratatui, etc.)
+- `profile/skills/libraries.md` — Libraries (rusqlite, serde, reqwest, etc.)
+- `profile/skills/engines-runtimes.md` — Engines + runtimes (ONNX, Bevy ECS, SQLite WAL, Ollama, etc.)
+- `profile/skills/tools-platforms.md` — Tools (Git/GitHub, Cargo, CMake, pnpm, etc.)
+- `profile/skills/concepts-domains.md` — Cross-cutting concepts (lock-free, DeFi microstructure, ECS, etc.)
+- `profile/skills/methodologies-soft.md` — Methodologies + soft skills
+
+The group split is canonical because per-lane would duplicate (Rust appears in 5 lanes). The skills-derivation agent reads project files and bins each skill into the appropriate group with project-anchor evidence inline. Lane relevance is annotated in `_Overview.md`, not in per-skill rows.
+
+### Phase 5 output contract
+
+Each group file has frontmatter (`title`, `parent`, `last_updated`) and inherits the table format from the legacy skills.md. The agent returns:
+
+- Output paths (8 files)
+- Per-project evidence block (path | line count | verbatim last line)
+- Per-category band distribution
+
+Phase 8 summary lists each group file in the diff summary.
+
 > [!important] Read this entire file before starting any work
 > Cernio doctrine requires reading every reference file in `references/` and every file in `profile/` (when referenced for evaluation tasks). For this skill specifically, also read `references/lifeos-source-map.md`, `references/project-synthesis-schema.md`, and `references/skills-derivation-rubric.md` end-to-end before Phase 0. The skill orchestrates parallel subagents and a final synthesis agent — incomplete reading means the dispatch prompts will be incomplete, which means the subagents work blind.
 

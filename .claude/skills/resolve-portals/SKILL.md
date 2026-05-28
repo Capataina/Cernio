@@ -10,6 +10,33 @@ description: "AI fallback for ATS portal resolution — handles companies the me
 >
 > 1. **Sponsor gate at entry**: do NOT spend AI compute resolving portals for companies where `sponsors_uk != 'yes'`. They shouldn't reach this skill anyway (filtered at discovery), but defensive double-check.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Sponsor gate
+
+- Filter input to companies with `sponsors_uk = 'yes'` or `'unknown'` (treat unknown as eligible for AI verification)
+- Companies with `sponsors_uk = 'no'` rejected with diagnostic
+
+### Phase 2 — Careers-page extraction
+
+- For each input company:
+  - Fetch careers page (typically `<website>/careers` or `<website>/jobs`)
+  - Look for embedded ATS iframe / link patterns
+  - Extract candidate ATS slug
+
+### Phase 3 — Verification against ATS API
+
+- For each extracted slug:
+  - Call provider's JSON API (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday)
+  - If returns valid response: mark status='resolved' with verified slug
+  - If returns 404: try alternative slug variants (hyphenated, lowercase, legal entity name)
+  - If exhausted: mark status='bespoke' with reason
+
+### Phase 4 — Output to populate-db
+
+- Return verified companies for INSERT into company_portals table
+- Bespoke companies surfaced for search-jobs Phase 3 (manual subagent search)
+
 AI fallback for companies the mechanical resolver could not match. Every company reaching this skill has already had its obvious slug variants probed — `{company-name}`, `{domain-without-tld}`, `{hyphenated-name}` — against every supported ATS. None returned valid results. The remaining cases need judgment: find the real careers page, inspect it for the actual ATS link, and verify the slug against the provider's JSON API.
 
 The skill's single output is a lifecycle transition: every target company moves from `potential` to either `resolved` (ATS found and verified) or `bespoke` (no supported ATS; careers URL preserved). Dead companies are surfaced with evidence and left for the user to decide.

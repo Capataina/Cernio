@@ -13,6 +13,34 @@ description: "Orchestrates full Cernio job-search — runs `cernio search` acros
 > 3. **Inserted jobs get `lanes` populated from the parent company's `lanes` array** as a default — Phase 1 of grade-jobs will refine to job-specific lanes if the role is multi-lane or differs.
 > 4. **No mention of `prepare-applications`** in the description or body anywhere — that skill was removed in this refactor.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Pre-filter to sponsor-only universe
+
+- Read companies table; restrict to `sponsors_uk = 'yes'`
+- Cross-reference profile/career-goals.md soft-preferences (location tiers, remote-acceptable rule)
+- Filter to companies with at least one active lane assignment
+- Output: target company list with per-company ats_provider/ats_slug
+
+### Phase 2 — Mechanical search via cernio search (Rust)
+
+- For each resolved-ATS company, invoke `cernio search --company <name>` (uses Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Workday fetchers)
+- Per-job insert with `INSERT OR IGNORE` on URL uniqueness
+- Tag inserted jobs with `lanes` inherited from parent company's `lanes` array
+
+### Phase 3 — Bespoke search via parallel subagents
+
+- For each bespoke company (those without ATS resolution): dispatch lane-context-aware subagent
+- Subagent prompt includes the company's `lanes` array + role-title heuristics per lane (HFT firm → "Quant Developer", "Low Latency Engineer"; Crypto MM → "DeFi Engineer", "Liquidity Engineer"; AI/ML → "Research Engineer", "ML Infrastructure"; etc.)
+- Subagent visits careers page + aggregators (LinkedIn, Indeed, BuiltIn London, Otta)
+- Returns job listings; orchestrator inserts via INSERT OR IGNORE with lane inheritance
+
+### Phase 4 — Handoff to grade-jobs
+
+- All newly-inserted jobs have `grade IS NULL` + `lanes` populated
+- Cascade to grade-jobs Phase 1 for initial lane-aware grading
+- Phase 2 within-lane relativity will follow once enough new jobs land
+
 End-to-end job-search orchestration. The Cernio company universe contains two structurally different classes of companies, and a complete job search covers both:
 
 1. **Resolved-ATS companies** (`status = 'resolved'` in the `companies` table) — companies with Greenhouse / Lever / Ashby / Workable / SmartRecruiters / Workday portals. These are handled by `cernio search`, the Rust pipeline's bulk fetcher. Mechanical: thousands of raw jobs fetched, filtered, deduplicated, inserted — in seconds.

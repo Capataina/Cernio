@@ -13,6 +13,47 @@ description: "Audits the Cernio SQLite database — runs `cernio check` + `cerni
 > 3. **Portfolio-gaps freshness**: instead of checking single `profile/portfolio-gaps.md`, walk `profile/portfolio-gaps/` folder; each per-lane file's last-update timestamp checked against the most recent grade-jobs run for that lane.
 > 4. **Per-lane staleness windows**: when profile changes, some lane-relevant judgments may be stale. Cross-check `relevance_updated_at` against profile mtime AND against the company's tagged lanes (a profile change to ML skills only affects companies tagged ai-ml, systems-infra).
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Mechanical (cernio check + cernio format)
+
+- Run `cernio check` (the existing Rust integrity checks: FK enforcement, CHECK constraints, idempotent migration, no orphans, etc.)
+- Run `cernio format` to normalise fit_assessment formatting
+- Cite per-check pass/fail count
+
+### Phase 2 — Profile-driven staleness
+
+- Compare profile/ mtimes (career-goals.md, skills/, projects/) against companies.relevance_updated_at and jobs.graded_at
+- Surface companies/jobs graded BEFORE the most recent material profile change
+- Recommend targeted re-grading where the profile change is lane-relevant
+
+### Phase 3 — Lane coherence check
+
+- Every company has non-empty `lanes` (count violations)
+- Every job's `lanes` ⊆ its company's `lanes`, or genuine subset intersection if multi-lane
+- Every active lane in `profile/career-goals.md` is tagged to ≥ N companies (sanity threshold)
+- Surface orphan jobs (job with lanes that don't intersect parent company's lanes)
+
+### Phase 4 — Sponsor coherence check
+
+- Every company has `sponsors_uk = 'yes'`
+- No `unknown` or NULL should persist past discovery + resolve
+- No `no` should exist (those should have been rejected at discovery)
+- Surface coherence violations for cleanup
+
+### Phase 5 — Portfolio-gaps folder freshness
+
+- For each per-lane file in `profile/portfolio-gaps/`, check last-update timestamp
+- Compare against the most recent grade-jobs batch that processed jobs in that lane
+- Surface stale per-lane files (>14 days since last grade-jobs Phase 3 touched them)
+- Update `profile/portfolio-gaps/_Overview.md` with the freshness summary
+
+### Phase 6 — Output summary
+
+- Per-phase pass/fail counts
+- Per-lane health summary (company count, job count, pinnacle distribution)
+- Surface coherence violations as actionable next-step items
+
 The Cernio database is a living system. Grades, fit assessments, and `why_relevant` fields written yesterday may be wrong today — a new flagship project in the profile, a shifted preference, an expanded skill set can silently invalidate prior judgments without altering any timestamp. Mechanical integrity checks catch schema-level and timestamp-level drift; this skill catches semantic drift — the class of staleness that only shows up when the profile is read alongside the grade reasoning.
 
 The skill runs in two modes. In report mode (default), it produces a prioritised findings list and stops — no DB writes. In remediation mode (triggered by the user saying "fix these" / "update these" / "regrade these"), it works through the findings with the user's explicit approval per fix, using the procedures in `references/remediation-guide.md` and the quality bars in `references/quality-standards.md`.

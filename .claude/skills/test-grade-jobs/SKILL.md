@@ -18,6 +18,44 @@ description: "Measures grade-jobs' own structural compliance + inter-agent consi
 > 
 > Baseline + iteration tracking continues; new baseline established post-refactor.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Sample selection
+
+- Pull stratified sample: N jobs across 8 lanes (e.g., 5 per lane × 8 = 40 jobs)
+- Stratification: 1 SS / 1 S / 1 A / 1 B / 1 C/F per lane to test full range
+- Cite job IDs + parent company lanes for reproducibility
+
+### Phase 2 — Parallel agent grading
+
+- Dispatch ~3 Opus agents to grade the same sample in parallel (independent prompts)
+- Each agent runs grade-jobs verbatim per its current SKILL.md
+- Collect 3-agent output per job for inter-agent variance measurement
+
+### Phase 3 — Seven-axis scoring
+
+Score the collected output:
+
+- **Axis A — Lane assignment correctness**: does each agent identify the correct primary lane?
+- **Axis B — Role-truth-at-hire detection**: does the rubric correctly auto-downgrade cross-function-transition roles?
+- **Axis C — Within-lane relative consistency**: do agents grade similar-pinnacle-position roles similarly within a single lane?
+- **Axis D — Cross-lane independence**: do HFT lane grades correlate with Fintech lane grades on shared agent runs? (correlation should be near zero — they're separate scales)
+- **Axis E — Sponsor-status accuracy**: does the grader respect company.sponsors_uk?
+- **Axis F — Phase 2 consistency-pass effectiveness**: does within-lane Phase 2 actually correct Phase 1 drift?
+- **Axis G — Q-slot structure adherence**: no hardcoded calibration anchors in slot prose, no banned-rubric-narration tokens
+
+### Phase 4 — Baseline + delta
+
+- Persist per-axis scores to `.claude/skills/test-grade-jobs/baseline.json`
+- Compare to prior baseline; cite regression direction per axis
+- If composite score drops > 5 points vs prior baseline: surface as regression alert
+
+### Phase 5 — Output
+
+- Markdown report per-axis with cited evidence
+- Baseline.json update
+- No DB writes (this is measurement-only)
+
 > [!important] Read this entire file before starting any work
 > The inviolable rules and the quality checklist are at the bottom. Do not begin Phase 1 (Setup) until every reference file in this skill has been read and every file under `.claude/skills/grade-jobs/` and `profile/` (except `portfolio-gaps.md` and `resume.pdf`) has been read end-to-end.
 

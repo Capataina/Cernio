@@ -16,6 +16,44 @@ description: "Grades ungraded companies in the Cernio database (S / A / B / C) a
 > 6. **No hardcoded calibration anchors.** Pinnacle ranking emerges from Phase 2 comparison, not from a hardcoded "Anthropic is SS-in-ai-ml" list.
 > 7. **Reads `profile/career-goals.md`** for the 8 active lanes and hard rules.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Initial parallel pass
+
+- Input: companies where `grade IS NULL` OR `lanes IS NULL` OR `sponsors_uk IS NULL`
+- Process: 15–20 parallel Opus agents, each handling ~30 companies
+- Per company per agent:
+  - Verify `sponsors_uk` via Gov.uk Skilled Worker register + careers-page check; if cannot verify, mark `unknown` for resolve fallback
+  - Assign `lanes` array from research (which of 8 lanes the company has teams in; multi-tag where genuine)
+  - Initial `pinnacle_status_per_lane` per tagged lane (pinnacle / strong / adjacent / borderline)
+  - Generalised employer `grade` (SS/S/A/B/C/F) — separate from per-lane positioning
+  - Prose `grade_reasoning` citing profile/career-goals.md + profile/skills/* evidence
+- Output: company rows with lanes, pinnacle_status_per_lane, sponsors_uk, grade, grade_reasoning
+
+### Phase 2 — Within-lane relativity cross-check
+
+- Input: all companies, grouped by tagged lanes
+- Process: ~10 parallel agents, each pulls random sample of 50 companies spanning multiple lanes
+- Per agent:
+  - Compare within-lane pinnacle assignments for consistency
+  - Within-lane percentile bands: top ~10% pinnacle, next ~25% strong, next ~40% adjacent, remainder borderline
+  - Adjust `pinnacle_status_per_lane` where similar firms have inconsistent classifications
+  - The calibration is emergent — no hardcoded "Anthropic is SS-in-ai-ml" anchor
+- Output: refined `pinnacle_status_per_lane` per company
+
+### Phase 3 — No-lane deletion sweep
+
+- Run `cernio clean` (or equivalent SQL) to delete companies with empty `lanes` array
+- Cascade-delete their jobs
+- Surface deletion summary: company names + grade + reason (could not place in 8 lanes; declassified per plan)
+- If the deletion volume is large (>5% of universe), surface for review before sweep
+
+### Phase 4 — Commit + handoff to grade-jobs
+
+- Commit with per-lane company count delta versus prior batch
+- Note in commit body which companies migrated pinnacle_status_per_lane bands
+- Trigger downstream grade-jobs Phase 1 for any jobs at newly-tagged companies
+
 Grades companies in the Cernio database against the user's profile. Each grade is a reasoned position on one question: **is this company worth monitoring for jobs?** The answer weighs engineering reputation, technical alignment with the specific project portfolio, sponsorship capability against the visa timeline, career ceiling against the long-term trajectory, and growth / stability — calibrated against real anchor companies already graded in the database.
 
 Grades are not permanent. They are snapshots tied to the current profile state. When the profile changes — a new flagship project, a visa-status shift, revised preferences — previously-assigned grades become potentially stale and the `check-integrity` skill surfaces them for re-grading. This skill writes the grade that is correct *right now*, not a grade that is assumed to survive profile evolution.

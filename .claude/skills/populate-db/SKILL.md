@@ -11,6 +11,34 @@ description: "Validates discovered companies, runs the `cernio resolve` Rust scr
 > 1. **Phase 1 — Sponsor verification precondition**: confirm `sponsors_uk = 'yes'` for each company before running `cernio resolve`. Companies without verified sponsorship are rejected — they don't reach the mechanical probe.
 > 2. **Phase 4 — Hand off to `grade-companies`** for initial `lanes` assignment + `pinnacle_status_per_lane` + employer grade after ATS resolution succeeds.
 
+## Phased Structure (canonical, post-refactor)
+
+### Phase 1 — Sponsor verification precondition
+
+- For each company in companies/potential.md (or discovery-*.md):
+  - Cross-check Gov.uk Skilled Worker sponsor register
+  - Verify careers page mentions visa support OR check Hunt-UK-Visa-Sponsors-style database
+  - Mark `sponsors_uk = 'yes' | 'unknown'`; non-sponsors rejected entirely
+- Companies with `sponsors_uk = 'no'` never proceed to Phase 2
+
+### Phase 2 — Mechanical ATS resolution (cernio resolve)
+
+- Invoke `cernio resolve` Rust script against companies with sponsors_uk in (yes, unknown)
+- Script probes 7 ATS providers for slug matches
+- Output: companies with status='resolved' (ATS slug found) or status='potential' (no match)
+
+### Phase 3 — AI fallback for unmatched (resolve-portals)
+
+- For companies still status='potential' after Phase 2:
+  - Dispatch resolve-portals subagent
+  - Subagent reads careers page + searches for ATS link
+  - Either finds the real slug or marks status='bespoke' (unsupported ATS)
+
+### Phase 4 — Handoff to grade-companies
+
+- Cascade resolved + bespoke companies to grade-companies Phase 1
+- grade-companies assigns lanes, pinnacle_status_per_lane, employer grade
+
 Bridge between company discovery and job search. Discovery produces a list of company names and websites; the search pipeline needs those companies resolved to a specific ATS provider and slug, or marked as bespoke. This skill drives that transition — it validates each company, runs `cernio resolve` for the mechanical slug probing, and applies AI judgment to the cases the script cannot handle.
 
 The skill is the orchestration layer. The Rust script handles 10,000+ HTTP requests against supported ATS providers in seconds; this skill handles the ~20% of cases where the mechanical probing fails — non-obvious slugs (XTX Markets → `xtxmarketstechnologies`), unsupported ATS providers (iCIMS, Taleo, Personio), and companies that turned out to be dead.
