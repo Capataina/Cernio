@@ -5,6 +5,14 @@ description: "Orchestrates full Cernio job-search — runs `cernio search` acros
 
 # Search Jobs
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.7`. Until full phased rewrite:
+>
+> 1. **Sponsor-only filter at search time**: only search jobs at companies where `sponsors_uk = yes`. Companies without verified sponsorship are skipped — they shouldn't be in the DB anyway but defensive double-check.
+> 2. **Lane context for bespoke subagents**: when dispatching bespoke search agents, include the target company's `lanes` array in the prompt context so the agent searches for lane-relevant role titles (HFT firm → "Quant Developer", "Low Latency Engineer"; Crypto MM → "DeFi Engineer", "Liquidity Engineer"; etc.)
+> 3. **Inserted jobs get `lanes` populated from the parent company's `lanes` array** as a default — Phase 1 of grade-jobs will refine to job-specific lanes if the role is multi-lane or differs.
+> 4. **No mention of `prepare-applications`** in the description or body anywhere — that skill was removed in this refactor.
+
 End-to-end job-search orchestration. The Cernio company universe contains two structurally different classes of companies, and a complete job search covers both:
 
 1. **Resolved-ATS companies** (`status = 'resolved'` in the `companies` table) — companies with Greenhouse / Lever / Ashby / Workable / SmartRecruiters / Workday portals. These are handled by `cernio search`, the Rust pipeline's bulk fetcher. Mechanical: thousands of raw jobs fetched, filtered, deduplicated, inserted — in seconds.

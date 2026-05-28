@@ -5,6 +5,13 @@ description: "Expands the Cernio company universe via parallel subagents (one pe
 
 # Discover Companies
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.1`. Until full phased rewrite:
+>
+> 1. **Per-lane parallel discovery**: dispatch ~8 parallel subagents, one per active lane (`big-tech`, `ai-ml`, `hft`, `crypto-mm`, `bank-strats`, `systems-infra`, `devtools`, `fintech`). Each agent uses lane-specific source heuristics — HFT: prop-trading registries / low-latency conference sponsors / kdb+/q job boards. Crypto MM: on-chain DEX maker addresses backtraced to entities. AI/ML: AI Safety org lists / arXiv-affiliated startups. Bank Strats: bank careers pages / e-trading vendor partnerships. Systems/Infra: OSS-foundation sponsor lists (Rust, CNCF). Devtools: HN Show HN tracking / YC devtools cohorts. Fintech: UK fintech accelerator graduates / FCA-authorised firm lists. Big-Tech: established sources. Each agent writes to `companies/discovery-{lane}-{date}.md`.
+> 2. **Sponsor-only filter**: verify each discovered company sponsors UK Skilled Worker (Gov.uk Skilled Worker register OR direct careers-page evidence). Non-sponsors dropped before import — never enter the DB.
+> 3. **Reads `profile/career-goals.md`** for the 8 active lanes and sponsor rule.
+
 Expands the Cernio company universe. Mass-market aggregators surface the same obvious names to everyone; this skill finds the 60-person startup doing brilliant infrastructure work, the company that just raised a Series B and is hiring its first engineers in a profile-aligned niche, the firm whose engineering blog describes exactly the kind of work the profile's flagship projects demonstrate. The universe is the foundation of every downstream step — the quality of companies tracked determines the quality of jobs found, evaluations written, and applications prepared.
 
 Discovery runs parallel subagents by territory. One agent per sector (territories derived from the profile on this invocation, not a hardcoded list) plus one agent dedicated to non-obvious sources (source-type territory: VC portfolios, OSS contributors, conference sponsors, engineering blog rolls). Each agent reads the profile, receives the existing universe for deduplication, performs real web searches, and writes its finds to its own file. The orchestrator imports the files and the DB's unique website-URL constraint handles dedup.

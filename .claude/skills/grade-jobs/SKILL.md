@@ -5,6 +5,15 @@ description: "Grades ungraded jobs in the Cernio DB against the profile using a 
 
 # Grade Jobs
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> This skill is being restructured per `context/plans/cernio-full-refactor.md §5.6`. The DB schema is already migrated (companies.lanes / pinnacle_status_per_lane / sponsors_uk, jobs.lanes; application_packages dropped). The SKILL.md body below still describes the pre-refactor single-scale rubric — full phased rewrite is a pending skill-creator iteration. Until then, when grading:
+>
+> 1. **Lane-relative grading**: grade SS/S/A/B/C/F against peers WITHIN the job's primary lane, not globally. A Monzo SS-in-fintech and an Anthropic SS-in-AI do not compete.
+> 2. **Q-slot structure (target)**: Q1 lane assignment (cite JD + company context, multi-tag if applicable) · Q2 role-truth-at-hire (function locked at day 1? cross-function-transition hopes auto-downgrade per profile/career-goals.md hard rule) · Q3 within-lane pinnacle position (read company.pinnacle_status_per_lane) · Q4 profile fit within lane (cite specific project anchors from profile/skills/) · Q5 visa+sponsorship (verify company.sponsors_uk = yes; check Tier 1/2/3 location compatibility per profile/career-goals.md).
+> 3. **Phased structure (target)**: Phase 1 parallel initial grading → Phase 2 within-lane relativity cross-check → Phase 3 per-lane portfolio-gaps regeneration to profile/portfolio-gaps/{lane}.md.
+> 4. **Realism semantic preserved**: brand alone never determines grade. SS still requires Q1-cleared-decisively + strong Q2-Q5. Pinnacle-of-lane firms with narrow pipelines cap at A-stretch. Phase 2 cross-check compares on combined Q1-Q5 evidence, never on pinnacle status alone.
+> 5. **Reads `profile/career-goals.md`** for the 8 active lanes (`big-tech`, `ai-ml`, `hft`, `crypto-mm`, `bank-strats`, `systems-infra`, `devtools`, `fintech`) and the hard rules.
+
 Grades individual jobs in the Cernio database. Company grading determines what gets searched; job grading determines what gets applied to. Every grade emerges from reasoning about this specific role for this specific candidate — the role's actual requirements (from the description, not the title), the candidate's flagship projects and technologies, the sponsorship timeline, and the calibration anchors already graded in the database.
 
 Grades are not permanent. They reflect the current profile state. When the profile changes — a new project, a closed gap, a shifted preference — prior grades become potentially stale and the `check-integrity` skill surfaces them for re-grading.
