@@ -176,13 +176,11 @@ impl App {
                 // producing the "no package" gate failure observed in
                 // session-1778793032.jsonl event [118] despite the row
                 // being physically present.
-                let answers = conn
-                    .query_row(
-                        "SELECT CAST(answers AS TEXT) FROM application_packages WHERE job_id = ?1",
-                        rusqlite::params![job_id],
-                        |row| row.get::<_, String>(0),
-                    )
-                    .ok();
+                // application_packages was dropped in migration_008 — the
+                // prepare-applications skill is removed from the system.
+                // Autofill answers are no longer retrievable from the DB.
+                let _ = job_id;
+                let answers: Option<String> = None;
 
                 let (provider, slug) = match portal {
                     Some((p, s)) => (Some(p), Some(s)),
@@ -220,11 +218,14 @@ impl App {
             return;
         }
 
-        // ── Gate: an application package must be prepared ──
+        // ── Gate: application_packages was dropped in migration_008 ──
+        // The prepare-applications skill is removed from the system.
+        // The autofill `p` flow is therefore inert pending a future replacement.
         let Some(package_answers) = package_answers else {
-            crate::tel!("autofill_gate_no_package", "job_id": job_id);
+            crate::tel!("autofill_gate_packages_feature_removed", "job_id": job_id);
             self.add_toast(
-                "No application package for this job — run prepare-applications first".to_string(),
+                "Autofill is disabled: application_packages was removed in the lane-based-relativity refactor."
+                    .to_string(),
             );
             return;
         };
