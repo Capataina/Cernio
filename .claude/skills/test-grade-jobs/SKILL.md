@@ -5,6 +5,19 @@ description: "Measures grade-jobs' own structural compliance + inter-agent consi
 
 # Test Grade Jobs
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.10`. The 7-axis structure is being restructured for lane-aware testing:
+>
+> - **Axis A — Lane assignment correctness**: does the agent correctly identify which lane (or lanes) a job belongs to?
+> - **Axis B — Role-truth-at-hire detection**: does the rubric correctly auto-downgrade cross-function-transition roles (Solutions Architect hoping to lateral to SWE)?
+> - **Axis C — Within-lane relative consistency**: do agents grade similar-pinnacle-position roles similarly WITHIN a single lane?
+> - **Axis D — Cross-lane independence**: grading in HFT must not influence grading in Fintech — they're separate scales.
+> - **Axis E — Sponsor-status accuracy**: does the grader respect the company.sponsors_uk flag and not surface non-sponsor companies?
+> - **Axis F — Phase 2 consistency-pass effectiveness**: does Phase 2 actually correct Phase 1 drift?
+> - **Axis G — Q-slot structure adherence**: no hardcoded calibration anchors in slot prose, no banned-tokens leak from rubric narration.
+> 
+> Baseline + iteration tracking continues; new baseline established post-refactor.
+
 > [!important] Read this entire file before starting any work
 > The inviolable rules and the quality checklist are at the bottom. Do not begin Phase 1 (Setup) until every reference file in this skill has been read and every file under `.claude/skills/grade-jobs/` and `profile/` (except `portfolio-gaps.md` and `resume.pdf`) has been read end-to-end.
 

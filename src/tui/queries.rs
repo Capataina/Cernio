@@ -133,17 +133,12 @@ pub fn fetch_jobs(
     };
 
     // ── Package axis ──
-    let package_filter = match (
-        filters.package.contains("prepared"),
-        filters.package.contains("not-prepared"),
-    ) {
-        (true, false) => {
-            " AND j.id IN (SELECT job_id FROM application_packages)".to_string()
-        }
-        (false, true) => {
-            " AND j.id NOT IN (SELECT job_id FROM application_packages)".to_string()
-        }
-        _ => String::new(),
+    // The application_packages table was dropped in migration_008 as part of the
+    // lane-based-relativity refactor (prepare-applications skill removed). The
+    // axis is kept in the Filters struct for API stability but is now a no-op.
+    let package_filter: String = {
+        let _ = &filters.package;
+        String::new()
     };
 
     // ── Archive axis ──
@@ -188,7 +183,7 @@ pub fn fetch_jobs(
                j.grade, j.evidence_basis, j.raw_description,
                (SELECT ud.decision FROM user_decisions ud
                 WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1),
-               (SELECT 1 FROM application_packages ap WHERE ap.job_id = j.id) IS NOT NULL
+               0 AS has_package
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
         WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}");

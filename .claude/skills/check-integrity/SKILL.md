@@ -5,6 +5,14 @@ description: "Audits the Cernio SQLite database — runs `cernio check` + `cerni
 
 # Check Integrity
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.8`. New mechanical phases to add to the existing audit:
+>
+> 1. **Lane coherence check**: every company has non-empty `lanes`. Every job's `lanes` ⊆ its company's `lanes` (or company.lanes intersects job.lanes when company is multi-lane). Every active lane in `profile/career-goals.md` is tagged to ≥ N companies (sanity threshold).
+> 2. **Sponsor coherence check**: every company has `sponsors_uk = 'yes'`. No `unknown` should persist past discovery. No `no` should exist (those should have been rejected at discovery).
+> 3. **Portfolio-gaps freshness**: instead of checking single `profile/portfolio-gaps.md`, walk `profile/portfolio-gaps/` folder; each per-lane file's last-update timestamp checked against the most recent grade-jobs run for that lane.
+> 4. **Per-lane staleness windows**: when profile changes, some lane-relevant judgments may be stale. Cross-check `relevance_updated_at` against profile mtime AND against the company's tagged lanes (a profile change to ML skills only affects companies tagged ai-ml, systems-infra).
+
 The Cernio database is a living system. Grades, fit assessments, and `why_relevant` fields written yesterday may be wrong today — a new flagship project in the profile, a shifted preference, an expanded skill set can silently invalidate prior judgments without altering any timestamp. Mechanical integrity checks catch schema-level and timestamp-level drift; this skill catches semantic drift — the class of staleness that only shows up when the profile is read alongside the grade reasoning.
 
 The skill runs in two modes. In report mode (default), it produces a prioritised findings list and stops — no DB writes. In remediation mode (triggered by the user saying "fix these" / "update these" / "regrade these"), it works through the findings with the user's explicit approval per fix, using the procedures in `references/remediation-guide.md` and the quality bars in `references/quality-standards.md`.

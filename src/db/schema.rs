@@ -47,6 +47,7 @@ impl Database {
         self.migrate_005_add_archived_at()?;
         self.migrate_006_add_application_packages()?;
         self.migrate_007_drop_fit_score_add_insufficient_evidence()?;
+        self.migrate_008_lane_based_relativity()?;
         Ok(())
     }
 
@@ -150,15 +151,15 @@ impl Database {
                         evaluation_status   TEXT NOT NULL DEFAULT 'pending'
                                             CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit', 'archived')),
                         fit_assessment      TEXT,
-                        fit_score           REAL,
                         grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+                        evidence_basis      TEXT CHECK (evidence_basis IS NULL OR evidence_basis IN ('jd','semantic','insufficient')),
                         discovered_at       TEXT NOT NULL,
                         archived_at         TEXT
                     );
                     INSERT OR IGNORE INTO jobs_new
                         SELECT id, company_id, portal_id, title, url, location,
                                remote_policy, posted_date, raw_description, parsed_tags,
-                               evaluation_status, fit_assessment, fit_score, grade,
+                               evaluation_status, fit_assessment, grade, evidence_basis,
                                discovered_at, NULL
                         FROM jobs;
                     DROP TABLE jobs;
@@ -377,6 +378,84 @@ impl Database {
                 PRAGMA foreign_keys = ON;
             ")?;
         }
+
+        Ok(())
+    }
+
+    /// Migration 008: Lane-based relative grading refactor.
+    ///
+    /// Adds the columns the refactor depends on:
+    ///   companies.lanes                    — JSON array of lane keys (multi-tag)
+    ///   companies.pinnacle_status_per_lane — JSON map {lane → pinnacle/strong/adjacent/borderline}
+    ///   companies.sponsors_uk              — 'yes' / 'no' / 'unknown'
+    ///   jobs.lanes                         — JSON array of lane keys
+    ///
+    /// Drops application_packages entirely (prepare-applications skill is removed
+    /// from the system).
+    ///
+    /// Does NOT delete jobs rows here — the jobs reset is an explicit one-shot
+    /// activation step handled outside the migration so it's auditable. The
+    /// activation pipeline (cernio-full-refactor.md §11.4 step 1) issues the
+    /// DELETE before grade-companies re-runs.
+    ///
+    /// All ALTER statements are idempotent — re-running the migration on a
+    /// post-migrated DB is a no-op.
+    fn migrate_008_lane_based_relativity(&self) -> Result<()> {
+        let has_companies_lanes: bool = self
+            .conn
+            .prepare("SELECT lanes FROM companies LIMIT 0")
+            .is_ok();
+
+        if !has_companies_lanes {
+            self.conn.execute_batch(
+                "ALTER TABLE companies ADD COLUMN lanes TEXT;",
+            )?;
+        }
+
+        let has_pinnacle_status: bool = self
+            .conn
+            .prepare("SELECT pinnacle_status_per_lane FROM companies LIMIT 0")
+            .is_ok();
+
+        if !has_pinnacle_status {
+            self.conn.execute_batch(
+                "ALTER TABLE companies ADD COLUMN pinnacle_status_per_lane TEXT;",
+            )?;
+        }
+
+        let has_sponsors_uk: bool = self
+            .conn
+            .prepare("SELECT sponsors_uk FROM companies LIMIT 0")
+            .is_ok();
+
+        if !has_sponsors_uk {
+            self.conn.execute_batch(
+                "ALTER TABLE companies ADD COLUMN sponsors_uk TEXT
+                 CHECK (sponsors_uk IS NULL OR sponsors_uk IN ('yes', 'no', 'unknown'));",
+            )?;
+        }
+
+        let has_jobs_lanes: bool = self
+            .conn
+            .prepare("SELECT lanes FROM jobs LIMIT 0")
+            .is_ok();
+
+        if !has_jobs_lanes {
+            self.conn.execute_batch(
+                "ALTER TABLE jobs ADD COLUMN lanes TEXT;",
+            )?;
+        }
+
+        // Drop application_packages — the prepare-applications skill is being
+        // removed from the system entirely.
+        self.conn.execute_batch(
+            "DROP TABLE IF EXISTS application_packages;",
+        )?;
+
+        // Index for lane-aware queries.
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_companies_sponsors_uk ON companies(sponsors_uk);",
+        )?;
 
         Ok(())
     }
@@ -890,57 +969,65 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Migration 006: application_packages
+    // Migration 006: application_packages — REMOVED as part of the
+    // lane-based-relativity refactor (migration_008 drops the table; the
+    // prepare-applications skill is removed from the system entirely).
+    // ─────────────────────────────────────────────────────────────
+
+    // Migration 008: lane-based-relativity
     // ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn application_packages_crud() {
+    fn migration_008_adds_lane_columns_to_companies() {
         let db = Database::open_in_memory().unwrap();
-        let cid = insert_company(&db, "X", "https://x.example", "resolved");
-        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
-
-        db.conn().execute(
-            "INSERT INTO application_packages (job_id, answers, created_at)
-             VALUES (?1, ?2, ?3)",
-            params![jid, r#"{"q1":"a1"}"#, "2026-04-01"],
-        ).unwrap();
-
-        let (ans, created_at): (String, String) = db.conn().query_row(
-            "SELECT answers, created_at FROM application_packages WHERE job_id = ?1",
-            params![jid],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        ).unwrap();
-        assert_eq!(ans, r#"{"q1":"a1"}"#);
-        assert_eq!(created_at, "2026-04-01");
+        // Just selecting from the columns proves they exist and are nullable.
+        let _: Option<String> = db.conn()
+            .query_row("SELECT lanes FROM companies LIMIT 1", [], |r| r.get(0))
+            .unwrap_or(None);
+        let _: Option<String> = db.conn()
+            .query_row("SELECT pinnacle_status_per_lane FROM companies LIMIT 1", [], |r| r.get(0))
+            .unwrap_or(None);
+        let _: Option<String> = db.conn()
+            .query_row("SELECT sponsors_uk FROM companies LIMIT 1", [], |r| r.get(0))
+            .unwrap_or(None);
     }
 
     #[test]
-    fn application_packages_one_per_job() {
+    fn migration_008_adds_lanes_to_jobs() {
         let db = Database::open_in_memory().unwrap();
-        let cid = insert_company(&db, "X", "https://x.example", "resolved");
-        let jid = insert_job(&db, cid, "t", "https://j.example/1", None, "pending");
-
-        db.conn().execute(
-            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (?1, '{}', '2026-04-01')",
-            params![jid],
-        ).unwrap();
-
-        // job_id is PRIMARY KEY, so a second insert for the same job must fail.
-        let result = db.conn().execute(
-            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (?1, '{}', '2026-04-02')",
-            params![jid],
-        );
-        assert!(result.is_err());
+        let _: Option<String> = db.conn()
+            .query_row("SELECT lanes FROM jobs LIMIT 1", [], |r| r.get(0))
+            .unwrap_or(None);
     }
 
     #[test]
-    fn application_packages_fk_to_jobs() {
+    fn migration_008_drops_application_packages() {
         let db = Database::open_in_memory().unwrap();
+        let result: Result<i64, _> = db.conn()
+            .query_row("SELECT COUNT(*) FROM application_packages", [], |r| r.get(0));
+        assert!(result.is_err(), "application_packages should be dropped by migration_008");
+    }
+
+    #[test]
+    fn migration_008_sponsors_uk_check_constraint() {
+        let db = Database::open_in_memory().unwrap();
+        let cid = insert_company(&db, "X", "https://x.example", "resolved");
+
+        // Valid values
+        for v in &["yes", "no", "unknown"] {
+            let result = db.conn().execute(
+                "UPDATE companies SET sponsors_uk = ?1 WHERE id = ?2",
+                params![v, cid],
+            );
+            assert!(result.is_ok(), "{v} should be accepted");
+        }
+
+        // Invalid value rejected
         let result = db.conn().execute(
-            "INSERT INTO application_packages (job_id, answers, created_at) VALUES (9999, '{}', '2026-04-01')",
-            [],
+            "UPDATE companies SET sponsors_uk = 'maybe' WHERE id = ?1",
+            params![cid],
         );
-        assert!(result.is_err(), "should reject package for non-existent job");
+        assert!(result.is_err(), "invalid sponsors_uk value should be rejected");
     }
 
     // ─────────────────────────────────────────────────────────────

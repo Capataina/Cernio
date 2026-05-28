@@ -5,6 +5,11 @@ description: "AI fallback for ATS portal resolution — handles companies the me
 
 # Resolve Portals
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.3`. Add sponsor-verification gate before AI-resolving:
+>
+> 1. **Sponsor gate at entry**: do NOT spend AI compute resolving portals for companies where `sponsors_uk != 'yes'`. They shouldn't reach this skill anyway (filtered at discovery), but defensive double-check.
+
 AI fallback for companies the mechanical resolver could not match. Every company reaching this skill has already had its obvious slug variants probed — `{company-name}`, `{domain-without-tld}`, `{hyphenated-name}` — against every supported ATS. None returned valid results. The remaining cases need judgment: find the real careers page, inspect it for the actual ATS link, and verify the slug against the provider's JSON API.
 
 The skill's single output is a lifecycle transition: every target company moves from `potential` to either `resolved` (ATS found and verified) or `bespoke` (no supported ATS; careers URL preserved). Dead companies are surfaced with evidence and left for the user to decide.

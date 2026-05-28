@@ -5,6 +5,17 @@ description: "Grades ungraded companies in the Cernio database (S / A / B / C) a
 
 # Grade Companies
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.5`. DB schema is already migrated. Until the full phased rewrite lands:
+>
+> 1. **Sponsor-only universe**: verify `sponsors_uk = yes` before grading. Companies that don't sponsor get rejected, not graded.
+> 2. **Assign `lanes` array**: which of the 8 lanes (`big-tech`, `ai-ml`, `hft`, `crypto-mm`, `bank-strats`, `systems-infra`, `devtools`, `fintech`) does this company have teams in. Multi-tag.
+> 3. **Set `pinnacle_status_per_lane`**: per lane the company tags, classify as `pinnacle` / `strong` / `adjacent` / `borderline`. This positioning is what jobs grade against.
+> 4. **Generalised company `grade` stays single-scale**: employer quality (SS/S/A/B/C/F) — separate from per-lane pinnacle positioning. Both fields are needed.
+> 5. **Phased structure (target)**: Phase 1 parallel initial pass (lanes + pinnacle status + sponsors_uk + employer grade) → Phase 2 within-lane relativity cross-check on pinnacle status → Phase 3 no-lane deletion sweep (cascade-deletes orphaned jobs).
+> 6. **No hardcoded calibration anchors.** Pinnacle ranking emerges from Phase 2 comparison, not from a hardcoded "Anthropic is SS-in-ai-ml" list.
+> 7. **Reads `profile/career-goals.md`** for the 8 active lanes and hard rules.
+
 Grades companies in the Cernio database against the user's profile. Each grade is a reasoned position on one question: **is this company worth monitoring for jobs?** The answer weighs engineering reputation, technical alignment with the specific project portfolio, sponsorship capability against the visa timeline, career ceiling against the long-term trajectory, and growth / stability — calibrated against real anchor companies already graded in the database.
 
 Grades are not permanent. They are snapshots tied to the current profile state. When the profile changes — a new flagship project, a visa-status shift, revised preferences — previously-assigned grades become potentially stale and the `check-integrity` skill surfaces them for re-grading. This skill writes the grade that is correct *right now*, not a grade that is assumed to survive profile evolution.

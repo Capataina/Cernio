@@ -5,6 +5,12 @@ description: "Validates discovered companies, runs the `cernio resolve` Rust scr
 
 # Populate DB
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.2`. Add a sponsor-verification precondition before any ATS resolution:
+>
+> 1. **Phase 1 — Sponsor verification precondition**: confirm `sponsors_uk = 'yes'` for each company before running `cernio resolve`. Companies without verified sponsorship are rejected — they don't reach the mechanical probe.
+> 2. **Phase 4 — Hand off to `grade-companies`** for initial `lanes` assignment + `pinnacle_status_per_lane` + employer grade after ATS resolution succeeds.
+
 Bridge between company discovery and job search. Discovery produces a list of company names and websites; the search pipeline needs those companies resolved to a specific ATS provider and slug, or marked as bespoke. This skill drives that transition — it validates each company, runs `cernio resolve` for the mechanical slug probing, and applies AI judgment to the cases the script cannot handle.
 
 The skill is the orchestration layer. The Rust script handles 10,000+ HTTP requests against supported ATS providers in seconds; this skill handles the ~20% of cases where the mechanical probing fails — non-obvious slugs (XTX Markets → `xtxmarketstechnologies`), unsupported ATS providers (iCIMS, Taleo, Personio), and companies that turned out to be dead.

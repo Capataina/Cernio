@@ -5,6 +5,14 @@ description: "Synchronises Cernio's profile/ folder from LifeOS as the canonical
 
 # Populate from LifeOS
 
+> [!warning] LANE-BASED RELATIVITY REFACTOR IN-PROGRESS (2026-05-28)
+> Per `context/plans/cernio-full-refactor.md §5.4`. The full phase restructure is a pending skill-creator iteration. Until then, in addition to the 8 phases below:
+>
+> 1. **Output target shifts**: instead of writing `profile/skills.md` (single file), Phase 5 writes `profile/skills/` (folder) with `_Overview.md` plus per-group files. Groups are chosen by the skill agent based on actual LifeOS content (e.g. `languages.md`, `systems-low-level.md`, `ml-ai.md`, `infra-tooling.md`, `data.md`, `web-frontend.md`, `finance-domain.md`). Per-group files contain skills + project anchors.
+> 2. **NEVER touches `profile/career-goals.md`** — that's a user-maintained Cernio-native file (alongside `preferences.toml`).
+> 3. **NEVER touches `profile/portfolio-gaps/` folder** — that's maintained by `grade-jobs`.
+> 4. **Legacy `profile/skills.md`** (flat file) should be detected and migrated to the folder structure on next run, or surfaced as orphan if folder structure already exists.
+
 > [!important] Read this entire file before starting any work
 > Cernio doctrine requires reading every reference file in `references/` and every file in `profile/` (when referenced for evaluation tasks). For this skill specifically, also read `references/lifeos-source-map.md`, `references/project-synthesis-schema.md`, and `references/skills-derivation-rubric.md` end-to-end before Phase 0. The skill orchestrates parallel subagents and a final synthesis agent — incomplete reading means the dispatch prompts will be incomplete, which means the subagents work blind.
 
