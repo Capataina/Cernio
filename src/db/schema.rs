@@ -150,15 +150,15 @@ impl Database {
                         evaluation_status   TEXT NOT NULL DEFAULT 'pending'
                                             CHECK (evaluation_status IN ('pending', 'evaluating', 'strong_fit', 'weak_fit', 'no_fit', 'archived')),
                         fit_assessment      TEXT,
-                        fit_score           REAL,
                         grade               TEXT CHECK (grade IS NULL OR grade IN ('SS', 'S', 'A', 'B', 'C', 'F')),
+                        evidence_basis      TEXT CHECK (evidence_basis IS NULL OR evidence_basis IN ('jd','semantic','insufficient')),
                         discovered_at       TEXT NOT NULL,
                         archived_at         TEXT
                     );
                     INSERT OR IGNORE INTO jobs_new
                         SELECT id, company_id, portal_id, title, url, location,
                                remote_policy, posted_date, raw_description, parsed_tags,
-                               evaluation_status, fit_assessment, fit_score, grade,
+                               evaluation_status, fit_assessment, grade, evidence_basis,
                                discovered_at, NULL
                         FROM jobs;
                     DROP TABLE jobs;
