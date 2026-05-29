@@ -52,6 +52,16 @@ pub struct Theme {
     pub countdown_ok: Style,
     pub countdown_warn: Style,
     pub countdown_urgent: Style,
+
+    // ── Lane palette (per lane-based-relativity refactor) ───────
+    pub lane_big_tech: Style,
+    pub lane_ai_ml: Style,
+    pub lane_hft: Style,
+    pub lane_crypto_mm: Style,
+    pub lane_bank_strats: Style,
+    pub lane_systems_infra: Style,
+    pub lane_devtools: Style,
+    pub lane_fintech: Style,
 }
 
 impl Default for Theme {
@@ -135,8 +145,74 @@ impl Default for Theme {
             countdown_ok: Style::default().fg(Color::Green),
             countdown_warn: Style::default().fg(Color::Yellow),
             countdown_urgent: Style::default().fg(Color::Red),
+
+            // Lane palette — ANSI-only so the terminal theme is preserved.
+            // Collisions with grade colours are intentional: lane colour only
+            // appears in lane chrome (badge column, lane-specific blocks),
+            // while grade colour stays in grade cells. The eye reads colour
+            // by column position, not in isolation.
+            lane_big_tech: Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD),
+            lane_ai_ml: Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            lane_hft: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            lane_crypto_mm: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            lane_bank_strats: Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            lane_systems_infra: Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            lane_devtools: Style::default().fg(Color::LightBlue).add_modifier(Modifier::BOLD),
+            lane_fintech: Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD),
         }
     }
+}
+
+/// Canonical lane keys — order is the display order across the dashboard,
+/// company kanban, and filter UI.
+pub const LANE_KEYS: [&str; 8] = [
+    "big-tech",
+    "ai-ml",
+    "hft",
+    "crypto-mm",
+    "bank-strats",
+    "systems-infra",
+    "devtools",
+    "fintech",
+];
+
+/// Short 3-char lane badge for table cells. Stable across the codebase so
+/// the badge doesn't drift between Jobs / Companies / Activity / Dashboard.
+pub fn lane_badge(key: &str) -> &'static str {
+    match key {
+        "big-tech" => "BTH",
+        "ai-ml" => "AIM",
+        "hft" => "HFT",
+        "crypto-mm" => "CMM",
+        "bank-strats" => "BNK",
+        "systems-infra" => "SYS",
+        "devtools" => "DEV",
+        "fintech" => "FIN",
+        _ => "—  ",
+    }
+}
+
+/// Parse a JSON-array lanes field into its primary (first) lane key.
+/// Returns None when input is None / empty / unparseable.
+pub fn primary_lane(lanes_json: Option<&str>) -> Option<String> {
+    let raw = lanes_json?;
+    let cleaned = raw.replace(['[', ']', '"'], "");
+    let first = cleaned.split(',').next()?.trim();
+    if first.is_empty() {
+        None
+    } else {
+        Some(first.to_string())
+    }
+}
+
+/// Parse a JSON-array lanes field into all its lane keys.
+pub fn all_lanes(lanes_json: Option<&str>) -> Vec<String> {
+    let Some(raw) = lanes_json else { return Vec::new() };
+    raw.replace(['[', ']', '"'], "")
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 impl Theme {
@@ -178,6 +254,21 @@ impl Theme {
             Some("watching") => self.decision_watching,
             Some("applied") => self.decision_applied,
             Some("rejected") => self.decision_rejected,
+            _ => self.dim,
+        }
+    }
+
+    /// Style for a single lane key. Unknown lanes fall back to dim.
+    pub fn lane_style(&self, key: &str) -> Style {
+        match key {
+            "big-tech" => self.lane_big_tech,
+            "ai-ml" => self.lane_ai_ml,
+            "hft" => self.lane_hft,
+            "crypto-mm" => self.lane_crypto_mm,
+            "bank-strats" => self.lane_bank_strats,
+            "systems-infra" => self.lane_systems_infra,
+            "devtools" => self.lane_devtools,
+            "fintech" => self.lane_fintech,
             _ => self.dim,
         }
     }

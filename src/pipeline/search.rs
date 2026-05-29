@@ -100,6 +100,20 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
                 "UPDATE companies SET last_searched_at = datetime('now') WHERE id = ?1",
                 params![result.target.company_id],
             );
+            crate::db::events::emit(
+                conn,
+                "search.ran",
+                "company",
+                Some(result.target.company_id),
+                Some(&result.target.company_name),
+                None,
+                None,
+                Some(&serde_json::json!({
+                    "fetched": fetched,
+                    "new": new_count,
+                }).to_string()),
+                "cli:search",
+            );
         }
     }
 

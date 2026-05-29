@@ -35,13 +35,7 @@ impl App {
                     "decision": decision,
                     "rows": insert_result.unwrap_or(0),
                 );
-
-                // NOTE: previously this branch DELETEd from application_packages
-                // when a job was marked "applied". That fired on every `p` press
-                // (autofill auto-marks applied) and wiped the package mid-run,
-                // making any retry impossible. Removed — packages are small and
-                // keeping them around is harmless. A `cernio clean --packages`
-                // command can sweep stale entries if needed later.
+                crate::db::events::decision_recorded(&conn, *id, decision, "tui");
                 if decision == "applied" {
                     crate::tel!("decision_applied_no_delete", "job_id": id);
                 }
@@ -81,6 +75,7 @@ impl App {
                 "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
                 rusqlite::params![job_id, decision, now],
             );
+            crate::db::events::decision_recorded(&conn, job_id, decision, "tui");
         }
         let icon = match decision {
             "watching" => "👁",
@@ -103,7 +98,7 @@ impl App {
                 }),
                 false,
             ),
-            View::Dashboard | View::Pipeline | View::Activity => (None, false),
+            View::Dashboard | View::Activity => (None, false),
         };
         crate::tel!(
             "open_url_attempt",
@@ -315,7 +310,7 @@ impl App {
             View::Companies => self.selected_company().and_then(|c| {
                 c.careers_url.as_deref().or(Some(c.website.as_str()))
             }),
-            View::Dashboard | View::Pipeline | View::Activity => None,
+            View::Dashboard | View::Activity => None,
         };
         if let Some(url) = url {
             if let Ok(mut child) = std::process::Command::new("pbcopy")
@@ -340,10 +335,20 @@ impl App {
         let job_id = job.id;
 
         if let Ok(conn) = Connection::open(&self.db_path) {
+            // Read prior grade for the diff payload.
+            let prior: Option<String> = conn
+                .query_row(
+                    "SELECT grade FROM jobs WHERE id = ?1",
+                    rusqlite::params![job_id],
+                    |r| r.get(0),
+                )
+                .ok()
+                .flatten();
             let _ = conn.execute(
                 "UPDATE jobs SET grade = ?1 WHERE id = ?2",
                 rusqlite::params![grade, job_id],
             );
+            crate::db::events::job_grade_changed(&conn, job_id, prior.as_deref(), Some(grade), "tui");
         }
         self.add_toast(format!("Grade → {grade}"));
         self.show_grade_picker = false;
@@ -372,6 +377,7 @@ impl App {
                     "INSERT INTO user_decisions (job_id, decision, decided_at) VALUES (?1, ?2, ?3)",
                     rusqlite::params![id, decision, now],
                 );
+                crate::db::events::decision_recorded(&conn, *id, decision, "tui");
             }
         }
         self.add_toast(format!("{decision} all {count} {grade} jobs"));
@@ -384,7 +390,6 @@ impl App {
         let content = match self.view {
             View::Jobs => self.export_jobs_markdown(),
             View::Companies => self.export_companies_markdown(),
-            View::Pipeline => self.export_pipeline_markdown(),
             View::Dashboard | View::Activity => self.export_jobs_markdown(), // default to jobs
         };
 
@@ -392,7 +397,6 @@ impl App {
         let suffix = match self.view {
             View::Jobs => "jobs",
             View::Companies => "companies",
-            View::Pipeline => "pipeline",
             View::Dashboard | View::Activity => "jobs",
         };
         let dir = Path::new("exports");
@@ -452,24 +456,4 @@ impl App {
         out
     }
 
-    pub fn export_pipeline_markdown(&self) -> String {
-        let mut out = String::from("# Pipeline Export\n\n");
-        let date = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
-        out.push_str(&format!("Generated: {date}\n\n"));
-
-        let sections = [
-            ("Watching", &self.pipeline_watching),
-            ("Applied", &self.pipeline_applied),
-            ("Interview", &self.pipeline_interview),
-        ];
-        for (label, cards) in &sections {
-            out.push_str(&format!("## {} ({})\n\n", label, cards.len()));
-            for card in *cards {
-                let g = card.grade.as_deref().unwrap_or("—");
-                out.push_str(&format!("- **{g}** {} — {}\n", card.title, card.company));
-            }
-            out.push('\n');
-        }
-        out
-    }
 }

@@ -5,9 +5,16 @@ use ratatui::widgets::{Block, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientat
 use ratatui::Frame;
 use rusqlite::Connection;
 
-use crate::tui::app::{App, Focus};
+use crate::tui::app::{App, CompaniesLayout, Focus};
+use crate::tui::theme::{all_lanes, lane_badge, LANE_KEYS};
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    // Lanes layout overrides the classic table + detail layout.
+    if app.companies_layout == CompaniesLayout::Lanes {
+        draw_lanes_kanban(frame, app, area);
+        return;
+    }
+
     let is_compact = area.width < 80;
     let is_narrow = area.width < 100;
 
@@ -238,6 +245,35 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(&c.status, status_style),
     ));
 
+    // Lane chips with pinnacle status per lane.
+    let lane_keys = all_lanes(c.lanes.as_deref());
+    if !lane_keys.is_empty() {
+        let mut spans: Vec<Span> = vec![Span::styled("  Lanes       ", t.stat_label)];
+        for (i, lk) in lane_keys.iter().enumerate() {
+            if i > 0 { spans.push(Span::raw(" · ")); }
+            spans.push(Span::styled(
+                format!("{}", lane_badge(lk)),
+                t.lane_style(lk),
+            ));
+            // Lookup pinnacle status for this lane.
+            if let Ok(conn) = Connection::open(&app.db_path) {
+                let pin: Option<String> = conn
+                    .query_row(
+                        "SELECT json_extract(pinnacle_status_per_lane, '$.' || ?1)
+                         FROM companies WHERE id = ?2",
+                        rusqlite::params![lk, c.id],
+                        |r| r.get(0),
+                    )
+                    .ok()
+                    .flatten();
+                if let Some(p) = pin {
+                    spans.push(Span::styled(format!(" {p}"), t.dim));
+                }
+            }
+        }
+        lines.push(Line::from(spans));
+    }
+
     if let (Some(provider), Some(slug)) = (&c.ats_provider, &c.ats_slug) {
         lines.push(detail_row(
             t,
@@ -373,6 +409,95 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             area.inner(Margin { vertical: 1, horizontal: 0 }),
             &mut scrollbar_state,
         );
+    }
+}
+
+// ── Lanes Kanban layout ────────────────────────────────────────
+
+fn draw_lanes_kanban(frame: &mut Frame, app: &mut App, area: Rect) {
+    let t = &app.theme;
+
+    // Reset the list/detail areas — kanban doesn't use them.
+    app.list_area = area;
+    app.detail_area = Rect::default();
+
+    // Gather companies per lane from the in-memory app.companies (already
+    // filtered for archived per current preferences).
+    let mut per_lane: [Vec<usize>; 8] = Default::default();
+    for (i, c) in app.companies.iter().enumerate() {
+        let lanes = all_lanes(c.lanes.as_deref());
+        for lk in &lanes {
+            if let Some(pos) = LANE_KEYS.iter().position(|k| k == lk) {
+                per_lane[pos].push(i);
+            }
+        }
+    }
+
+    let col_count = 8u16;
+    // Tight columns — minimum width 14, expand to fit canvas.
+    let inner_width = area.width.saturating_sub(2);
+    let col_width = (inner_width / col_count).max(14);
+
+    let constraints: Vec<Constraint> = (0..col_count).map(|_| Constraint::Length(col_width)).collect();
+    let cols = Layout::horizontal(constraints).split(area);
+
+    for (col_idx, key) in LANE_KEYS.iter().enumerate() {
+        let is_focused = col_idx == app.companies_lane_col;
+        let indices = &per_lane[col_idx];
+
+        let title = format!(" {} ({}) ", lane_badge(key), indices.len());
+
+        let lane_style = t.lane_style(key);
+        let block = Block::bordered()
+            .title(Span::styled(title, lane_style))
+            .border_style(Style::default().fg(if is_focused {
+                t.border_focused
+            } else {
+                t.border
+            }));
+
+        let selected_idx = app.companies_lane_selections[col_idx];
+
+        let mut lines: Vec<Line> = Vec::new();
+        if indices.is_empty() {
+            lines.push(Line::from(Span::styled("  (empty)", t.dim)));
+        } else {
+            // Render up to viewport height; ratatui will clip but selection
+            // visibility needs manual scroll.
+            for (row_idx, &i) in indices.iter().enumerate() {
+                let c = &app.companies[i];
+                let grade = c.grade.as_deref().unwrap_or("—");
+                let gs = t.grade_style(c.grade.as_deref());
+                let is_multi = all_lanes(c.lanes.as_deref()).len() > 1;
+                let marker = if is_multi { "*" } else { " " };
+                let name = truncate(&c.name, (col_width as usize).saturating_sub(8));
+                let sel_prefix = if is_focused && row_idx == selected_idx { "▸" } else { " " };
+                let row_style = if is_focused && row_idx == selected_idx {
+                    Style::default().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(sel_prefix.to_string(), row_style),
+                    Span::styled(format!("{grade:<2}"), gs),
+                    Span::styled(format!("{marker}"), t.dim),
+                    Span::styled(format!(" {name}"), row_style),
+                ]));
+            }
+        }
+
+        let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+        frame.render_widget(paragraph, cols[col_idx as usize]);
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
+        out.push('…');
+        out
     }
 }
 

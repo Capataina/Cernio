@@ -4,7 +4,6 @@ mod activity;
 mod companies;
 mod dashboard;
 mod jobs;
-mod pipeline;
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -57,7 +56,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         View::Dashboard => dashboard::draw(frame, app, content_area),
         View::Companies => companies::draw(frame, app, content_area),
         View::Jobs => jobs::draw(frame, app, content_area),
-        View::Pipeline => pipeline::draw(frame, app, content_area),
         View::Activity => activity::draw(frame, app, content_area),
     }
 

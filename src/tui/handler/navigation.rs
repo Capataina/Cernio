@@ -12,6 +12,14 @@ pub fn handle_dashboard(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle_company_list(app: &mut App, key: KeyEvent) {
+    use crate::tui::app::CompaniesLayout;
+
+    // Lanes layout overrides most keys.
+    if app.companies_layout == CompaniesLayout::Lanes {
+        handle_company_lanes(app, key);
+        return;
+    }
+
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => app.next_in_list(),
         KeyCode::Char('k') | KeyCode::Up => app.prev_in_list(),
@@ -22,7 +30,78 @@ pub fn handle_company_list(app: &mut App, key: KeyEvent) {
         KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => app.enter_company_jobs(),
         KeyCode::Char('o') => app.open_selected_url(),
         KeyCode::Char('s') => app.toggle_sort(),
+        KeyCode::Char('L') => {
+            app.companies_layout = CompaniesLayout::Lanes;
+            app.add_toast("Layout: Lanes".to_string());
+        }
         KeyCode::Esc => app.clear_multi_select(),
+        _ => {}
+    }
+}
+
+fn handle_company_lanes(app: &mut App, key: KeyEvent) {
+    use crate::tui::app::CompaniesLayout;
+    use crate::tui::theme::{all_lanes, LANE_KEYS};
+
+    // Compute the count of companies in the focused column for clamping.
+    let lane_key = LANE_KEYS[app.companies_lane_col];
+    let col_len = app.companies.iter().filter(|c| {
+        all_lanes(c.lanes.as_deref()).iter().any(|k| k == lane_key)
+    }).count();
+
+    match key.code {
+        KeyCode::Char('h') | KeyCode::Left => {
+            if app.companies_lane_col > 0 {
+                app.companies_lane_col -= 1;
+            }
+        }
+        KeyCode::Char('l') | KeyCode::Right => {
+            if app.companies_lane_col < LANE_KEYS.len() - 1 {
+                app.companies_lane_col += 1;
+            }
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            let sel = &mut app.companies_lane_selections[app.companies_lane_col];
+            if col_len > 0 && *sel + 1 < col_len {
+                *sel += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            let sel = &mut app.companies_lane_selections[app.companies_lane_col];
+            if *sel > 0 { *sel -= 1; }
+        }
+        KeyCode::Char('g') | KeyCode::Home => {
+            app.companies_lane_selections[app.companies_lane_col] = 0;
+        }
+        KeyCode::Char('G') | KeyCode::End => {
+            if col_len > 0 {
+                app.companies_lane_selections[app.companies_lane_col] = col_len - 1;
+            }
+        }
+        KeyCode::Char('L') | KeyCode::Esc => {
+            app.companies_layout = CompaniesLayout::Classic;
+            app.add_toast("Layout: Classic".to_string());
+        }
+        KeyCode::Enter => {
+            // Drill into the selected company's jobs.
+            let lane_key = LANE_KEYS[app.companies_lane_col];
+            let sel = app.companies_lane_selections[app.companies_lane_col];
+            let idx = app.companies.iter().enumerate()
+                .filter(|(_, c)| all_lanes(c.lanes.as_deref()).iter().any(|k| k == lane_key))
+                .nth(sel)
+                .map(|(i, _)| i);
+            if let Some(i) = idx {
+                // Mirror enter_company_jobs by setting selection first.
+                app.company_state.select(Some(i));
+                app.enter_company_jobs();
+            }
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            let n = c.to_digit(10).unwrap_or(1) as usize;
+            if n >= 1 && n <= LANE_KEYS.len() {
+                app.companies_lane_col = n - 1;
+            }
+        }
         _ => {}
     }
 }
@@ -92,35 +171,6 @@ pub fn handle_activity(app: &mut App, key: KeyEvent) {
         }
         KeyCode::End => {
             app.activity_scroll = max_scroll;
-        }
-        _ => {}
-    }
-}
-
-pub fn handle_pipeline(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('j') | KeyCode::Down => app.pipeline_next(),
-        KeyCode::Char('k') | KeyCode::Up => app.pipeline_prev(),
-        KeyCode::Char('l') | KeyCode::Right => app.pipeline_col_right(),
-        KeyCode::Char('h') | KeyCode::Left => app.pipeline_col_left(),
-        KeyCode::Char('w') => app.pipeline_move_card("watching"),
-        KeyCode::Char('a') => app.pipeline_move_card("applied"),
-        KeyCode::Char('i') => app.pipeline_move_card("interview"),
-        KeyCode::Char('o') => {
-            // Open URL of selected pipeline card.
-            let col_idx = app.pipeline_col_index();
-            let sel = app.pipeline_selections[col_idx];
-            let job_id = match app.pipeline_column {
-                crate::tui::app::PipelineColumn::Watching => app.pipeline_watching.get(sel).map(|c| c.job_id),
-                crate::tui::app::PipelineColumn::Applied => app.pipeline_applied.get(sel).map(|c| c.job_id),
-                crate::tui::app::PipelineColumn::Interview => app.pipeline_interview.get(sel).map(|c| c.job_id),
-            };
-            if let Some(id) = job_id {
-                // Find the job URL.
-                if let Some(job) = app.jobs.iter().find(|j| j.id == id) {
-                    let _ = std::process::Command::new("open").arg(&job.url).spawn();
-                }
-            }
         }
         _ => {}
     }

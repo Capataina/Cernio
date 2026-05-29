@@ -135,13 +135,6 @@ pub fn draw_help_overlay(frame: &mut Frame, app: &App) {
     help_line_push(&mut lines, t, "  D             ", "Clean database (Dashboard)");
     lines.push(Line::from(""));
 
-    // ── Pipeline section ──
-    lines.push(section_header("Pipeline", section_style, rule_style));
-    help_line_push(&mut lines, t, "  h / l         ", "Switch column");
-    help_line_push(&mut lines, t, "  w / a / i     ", "Move card");
-    help_line_push(&mut lines, t, "  o             ", "Open card URL");
-    lines.push(Line::from(""));
-
     // ── General section ──
     lines.push(section_header("General", section_style, rule_style));
     help_line_push(&mut lines, t, "  ?             ", "Toggle this help");
@@ -280,6 +273,7 @@ pub fn draw_filter_menu(frame: &mut Frame, app: &App) {
 fn active_set_for<'a>(app: &'a App, axis: FilterAxis) -> &'a std::collections::HashSet<String> {
     match axis {
         FilterAxis::Grade => &app.filters.grades,
+        FilterAxis::Lane => &app.filters.lanes,
         FilterAxis::Ats => &app.filters.ats,
         FilterAxis::Decision => &app.filters.decisions,
         FilterAxis::Package => &app.filters.package,

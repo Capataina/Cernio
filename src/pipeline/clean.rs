@@ -122,6 +122,22 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
 
     let mut stale = 0u64;
     for (grade, days) in tier_rules {
+        // Capture the ids about to be archived so we can emit events before
+        // the UPDATE wipes the timing information.
+        let about_to_archive: Vec<i64> = conn
+            .prepare(
+                "SELECT id FROM jobs
+                 WHERE grade = ?1
+                 AND evaluation_status != 'archived'
+                 AND datetime(discovered_at) < datetime('now', ?2)
+                 AND id NOT IN (SELECT job_id FROM user_decisions)",
+            )
+            .and_then(|mut stmt| {
+                stmt.query_map(params![grade, format!("-{days} days")], |r| r.get::<_, i64>(0))
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            })
+            .unwrap_or_default();
+
         let count = conn
             .execute(
                 "UPDATE jobs SET evaluation_status = 'archived', archived_at = datetime('now')
@@ -132,6 +148,9 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
                 params![grade, format!("-{days} days")],
             )
             .unwrap_or(0) as u64;
+        for id in &about_to_archive {
+            crate::db::events::job_archived(conn, *id, "cli:clean");
+        }
         if count > 0 {
             jobs_by_grade.push((grade.to_string(), count));
             jobs_removed += count;
@@ -142,6 +161,24 @@ fn execute(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
     // Delete archived jobs that have been in the archive for 14+ days.
     // Uses archived_at timestamp, not discovered_at.
     // Falls back to discovered_at + 42 days for jobs archived before migration 005.
+    let about_to_delete: Vec<i64> = conn
+        .prepare(
+            "SELECT id FROM jobs
+             WHERE evaluation_status = 'archived'
+             AND (
+                 (archived_at IS NOT NULL AND datetime(archived_at) < datetime('now', '-14 days'))
+                 OR (archived_at IS NULL AND datetime(discovered_at) < datetime('now', '-42 days'))
+             )
+             AND id NOT IN (SELECT job_id FROM user_decisions)",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| r.get::<_, i64>(0))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+    for id in &about_to_delete {
+        crate::db::events::job_pruned(conn, *id, "archive_expired", "cli:clean");
+    }
     let expired_archived = conn
         .execute(
             "DELETE FROM jobs
@@ -192,6 +229,15 @@ fn count_archivable_companies(conn: &Connection, config: &CleanupConfig) -> u64 
 fn archive_companies(conn: &Connection, config: &CleanupConfig) -> u64 {
     let mut total = 0u64;
     for grade in &config.archive_company_grades {
+        let about_to_archive: Vec<i64> = conn
+            .prepare(
+                "SELECT id FROM companies WHERE grade = ?1 AND status != 'archived'",
+            )
+            .and_then(|mut stmt| {
+                stmt.query_map(params![grade], |r| r.get::<_, i64>(0))
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            })
+            .unwrap_or_default();
         let count = conn
             .execute(
                 "UPDATE companies SET status = 'archived'
@@ -199,6 +245,9 @@ fn archive_companies(conn: &Connection, config: &CleanupConfig) -> u64 {
                 params![grade],
             )
             .unwrap_or(0) as u64;
+        for id in &about_to_archive {
+            crate::db::events::company_archived(conn, *id, "cli:clean");
+        }
         total += count;
     }
     total

@@ -88,6 +88,18 @@ pub fn run(conn: &Connection, path: &Path, dry_run: bool) {
 
         match result {
             Ok(_) => {
+                let id = conn.last_insert_rowid();
+                crate::db::events::emit(
+                    conn,
+                    "company.added",
+                    "company",
+                    Some(id),
+                    Some(&company.name),
+                    None,
+                    None,
+                    Some(&serde_json::json!({ "source": source, "sector": company.sector }).to_string()),
+                    "cli:import",
+                );
                 println!("  ✓ {:<30} inserted [{}]", company.name, company.sector);
                 inserted += 1;
             }

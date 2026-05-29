@@ -68,9 +68,11 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    // Column headers — Decision column removed, description indicator added.
+    // Column headers — Decision column removed, description indicator added,
+    // Lane column added (lane-based-relativity refactor).
     let header = Row::new(vec![
         Cell::from(" Gr"),
+        Cell::from("Ln"),
         Cell::from("D"),  // description indicator
         Cell::from("P"),  // application package ready indicator
         Cell::from("Title"),
@@ -171,8 +173,26 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 Cell::from(j.company_name.as_str())
             };
 
+            // Lane cell — primary lane as 3-char coloured badge + `+` when
+            // the job is multi-lane.
+            let lane_primary = crate::tui::theme::primary_lane(j.lanes.as_deref());
+            let all_lanes = crate::tui::theme::all_lanes(j.lanes.as_deref());
+            let lane_cell = match lane_primary.as_deref() {
+                Some(key) => {
+                    let badge = crate::tui::theme::lane_badge(key);
+                    let style = t.lane_style(key);
+                    let suffix = if all_lanes.len() > 1 { "+" } else { " " };
+                    Cell::from(Line::from(vec![
+                        Span::styled(badge.to_string(), style),
+                        Span::styled(suffix.to_string(), t.dim),
+                    ]))
+                }
+                None => Cell::from(Span::styled("—  ", t.dim)),
+            };
+
             let mut row = Row::new(vec![
                 Cell::from(format!("{}{grade_display:<4}", if is_multi { "▪" } else { " " })).style(grade_style),
+                lane_cell,
                 Cell::from(desc_indicator).style(desc_style),
                 Cell::from(pkg_indicator).style(pkg_style),
                 Cell::from(Line::from(if is_new {
@@ -202,12 +222,14 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let widths = if is_compact {
         vec![
             Constraint::Length(5),  // grade
+            Constraint::Length(4),  // lane badge
             Constraint::Fill(1),   // title
             Constraint::Length(12), // company (shorter)
         ]
     } else {
         vec![
             Constraint::Length(5),  // grade + decision indicator
+            Constraint::Length(4),  // lane badge
             Constraint::Length(2),  // description indicator
             Constraint::Length(2),  // package indicator
             Constraint::Fill(1),   // title

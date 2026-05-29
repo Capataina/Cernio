@@ -11,7 +11,6 @@ pub enum View {
     Dashboard,
     Companies,
     Jobs,
-    Pipeline,
     Activity,
 }
 
@@ -29,30 +28,32 @@ impl View {
             View::Dashboard => 0,
             View::Companies => 1,
             View::Jobs => 2,
-            View::Pipeline => 3,
-            View::Activity => 4,
+            View::Activity => 3,
         }
     }
 }
 
 pub struct ActivityEntry {
-    pub date: String,       // "2026-04-09"
-    pub action: String,     // "applied", "searched", "graded", "discovered", "watching", "rejected"
-    pub detail: String,     // "Software Engineer — Citadel" or "270 companies searched"
-}
-
-/// Which column is focused in the Pipeline/Kanban view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PipelineColumn {
-    Watching,
-    Applied,
-    Interview,
+    pub occurred_at: String,    // "2026-05-30 14:23:18"
+    pub date: String,           // "2026-05-30"
+    pub event_type: String,     // "job.added", "job.graded", "decision.applied", etc.
+    pub subject_label: String,  // cached label from activity_events (survives row deletion)
+    pub lane: Option<String>,   // primary lane at emit-time
+    pub grade: Option<String>,  // grade at emit-time
+    pub source: String,         // "tui", "cli:clean", "skill:grade-jobs", "trigger", "backfill-..."
+    pub detail_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
     List,
     Detail,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompaniesLayout {
+    Classic,
+    Lanes,
 }
 
 // ── Data models ──────────────────────────────────────────────────
@@ -98,6 +99,9 @@ pub struct JobRow {
     pub raw_description: Option<String>,
     pub decision: Option<String>,
     pub has_package: bool,
+    /// JSON array of lane keys per the lane-based-relativity refactor.
+    /// None when the job has no lane tag yet.
+    pub lanes: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -136,14 +140,6 @@ pub struct Toast {
     pub created_at: std::time::Instant,
 }
 
-/// A card in the Pipeline/Kanban view.
-pub struct PipelineCard {
-    pub job_id: i64,
-    pub title: String,
-    pub company: String,
-    pub grade: Option<String>,
-}
-
 // ── Filter model ─────────────────────────────────────────────────
 
 /// Multi-axis job filter. Each axis is a "show only this" set: an empty
@@ -171,6 +167,9 @@ pub struct JobFilters {
     /// Default {"jd","semantic"} hides only the truly-ungradable rows but keeps
     /// semantically-graded brand-strong roles visible.
     pub evidence: HashSet<String>,
+    /// Lane filter — match the job's primary lane against this set.
+    /// Empty = no filter (all lanes).
+    pub lanes: HashSet<String>,
 }
 
 impl Default for JobFilters {
@@ -191,6 +190,7 @@ impl Default for JobFilters {
             package: HashSet::new(),
             archive,
             evidence,
+            lanes: HashSet::new(),
         }
     }
 }
@@ -204,6 +204,7 @@ impl JobFilters {
             + self.package.len()
             + self.archive.len()
             + self.evidence.len()
+            + self.lanes.len()
     }
 
     /// Returns true iff every axis is at its default state.
@@ -217,6 +218,7 @@ impl JobFilters {
             && self.evidence.len() == 2
             && self.evidence.contains("jd")
             && self.evidence.contains("semantic")
+            && self.lanes.is_empty()
     }
 
     /// Reset every axis to default.
@@ -232,6 +234,7 @@ impl JobFilters {
         self.package.clear();
         self.archive.clear();
         self.evidence.clear();
+        self.lanes.clear();
     }
 }
 
@@ -240,6 +243,7 @@ impl JobFilters {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterAxis {
     Grade,
+    Lane,
     Ats,
     Decision,
     Package,
@@ -248,8 +252,9 @@ pub enum FilterAxis {
 }
 
 impl FilterAxis {
-    pub const ALL: [FilterAxis; 6] = [
+    pub const ALL: [FilterAxis; 7] = [
         FilterAxis::Grade,
+        FilterAxis::Lane,
         FilterAxis::Ats,
         FilterAxis::Decision,
         FilterAxis::Package,
@@ -260,6 +265,7 @@ impl FilterAxis {
     pub fn label(self) -> &'static str {
         match self {
             FilterAxis::Grade => "Grade",
+            FilterAxis::Lane => "Lane",
             FilterAxis::Ats => "ATS",
             FilterAxis::Decision => "Decision",
             FilterAxis::Package => "Package",
@@ -271,6 +277,16 @@ impl FilterAxis {
     pub fn chips(self) -> &'static [&'static str] {
         match self {
             FilterAxis::Grade => &["SS", "S", "A", "B", "C", "F", "?"],
+            FilterAxis::Lane => &[
+                "big-tech",
+                "ai-ml",
+                "hft",
+                "crypto-mm",
+                "bank-strats",
+                "systems-infra",
+                "devtools",
+                "fintech",
+            ],
             FilterAxis::Ats => &[
                 "greenhouse",
                 "ashby",
@@ -344,13 +360,6 @@ pub struct App {
     pub terminal_width: u16,
     pub terminal_height: u16,
 
-    // ── Pipeline/Kanban view ─────────────────────────────────────
-    pub pipeline_column: PipelineColumn,
-    pub pipeline_watching: Vec<PipelineCard>,
-    pub pipeline_applied: Vec<PipelineCard>,
-    pub pipeline_interview: Vec<PipelineCard>,
-    pub pipeline_selections: [usize; 3], // selection index per column
-
     // ── Activity timeline ───────────────────────────────────────
     pub activity_timeline: Vec<ActivityEntry>,
     pub activity_scroll: u16,
@@ -360,6 +369,18 @@ pub struct App {
 
     // ── Smart job grouping ──────────────────────────────────────
     pub group_by_company: bool,
+
+    // ── Companies view layout ───────────────────────────────────
+    /// `Classic` is the table layout (single list, all lanes mixed).
+    /// `Lanes` is the kanban-style 8-column layout (one column per lane,
+    /// companies ranked top→worst within each column). Toggled with Tab
+    /// when focused on the Companies list. Multi-lane companies appear in
+    /// every lane column they belong to (with a `*` marker).
+    pub companies_layout: CompaniesLayout,
+    /// Currently-focused lane column in the Lanes layout (0..7).
+    pub companies_lane_col: usize,
+    /// Per-lane selection index in the Lanes layout.
+    pub companies_lane_selections: [usize; 8],
 
     // ── Session welcome diff ────────────────────────────────────
     pub new_jobs_since_last: i64,

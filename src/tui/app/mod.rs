@@ -1,7 +1,6 @@
 pub mod state;
 pub mod navigation;
 pub mod actions;
-pub mod pipeline;
 pub mod cleanup;
 
 pub use state::*;
@@ -33,7 +32,19 @@ impl App {
         let companies = queries::fetch_companies(&conn, false);
         crate::tel!("app_fetch_companies", "count": companies.len(), "duration_ms": fetch_start.elapsed().as_millis() as u64);
 
-        let filters = JobFilters::default();
+        let mut filters = JobFilters::default();
+        // Load persisted lane filter if state/tui-prefs.toml exists.
+        if let Ok(content) = std::fs::read_to_string("state/tui-prefs.toml") {
+            if let Ok(val) = content.parse::<toml::Value>() {
+                if let Some(arr) = val.get("lane_filter").and_then(|v| v.as_array()) {
+                    for v in arr {
+                        if let Some(s) = v.as_str() {
+                            filters.lanes.insert(s.to_string());
+                        }
+                    }
+                }
+            }
+        }
         let fetch_start = std::time::Instant::now();
         let jobs = queries::fetch_jobs(&conn, None, &filters, SortMode::ByGrade);
         crate::tel!("app_fetch_jobs", "count": jobs.len(), "duration_ms": fetch_start.elapsed().as_millis() as u64);
@@ -54,9 +65,6 @@ impl App {
         if !jobs.is_empty() {
             job_state.select(Some(0));
         }
-
-        let (pipeline_watching, pipeline_applied, pipeline_interview) =
-            queries::fetch_pipeline_cards(&conn);
 
         let activity_data = queries::fetch_activity_data(&conn);
         let activity_timeline = queries::fetch_activity_timeline(&conn);
@@ -108,23 +116,41 @@ impl App {
             detail_area: Rect::default(),
             terminal_width: 0,
             terminal_height: 0,
-            pipeline_column: PipelineColumn::Watching,
-            pipeline_watching,
-            pipeline_applied,
-            pipeline_interview,
-            pipeline_selections: [0; 3],
             activity_timeline,
             activity_scroll: 0,
             show_quick_peek: false,
             group_by_company: false,
+            companies_layout: CompaniesLayout::Classic,
+            companies_lane_col: 0,
+            companies_lane_selections: [0; 8],
             new_jobs_since_last,
             new_companies_since_last,
             new_decisions_since_last,
         })
     }
 
+    /// Write the current lane filter to state/tui-prefs.toml so it sticks
+    /// across sessions. Called whenever lane filter changes via refresh().
+    fn persist_lane_filter(&self) {
+        let mut sorted: Vec<&String> = self.filters.lanes.iter().collect();
+        sorted.sort();
+        let body = if sorted.is_empty() {
+            "lane_filter = []\n".to_string()
+        } else {
+            let inner = sorted
+                .iter()
+                .map(|s| format!("\"{}\"", s))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("lane_filter = [{inner}]\n")
+        };
+        let _ = std::fs::create_dir_all("state");
+        let _ = std::fs::write("state/tui-prefs.toml", body);
+    }
+
     pub fn refresh(&mut self) {
         let refresh_start = std::time::Instant::now();
+        self.persist_lane_filter();
         let Ok(conn) = Connection::open(&self.db_path) else {
             crate::tel!("refresh_db_open_failed", "db_path": self.db_path.display().to_string());
             return;
@@ -156,11 +182,6 @@ impl App {
         self.last_search_at = queries::fetch_last_search_at(&conn);
         self.last_graded_at = queries::fetch_last_graded_at(&conn);
         self.top_companies_by_hits = queries::fetch_top_companies_by_hits(&conn);
-
-        let (pw, pa, pi) = queries::fetch_pipeline_cards(&conn);
-        self.pipeline_watching = pw;
-        self.pipeline_applied = pa;
-        self.pipeline_interview = pi;
 
         // Re-apply search filter if active.
         if self.search_mode || !self.search_query.is_empty() {
@@ -266,7 +287,6 @@ impl App {
             "detail_scroll": self.detail_scroll,
             "dashboard_scroll": self.dashboard_scroll,
             "activity_scroll": self.activity_scroll,
-            "pipeline_column": format!("{:?}", self.pipeline_column),
             "terminal": {
                 "width": self.terminal_width,
                 "height": self.terminal_height,

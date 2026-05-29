@@ -170,6 +170,7 @@ fn filter_set_mut<'a>(
 ) -> &'a mut std::collections::HashSet<String> {
     match axis {
         FilterAxis::Grade => &mut app.filters.grades,
+        FilterAxis::Lane => &mut app.filters.lanes,
         FilterAxis::Ats => &mut app.filters.ats,
         FilterAxis::Decision => &mut app.filters.decisions,
         FilterAxis::Package => &mut app.filters.package,

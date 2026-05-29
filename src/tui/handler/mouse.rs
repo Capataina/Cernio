@@ -1,6 +1,6 @@
 use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
-use crate::tui::app::{App, Focus, PipelineColumn, View};
+use crate::tui::app::{App, Focus, View};
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     // Only emit telemetry for clicks (not every scroll-pixel) — scroll is high-frequency.
@@ -51,11 +51,6 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 View::Activity => {
                     app.activity_scroll = app.activity_scroll.saturating_add(3);
                 }
-                View::Pipeline => {
-                    app.pipeline_next();
-                    app.pipeline_next();
-                    app.pipeline_next();
-                }
                 _ => {
                     if mouse.column < list_right {
                         app.scroll_table_down(3);
@@ -74,11 +69,6 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 }
                 View::Activity => {
                     app.activity_scroll = app.activity_scroll.saturating_sub(3);
-                }
-                View::Pipeline => {
-                    app.pipeline_prev();
-                    app.pipeline_prev();
-                    app.pipeline_prev();
                 }
                 _ => {
                     if mouse.column < list_right {
@@ -104,8 +94,6 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     app.view = View::Companies;
                 } else if col < 48 {
                     app.view = View::Jobs;
-                } else if col < 64 {
-                    app.view = View::Pipeline;
                 } else {
                     app.view = View::Activity;
                 }
@@ -117,30 +105,6 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
 
             // Below tab bar.
             if matches!(app.view, View::Dashboard | View::Activity) {
-                return;
-            }
-
-            // Pipeline click — select card in the clicked column.
-            if matches!(app.view, View::Pipeline) {
-                let third = app.terminal_width / 3;
-                let col_idx = if mouse.column < third { 0 }
-                    else if mouse.column < third * 2 { 1 }
-                    else { 2 };
-                app.pipeline_column = match col_idx {
-                    0 => PipelineColumn::Watching,
-                    1 => PipelineColumn::Applied,
-                    _ => PipelineColumn::Interview,
-                };
-                // Rough row calc: each card is ~3 lines (title + company + separator).
-                let content_start = 4u16; // tab bar (3) + border (1)
-                if mouse.row >= content_start {
-                    let visual = (mouse.row - content_start) as usize;
-                    let card_idx = visual / 3; // each card ~3 lines
-                    let col_len = app.pipeline_col_len();
-                    if card_idx < col_len {
-                        app.pipeline_selections[col_idx] = card_idx;
-                    }
-                }
                 return;
             }
 

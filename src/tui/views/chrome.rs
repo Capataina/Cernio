@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Paragraph, Tabs};
 use ratatui::Frame;
 
 use crate::tui::app::{App, Focus, SortMode, View};
+use crate::tui::theme::lane_badge;
 
 // ── Tab bar ──────────────────────────────────────────────────────
 
@@ -61,21 +62,6 @@ pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
         ])
     };
 
-    // Pipeline tab — count in green if applied > 0.
-    let pipeline_count = app.pipeline_watching.len()
-        + app.pipeline_applied.len()
-        + app.pipeline_interview.len();
-    let pipeline_count_style = if !app.pipeline_applied.is_empty() {
-        Style::default().fg(Color::Green)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-    let pipeline_tab = Line::from(vec![
-        Span::raw(" Pipeline ("),
-        Span::styled(format!("{pipeline_count}"), pipeline_count_style),
-        Span::raw(") "),
-    ]);
-
     // Activity tab — count in cyan if entries exist.
     let activity_count = app.activity_timeline.len();
     let activity_count_style = if activity_count > 0 {
@@ -89,7 +75,7 @@ pub fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(") "),
     ]);
 
-    let titles = vec![dashboard_tab, companies_tab, jobs_tab, pipeline_tab, activity_tab];
+    let titles = vec![dashboard_tab, companies_tab, jobs_tab, activity_tab];
 
     let tabs = Tabs::new(titles)
         .block(
@@ -175,13 +161,6 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ("Esc", "back"),
             ("q", "quit"),
         ],
-        (View::Pipeline, _) => vec![
-            ("j/k", "up/down"),
-            ("h/l", "columns"),
-            ("w/a/i", "move"),
-            ("?", "help"),
-            ("q", "quit"),
-        ],
         (View::Activity, _) => vec![
             ("j/k", "scroll"),
             ("?", "help"),
@@ -244,17 +223,6 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 app.theme.dim,
             ));
         }
-        View::Pipeline => {
-            right_parts.push(Span::styled(
-                format!(
-                    " {} watching · {} applied · {} interview ",
-                    app.pipeline_watching.len(),
-                    app.pipeline_applied.len(),
-                    app.pipeline_interview.len(),
-                ),
-                app.theme.dim,
-            ));
-        }
         View::Activity => {
             right_parts.push(Span::styled(
                 format!(" {} entries ", app.activity_timeline.len()),
@@ -269,6 +237,19 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             format!(" \"{}\" — {} matches ", app.search_query, count),
             Style::default().fg(Color::Cyan),
         ));
+    }
+
+    // Lane filter chip — shown when any lane filter is active.
+    if !app.filters.lanes.is_empty() {
+        let mut sorted: Vec<&String> = app.filters.lanes.iter().collect();
+        sorted.sort();
+        let mut chip_spans: Vec<Span> = vec![Span::styled(" [lane: ", app.theme.dim)];
+        for (i, lk) in sorted.iter().enumerate() {
+            if i > 0 { chip_spans.push(Span::styled(",", app.theme.dim)); }
+            chip_spans.push(Span::styled(lane_badge(lk).to_string(), app.theme.lane_style(lk)));
+        }
+        chip_spans.push(Span::styled("] ", app.theme.dim));
+        right_parts.extend(chip_spans);
     }
 
     // Session timer.

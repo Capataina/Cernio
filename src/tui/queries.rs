@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-use super::app::{ActivityEntry, CompanyRow, DashboardStats, JobRow, PipelineCard, SortMode, TopMatch};
+use super::app::{ActivityEntry, CompanyRow, DashboardStats, JobRow, SortMode, TopMatch};
 
 pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow> {
     let archive_filter = if show_archived { "" } else { "WHERE c.status != 'archived'" };
@@ -179,16 +179,33 @@ pub fn fetch_jobs(
         clause
     };
 
+    // ── Lane axis ──
+    let lane_filter = if filters.lanes.is_empty() {
+        String::new()
+    } else {
+        // Match if the job's primary lane (the first array element) is in the
+        // set. lanes is stored as TEXT JSON array; we match the literal
+        // prefix `["<lane>"`. Empty/NULL lanes never match a positive filter.
+        let mut parts: Vec<String> = filters
+            .lanes
+            .iter()
+            .map(|l| format!("j.lanes LIKE '[\"{}\"%'", l.replace('\'', "''")))
+            .collect();
+        parts.sort();
+        format!(" AND ({})", parts.join(" OR "))
+    };
+
     let base = format!("
         SELECT j.id, j.company_id, c.name, j.title, j.url, j.location,
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
                j.grade, j.evidence_basis, j.raw_description,
                (SELECT ud.decision FROM user_decisions ud
                 WHERE ud.job_id = j.id ORDER BY ud.decided_at DESC LIMIT 1),
-               0 AS has_package
+               0 AS has_package,
+               j.lanes
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}");
+        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}{lane_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "
@@ -224,6 +241,7 @@ pub fn fetch_jobs(
             raw_description: row.get(12)?,
             decision: row.get(13)?,
             has_package: row.get::<_, bool>(14).unwrap_or(false),
+            lanes: row.get(15)?,
         })
     };
 
@@ -413,46 +431,7 @@ fn query_groups(conn: &Connection, sql: &str) -> Vec<(String, i64)> {
         .unwrap_or_default()
 }
 
-/// Fetch pipeline cards grouped by decision (watching, applied, interview).
-pub fn fetch_pipeline_cards(
-    conn: &Connection,
-) -> (Vec<PipelineCard>, Vec<PipelineCard>, Vec<PipelineCard>) {
-    let fetch = |decision: &str| -> Vec<PipelineCard> {
-        let sql = "
-            SELECT j.id, j.title, c.name, j.grade
-            FROM jobs j
-            JOIN companies c ON c.id = j.company_id
-            JOIN (
-                SELECT job_id, decision
-                FROM user_decisions
-                WHERE id IN (
-                    SELECT MAX(id) FROM user_decisions GROUP BY job_id
-                )
-            ) ud ON ud.job_id = j.id
-            WHERE ud.decision = ?1
-            AND j.evaluation_status != 'archived'
-            ORDER BY
-                CASE j.grade WHEN 'SS' THEN 1 WHEN 'S' THEN 2 WHEN 'A' THEN 3
-                    WHEN 'B' THEN 4 WHEN 'C' THEN 5 WHEN 'F' THEN 6 ELSE 7 END,
-                j.title";
-
-        conn.prepare(sql)
-            .and_then(|mut stmt| {
-                stmt.query_map([decision], |row| {
-                    Ok(PipelineCard {
-                        job_id: row.get(0)?,
-                        title: row.get(1)?,
-                        company: row.get(2)?,
-                        grade: row.get(3)?,
-                    })
-                })
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            })
-            .unwrap_or_default()
-    };
-
-    (fetch("watching"), fetch("applied"), fetch("interview"))
-}
+// fetch_pipeline_cards removed — Pipeline tab deleted in TUI overhaul.
 
 /// Fetch activity data for the contribution heatmap (last 84 days).
 ///
@@ -523,72 +502,46 @@ pub fn fetch_top_companies_by_hits(conn: &Connection) -> Vec<(String, i64)> {
         .unwrap_or_default()
 }
 
-/// Fetch a rich activity timeline for the Activity tab.
+/// Fetch the Activity timeline from the append-only activity_events log.
 ///
-/// Returns individual decision entries (with job title + company) and
-/// aggregated search/grading/discovery events, ordered by date descending.
+/// Returns every event with cached fields intact (subject_label / lane / grade
+/// reflect state at emit-time, so events for deleted rows still render).
+/// Ordered by occurred_at descending, capped at 500 rows for view latency.
 pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
     let sql = "
-        SELECT d AS date, action, detail FROM (
-            -- Individual user decisions with job + company detail
-            SELECT DATE(ud.decided_at) AS d, ud.decision AS action,
-                   j.title || ' — ' || c.name AS detail,
-                   ud.decided_at AS sort_ts,
-                   1 AS priority
-            FROM user_decisions ud
-            JOIN jobs j ON j.id = ud.job_id
-            JOIN companies c ON c.id = j.company_id
-
-            UNION ALL
-
-            -- Aggregated search events per day
-            SELECT DATE(last_searched_at) AS d, 'searched' AS action,
-                   CAST(COUNT(*) AS TEXT) || ' companies searched' AS detail,
-                   MAX(last_searched_at) AS sort_ts,
-                   3 AS priority
-            FROM companies
-            WHERE last_searched_at IS NOT NULL
-            GROUP BY DATE(last_searched_at)
-
-            UNION ALL
-
-            -- Aggregated grading events per day
-            SELECT DATE(graded_at) AS d, 'graded' AS action,
-                   CAST(COUNT(*) AS TEXT) || ' companies graded' AS detail,
-                   MAX(graded_at) AS sort_ts,
-                   4 AS priority
-            FROM companies
-            WHERE graded_at IS NOT NULL
-            GROUP BY DATE(graded_at)
-
-            UNION ALL
-
-            -- Aggregated discovery events per day
-            SELECT DATE(discovered_at) AS d, 'discovered' AS action,
-                   CAST(COUNT(*) AS TEXT) || ' jobs discovered' AS detail,
-                   MAX(discovered_at) AS sort_ts,
-                   5 AS priority
-            FROM jobs
-            WHERE discovered_at IS NOT NULL
-            GROUP BY DATE(discovered_at)
-        )
-        ORDER BY date DESC, priority ASC
-        LIMIT 200
+        SELECT occurred_at,
+               substr(occurred_at, 1, 10) AS date,
+               event_type,
+               COALESCE(subject_label, ''),
+               lane,
+               grade,
+               source,
+               detail_json
+        FROM activity_events
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT 500
     ";
 
     conn.prepare(sql)
         .and_then(|mut stmt| {
             stmt.query_map([], |row| {
                 Ok(ActivityEntry {
-                    date: row.get(0)?,
-                    action: row.get(1)?,
-                    detail: row.get(2)?,
+                    occurred_at: row.get(0)?,
+                    date: row.get(1)?,
+                    event_type: row.get(2)?,
+                    subject_label: row.get(3)?,
+                    lane: row.get(4)?,
+                    grade: row.get(5)?,
+                    source: row.get(6)?,
+                    detail_json: row.get(7)?,
                 })
             })
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
         })
         .unwrap_or_default()
 }
+
+// (legacy fetch_activity_timeline removed — replaced by activity_events log.)
 
 /// Fetch counts of new jobs, companies, and decisions since last session (~12 hours ago).
 pub fn fetch_new_since_session(conn: &Connection) -> (i64, i64, i64) {

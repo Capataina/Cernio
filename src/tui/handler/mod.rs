@@ -96,20 +96,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('4') => {
-            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Pipeline", "trigger": "key_4");
-            app.view = View::Pipeline;
-            app.focus = Focus::List;
-            app.detail_scroll = 0;
-            return;
-        }
-        KeyCode::Char('5') => {
+            crate::tel!("view_change", "from": format!("{:?}", app.view), "to": "Activity", "trigger": "key_4");
             app.view = View::Activity;
             app.focus = Focus::List;
             app.activity_scroll = 0;
             return;
         }
         KeyCode::Char('f') => {
-            if !matches!(app.view, View::Dashboard | View::Pipeline | View::Activity) {
+            if !matches!(app.view, View::Dashboard | View::Activity) {
                 crate::tel!("filter_menu_open", "view": format!("{:?}", app.view));
                 app.show_filter_menu = true;
                 app.filter_menu_axis = 0;
@@ -130,7 +124,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('/') => {
-            if !matches!(app.view, View::Pipeline | View::Activity) {
+            if !matches!(app.view, View::Activity) {
                 app.search_mode = true;
                 app.search_query.clear();
             }
@@ -156,7 +150,6 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         (View::Companies, Focus::Detail) => navigation::handle_detail_scroll(app, key),
         (View::Jobs, Focus::List) => navigation::handle_job_list(app, key),
         (View::Jobs, Focus::Detail) => navigation::handle_detail_scroll(app, key),
-        (View::Pipeline, _) => navigation::handle_pipeline(app, key),
         (View::Activity, _) => navigation::handle_activity(app, key),
     }
 }

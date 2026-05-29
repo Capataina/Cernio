@@ -48,6 +48,232 @@ impl Database {
         self.migrate_006_add_application_packages()?;
         self.migrate_007_drop_fit_score_add_insufficient_evidence()?;
         self.migrate_008_lane_based_relativity()?;
+        self.migrate_009_activity_events()?;
+        Ok(())
+    }
+
+    /// Migration 009: Append-only activity_events log.
+    ///
+    /// Replaces the previous "derive activity from timestamps on living rows"
+    /// model. Events are first-class rows that outlive whatever they describe:
+    /// when a job is deleted, the `job.deleted` event stays in the log, and
+    /// every prior event for that job stays too (subject_label/lane/grade are
+    /// cached at emit-time).
+    ///
+    /// Sources:
+    ///   - `tui` — user action in TUI
+    ///   - `skill:<name>` — emitted from a skill run
+    ///   - `cli:<command>` — emitted from a `cernio` subcommand (clean, search,
+    ///     resolve, etc.)
+    ///   - `backfill-migration-009` — synthesised at migration time
+    ///   - `trigger` — emitted by the SQL trigger backstop
+    ///
+    /// Backfill synthesises events from existing timestamps so the log starts
+    /// populated. Trigger backstops catch any mutation path that bypasses the
+    /// Rust-side emit helpers.
+    fn migrate_009_activity_events(&self) -> Result<()> {
+        let has_table: bool = self
+            .conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='activity_events'",
+                [],
+                |_| Ok(()),
+            )
+            .is_ok();
+
+        if has_table {
+            return Ok(());
+        }
+
+        self.conn.execute_batch(
+            "CREATE TABLE activity_events (
+                 id              INTEGER PRIMARY KEY,
+                 occurred_at     TEXT NOT NULL,
+                 event_type      TEXT NOT NULL,
+                 subject_type    TEXT NOT NULL,
+                 subject_id      INTEGER,
+                 subject_label   TEXT,
+                 lane            TEXT,
+                 grade           TEXT,
+                 detail_json     TEXT,
+                 source          TEXT NOT NULL
+             );
+             CREATE INDEX idx_activity_events_occurred_at ON activity_events(occurred_at DESC);
+             CREATE INDEX idx_activity_events_event_type ON activity_events(event_type);
+             CREATE INDEX idx_activity_events_lane ON activity_events(lane);
+             CREATE INDEX idx_activity_events_subject ON activity_events(subject_type, subject_id);",
+        )?;
+
+        // ── Backfill from existing timestamps ────────────────────
+        //
+        // Cached subject_label/lane/grade reflect the state at backfill time;
+        // genuine "what happened then" data is lost (timestamps don't carry
+        // pre-state diffs), but the events themselves are preserved.
+        let source = "backfill-migration-009";
+
+        // companies.discovered_at → company.added
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT discovered_at, 'company.added', 'company', id, name,
+                    CASE WHEN lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(lanes, 1, INSTR(lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    grade,
+                    json_object('source', COALESCE(discovery_source, '')),
+                    ?1
+             FROM companies WHERE discovered_at IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // companies.graded_at → company.graded
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT graded_at, 'company.graded', 'company', id, name,
+                    CASE WHEN lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(lanes, 1, INSTR(lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    grade, NULL, ?1
+             FROM companies WHERE graded_at IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // companies.last_searched_at → search.ran (one event per company-search)
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT last_searched_at, 'search.ran', 'company', id, name,
+                    CASE WHEN lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(lanes, 1, INSTR(lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    grade, NULL, ?1
+             FROM companies WHERE last_searched_at IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // jobs.discovered_at → job.added
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT j.discovered_at, 'job.added', 'job', j.id,
+                    j.title || ' — ' || c.name,
+                    CASE WHEN j.lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(j.lanes, 1, INSTR(j.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    j.grade, NULL, ?1
+             FROM jobs j JOIN companies c ON c.id = j.company_id
+             WHERE j.discovered_at IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // Synthesise job.graded events for jobs that have a grade. We don't
+        // have a graded_at timestamp on jobs, so use discovered_at as a stand-in.
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT j.discovered_at, 'job.graded', 'job', j.id,
+                    j.title || ' — ' || c.name,
+                    CASE WHEN j.lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(j.lanes, 1, INSTR(j.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    j.grade,
+                    json_object('evidence_basis', COALESCE(j.evidence_basis, 'jd')),
+                    ?1
+             FROM jobs j JOIN companies c ON c.id = j.company_id
+             WHERE j.grade IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // jobs.archived_at → job.archived
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT j.archived_at, 'job.archived', 'job', j.id,
+                    j.title || ' — ' || c.name,
+                    CASE WHEN j.lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(j.lanes, 1, INSTR(j.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    j.grade, NULL, ?1
+             FROM jobs j JOIN companies c ON c.id = j.company_id
+             WHERE j.archived_at IS NOT NULL",
+            rusqlite::params![source],
+        )?;
+
+        // user_decisions → decision.<kind>
+        self.conn.execute(
+            "INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, detail_json, source)
+             SELECT ud.decided_at, 'decision.' || ud.decision, 'job', j.id,
+                    j.title || ' — ' || c.name,
+                    CASE WHEN j.lanes IS NULL THEN NULL
+                         ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(j.lanes, 1, INSTR(j.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                    END,
+                    j.grade, NULL, ?1
+             FROM user_decisions ud
+             JOIN jobs j ON j.id = ud.job_id
+             JOIN companies c ON c.id = j.company_id",
+            rusqlite::params![source],
+        )?;
+
+        // ── Trigger backstop ──
+        //
+        // Any mutation path that bypasses the Rust-side emit helpers produces a
+        // `raw.*` event. Cached fields are populated from OLD/NEW row state.
+        // The Rust helpers MUST run before the trigger fires for the same
+        // logical event (they cite source = 'tui' / 'skill:*' / 'cli:*'); the
+        // trigger only fires when the helper was skipped (source = 'trigger').
+        self.conn.execute_batch(
+            "CREATE TRIGGER trg_activity_job_insert AFTER INSERT ON jobs
+             BEGIN
+                INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, source)
+                SELECT datetime('now'), 'raw.job.inserted', 'job', NEW.id,
+                       NEW.title || ' — ' || c.name,
+                       CASE WHEN NEW.lanes IS NULL THEN NULL
+                            ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(NEW.lanes, 1, INSTR(NEW.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                       END,
+                       NEW.grade, 'trigger'
+                FROM companies c WHERE c.id = NEW.company_id
+                AND NOT EXISTS (
+                    SELECT 1 FROM activity_events ae
+                    WHERE ae.subject_type = 'job' AND ae.subject_id = NEW.id
+                      AND ae.event_type = 'job.added'
+                      AND ae.occurred_at > datetime('now', '-2 seconds')
+                );
+             END;
+
+             CREATE TRIGGER trg_activity_job_delete BEFORE DELETE ON jobs
+             BEGIN
+                INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, source)
+                SELECT datetime('now'), 'raw.job.deleted', 'job', OLD.id,
+                       OLD.title || ' — ' || c.name,
+                       CASE WHEN OLD.lanes IS NULL THEN NULL
+                            ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(OLD.lanes, 1, INSTR(OLD.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                       END,
+                       OLD.grade, 'trigger'
+                FROM companies c WHERE c.id = OLD.company_id
+                AND NOT EXISTS (
+                    SELECT 1 FROM activity_events ae
+                    WHERE ae.subject_type = 'job' AND ae.subject_id = OLD.id
+                      AND ae.event_type IN ('job.deleted', 'job.pruned')
+                      AND ae.occurred_at > datetime('now', '-2 seconds')
+                );
+             END;
+
+             CREATE TRIGGER trg_activity_company_insert AFTER INSERT ON companies
+             BEGIN
+                INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, source)
+                VALUES (datetime('now'), 'raw.company.inserted', 'company', NEW.id, NEW.name,
+                        CASE WHEN NEW.lanes IS NULL THEN NULL
+                             ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(NEW.lanes, 1, INSTR(NEW.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                        END,
+                        NEW.grade, 'trigger');
+             END;
+
+             CREATE TRIGGER trg_activity_company_delete BEFORE DELETE ON companies
+             BEGIN
+                INSERT INTO activity_events (occurred_at, event_type, subject_type, subject_id, subject_label, lane, grade, source)
+                VALUES (datetime('now'), 'raw.company.deleted', 'company', OLD.id, OLD.name,
+                        CASE WHEN OLD.lanes IS NULL THEN NULL
+                             ELSE TRIM(REPLACE(REPLACE(REPLACE(SUBSTR(OLD.lanes, 1, INSTR(OLD.lanes||',', ',')-1), '[', ''), ']', ''), '\"', ''))
+                        END,
+                        OLD.grade, 'trigger');
+             END;",
+        )?;
+
         Ok(())
     }
 
