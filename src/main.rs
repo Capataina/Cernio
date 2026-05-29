@@ -1,4 +1,4 @@
-use cernio::{ats, config, db, pipeline, telemetry, tui};
+use cernio::{ats, config, db, pipeline, telemetry, tui, web};
 use db::Database;
 use std::path::Path;
 
@@ -15,6 +15,7 @@ async fn main() {
 
     match args.get(1).map(|s| s.as_str()) {
         Some("tui") => cmd_tui(),
+        Some("web") => cmd_web(&args).await,
         Some("import") => cmd_import(&args),
         Some("resolve") => cmd_resolve(&args).await,
         Some("search") => cmd_search(&args).await,
@@ -474,6 +475,22 @@ fn cmd_tui() {
 /// Defaults to `state/cernio.db` for normal operation. Tests override this
 /// env var to point at a temporary per-test database so they never touch the
 /// real one.
+/// Launch the web frontend. Boots an axum server on localhost (default port
+/// 7878) reading the same SQLite DB the TUI uses, opens the system browser
+/// automatically. Stays in the foreground until Ctrl+C.
+async fn cmd_web(args: &[String]) {
+    // Ensure migrations have run on the shared DB before the server boots.
+    let _db = open_db();
+    let port = get_flag_value(args, "--port")
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(7878);
+    let no_open = args.iter().any(|a| a == "--no-open");
+    let db_path = db_path_from_env();
+    if let Err(e) = web::serve(&db_path, port, !no_open).await {
+        eprintln!("cernio web failed: {e}");
+    }
+}
+
 fn db_path_from_env() -> String {
     std::env::var("CERNIO_DB_PATH").unwrap_or_else(|_| "state/cernio.db".to_string())
 }
@@ -497,6 +514,10 @@ fn get_flag_value(args: &[String], flag: &str) -> Option<String> {
 
 fn print_usage() {
     println!("Usage: cernio <command>\n");
+    println!("UI commands:");
+    println!("  tui                                      Terminal UI");
+    println!("  web [--port N] [--no-open]               Browser UI (default port 7878)");
+    println!();
     println!("Pipeline commands:");
     println!("  import [--file PATH] [--dry-run]         Import companies from potential.md into DB");
     println!("  resolve [--company NAME] [--dry-run]     Resolve ATS portals for pending companies");

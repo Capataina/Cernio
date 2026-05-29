@@ -11,11 +11,13 @@
 pub mod ats;
 pub mod autofill;
 pub mod config;
+pub mod data;
 pub mod db;
 pub mod http;
 pub mod pipeline;
 pub mod telemetry;
 pub mod tui;
+pub mod web;
 
 /// Test-only helpers. Hidden from docs.
 ///

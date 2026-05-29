@@ -118,6 +118,8 @@ impl App {
             terminal_height: 0,
             activity_timeline,
             activity_scroll: 0,
+            activity_expanded: std::collections::HashSet::new(),
+            activity_cursor: 0,
             show_quick_peek: false,
             group_by_company: false,
             companies_layout: CompaniesLayout::Classic,

@@ -1,6 +1,6 @@
 pub mod chrome;
 pub mod overlays;
-mod activity;
+pub mod activity;
 mod companies;
 mod dashboard;
 mod jobs;

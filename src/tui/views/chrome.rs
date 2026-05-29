@@ -124,14 +124,30 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ("?", "help"),
             ("q", "quit"),
         ],
-        (View::Companies, Focus::List) => vec![
-            ("j/k", "navigate"),
-            ("Enter", "jobs"),
-            ("Tab", "detail"),
-            ("/", "search"),
-            ("?", "help"),
-            ("q", "quit"),
-        ],
+        (View::Companies, Focus::List) => {
+            use crate::tui::app::CompaniesLayout;
+            if app.companies_layout == CompaniesLayout::Lanes {
+                vec![
+                    ("j/k", "scroll lane"),
+                    ("h/l", "switch lane"),
+                    ("1-8", "jump lane"),
+                    ("Enter", "jobs"),
+                    ("L", "classic"),
+                    ("?", "help"),
+                    ("q", "quit"),
+                ]
+            } else {
+                vec![
+                    ("j/k", "navigate"),
+                    ("Enter", "jobs"),
+                    ("Tab", "detail"),
+                    ("/", "search"),
+                    ("L", "lanes"),
+                    ("?", "help"),
+                    ("q", "quit"),
+                ]
+            }
+        },
         (View::Companies, Focus::Detail) => vec![
             ("j/k", "scroll"),
             ("Tab", "list"),

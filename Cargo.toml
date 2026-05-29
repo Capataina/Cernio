@@ -15,6 +15,11 @@ ratatui = { version = "0.29", features = ["crossterm"] }
 chromiumoxide = "0.9"
 futures = "0.3"
 
+# Web frontend
+axum = "0.7"
+tower-http = { version = "0.5", features = ["fs"] }
+maud = "0.26"
+
 [dev-dependencies]
 proptest = "1.5"
 tempfile = "3.10"

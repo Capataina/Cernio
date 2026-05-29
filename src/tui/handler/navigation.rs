@@ -158,19 +158,36 @@ pub fn handle_job_list(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle_activity(app: &mut App, key: KeyEvent) {
+    let group_count = crate::tui::views::activity::group_count(app);
     let max_scroll = (app.activity_timeline.len() as u16).saturating_sub(10);
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
+            if app.activity_cursor + 1 < group_count {
+                app.activity_cursor += 1;
+            }
             app.activity_scroll = app.activity_scroll.saturating_add(1).min(max_scroll);
         }
         KeyCode::Char('k') | KeyCode::Up => {
+            if app.activity_cursor > 0 { app.activity_cursor -= 1; }
             app.activity_scroll = app.activity_scroll.saturating_sub(1);
         }
         KeyCode::Home => {
             app.activity_scroll = 0;
+            app.activity_cursor = 0;
         }
         KeyCode::End => {
             app.activity_scroll = max_scroll;
+            app.activity_cursor = group_count.saturating_sub(1);
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            if let Some(group) = crate::tui::views::activity::group_at(app, app.activity_cursor) {
+                let key = group.key();
+                if app.activity_expanded.contains(&key) {
+                    app.activity_expanded.remove(&key);
+                } else {
+                    app.activity_expanded.insert(key);
+                }
+            }
         }
         _ => {}
     }

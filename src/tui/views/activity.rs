@@ -5,30 +5,37 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 
+use crate::data::activity::{group_timeline, ActivityGroup};
+use crate::data::models::ActivityEntry;
 use crate::tui::app::App;
 use crate::tui::theme::lane_badge;
 
-/// Draw the Activity timeline — every event from `activity_events`, grouped
-/// by day, lane-coloured, with event-type icons. The data is the append-only
-/// event log written at every DB mutation, so events for deleted rows still
-/// render with their cached label/lane/grade.
+/// Draw the Activity timeline — aggregated event groups from the append-only
+/// `activity_events` log. Adjacent same-(event_type, source) events within a
+/// time window collapse into a single row showing the count; press Enter to
+/// expand and see the individual events.
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let entries = &app.activity_timeline;
-    let count = entries.len();
+    let groups = group_timeline(entries);
+    let count = groups.len();
 
     let block = Block::bordered()
-        .title(format!(" Activity ({count} events) "))
+        .title(format!(" Activity ({count} entries · {} events) ", entries.len()))
         .title_style(app.theme.title)
         .border_style(Style::default().fg(app.theme.border));
 
     let t = &app.theme;
     let mut lines: Vec<Line> = Vec::new();
-    let mut current_date: Option<&str> = None;
+    let mut current_date: Option<String> = None;
 
-    for entry in entries {
-        if current_date != Some(&entry.date) {
-            current_date = Some(&entry.date);
-            let formatted = format_date(&entry.date);
+    // Track per-row index for cursor highlighting (rows = group headers + expanded children).
+    let mut row_idx = 0usize;
+
+    for group in &groups {
+        let date = group.date().to_string();
+        if current_date.as_deref() != Some(date.as_str()) {
+            current_date = Some(date.clone());
+            let formatted = format_date(&date);
             if !lines.is_empty() {
                 lines.push(Line::from(""));
             }
@@ -39,47 +46,68 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from(""));
         }
 
-        // Per-event row: time · lane badge · icon · label · grade · source
-        let time = if entry.occurred_at.len() >= 16 {
-            &entry.occurred_at[11..16]
+        let cursor_here = row_idx == app.activity_cursor;
+        let base_style = if cursor_here {
+            Style::default().add_modifier(Modifier::REVERSED)
         } else {
-            ""
+            Style::default()
         };
 
-        let (icon, icon_style) = icon_for_event(&entry.event_type, t);
-        let lane_str = match entry.lane.as_deref() {
-            Some(key) => format!("{} ", lane_badge(key)),
-            None => "—   ".to_string(),
-        };
-        let lane_style = match entry.lane.as_deref() {
-            Some(key) => t.lane_style(key),
-            None => t.dim,
-        };
+        match group {
+            ActivityGroup::Single(entry) => {
+                lines.push(render_entry_line(entry, t, false, base_style));
+                row_idx += 1;
+            }
+            ActivityGroup::Collapsed {
+                event_type,
+                source,
+                first_at,
+                last_at,
+                entries,
+                ..
+            } => {
+                let key = group.key();
+                let expanded = app.activity_expanded.contains(&key);
+                let arrow = if expanded { "▾" } else { "▸" };
 
-        let mut spans = vec![
-            Span::raw("  "),
-            Span::styled(format!("{time} "), t.dim),
-            Span::styled(lane_str, lane_style),
-            Span::styled(format!("{icon} "), icon_style),
-            Span::styled(format!("{:<22}", event_label(&entry.event_type)), icon_style),
-            Span::raw(" "),
-        ];
+                let (icon, icon_style) = icon_for_event(event_type, t);
+                let label = event_label(event_type);
+                let time_first = if first_at.len() >= 16 { &first_at[11..16] } else { "" };
+                let time_last = if last_at.len() >= 16 { &last_at[11..16] } else { "" };
+                let time_str = if time_first == time_last {
+                    time_first.to_string()
+                } else {
+                    format!("{time_first}–{time_last}")
+                };
+                let source_str = if source != "tui" {
+                    format!("  · {source}")
+                } else {
+                    String::new()
+                };
 
-        if !entry.subject_label.is_empty() {
-            spans.push(Span::raw(entry.subject_label.clone()));
+                let mut spans = vec![
+                    Span::styled(format!("  {arrow} "), if expanded { t.stat_value } else { t.dim }),
+                    Span::styled(format!("{time_str:<11} "), t.dim),
+                    Span::styled(format!("{icon} "), icon_style),
+                    Span::styled(
+                        format!("{} {label}", entries.len()),
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(source_str, t.dim),
+                ];
+                if cursor_here {
+                    for s in &mut spans { s.style = s.style.add_modifier(Modifier::REVERSED); }
+                }
+                lines.push(Line::from(spans));
+                row_idx += 1;
+
+                if expanded {
+                    for entry in entries {
+                        lines.push(render_entry_line(entry, t, true, Style::default()));
+                    }
+                }
+            }
         }
-
-        if let Some(grade) = entry.grade.as_deref() {
-            spans.push(Span::raw("  "));
-            spans.push(Span::styled(format!("[{grade}]"), t.grade_style(Some(grade))));
-        }
-
-        // Source tag — only show if non-default (i.e. not 'tui' which is most common).
-        if entry.source != "tui" {
-            spans.push(Span::styled(format!("  · {}", entry.source), t.dim));
-        }
-
-        lines.push(Line::from(spans));
     }
 
     if lines.is_empty() {
@@ -112,21 +140,79 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-/// Map event_type to icon + style.
-///
-/// raw.* events come from the trigger backstop (mutation paths that bypassed
-/// the Rust-side emit helpers) and are rendered with a `?` to surface the
-/// coverage gap.
+/// Group count at the top-level (used by handlers to clamp cursor).
+pub fn group_count(app: &App) -> usize {
+    group_timeline(&app.activity_timeline).len()
+}
+
+/// Look up the group at `index` (top-level group rows only — children of
+/// expanded groups don't count). Used by Enter to toggle expansion.
+pub fn group_at(app: &App, index: usize) -> Option<ActivityGroup> {
+    group_timeline(&app.activity_timeline).into_iter().nth(index)
+}
+
+fn render_entry_line<'a>(
+    entry: &'a ActivityEntry,
+    t: &'a crate::tui::theme::Theme,
+    is_child: bool,
+    base_style: Style,
+) -> Line<'a> {
+    let time = if entry.occurred_at.len() >= 16 {
+        &entry.occurred_at[11..16]
+    } else {
+        ""
+    };
+
+    let (icon, icon_style) = icon_for_event(&entry.event_type, t);
+    let lane_str = match entry.lane.as_deref() {
+        Some(key) => format!("{} ", lane_badge(key)),
+        None => "—   ".to_string(),
+    };
+    let lane_style = match entry.lane.as_deref() {
+        Some(key) => t.lane_style(key),
+        None => t.dim,
+    };
+
+    let indent = if is_child { "      " } else { "  " };
+    let mut spans = vec![
+        Span::styled(indent.to_string(), Style::default()),
+        Span::styled(format!("{time} "), t.dim),
+        Span::styled(lane_str, lane_style),
+        Span::styled(format!("{icon} "), icon_style),
+        Span::styled(format!("{:<22}", event_label(&entry.event_type)), icon_style),
+        Span::raw(" "),
+    ];
+
+    if !entry.subject_label.is_empty() {
+        spans.push(Span::raw(entry.subject_label.clone()));
+    }
+
+    if let Some(grade) = entry.grade.as_deref() {
+        spans.push(Span::raw("  "));
+        spans.push(Span::styled(format!("[{grade}]"), t.grade_style(Some(grade))));
+    }
+
+    if entry.source != "tui" {
+        spans.push(Span::styled(format!("  · {}", entry.source), t.dim));
+    }
+
+    if base_style != Style::default() {
+        for s in &mut spans { s.style = s.style.patch(base_style); }
+    }
+
+    Line::from(spans)
+}
+
 fn icon_for_event(event_type: &str, t: &crate::tui::theme::Theme) -> (&'static str, Style) {
     match event_type {
         "job.added" => ("+", Style::default().fg(Color::Green)),
         "job.deleted" | "job.pruned" => ("−", Style::default().fg(Color::Red)),
-        "job.archived" => ("🗄", t.dim),
+        "job.archived" => ("□", t.dim),
         "job.graded" => ("★", Style::default().fg(Color::Yellow)),
         "job.regraded" => ("↺", Style::default().fg(Color::Yellow)),
         "company.added" => ("+", Style::default().fg(Color::Cyan)),
         "company.deleted" => ("−", Style::default().fg(Color::Red)),
-        "company.archived" => ("🗄", t.dim),
+        "company.archived" => ("□", t.dim),
         "company.unarchived" => ("↻", Style::default().fg(Color::Cyan)),
         "company.graded" => ("★", Style::default().fg(Color::Yellow)),
         "decision.applied" => ("✓", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
@@ -139,7 +225,6 @@ fn icon_for_event(event_type: &str, t: &crate::tui::theme::Theme) -> (&'static s
     }
 }
 
-/// Short human label for the event type column.
 fn event_label(event_type: &str) -> String {
     match event_type {
         "job.added" => "job added".into(),
@@ -158,6 +243,10 @@ fn event_label(event_type: &str) -> String {
         "decision.rejected" => "rejected".into(),
         "decision.interview" => "interview".into(),
         "search.ran" => "search".into(),
+        "raw.job.inserted" => "raw insert (job)".into(),
+        "raw.job.deleted" => "raw delete (job)".into(),
+        "raw.company.inserted" => "raw insert (company)".into(),
+        "raw.company.deleted" => "raw delete (company)".into(),
         other => other.to_string(),
     }
 }
