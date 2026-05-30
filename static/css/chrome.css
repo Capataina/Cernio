@@ -76,8 +76,63 @@
     box-shadow: 0 0 12px var(--accent-glow);
 }
 
-.status-strip {
+/* ── Lane legend topbar popover ──────────────────────────────────── */
+
+.lane-legend-topbar {
     margin-left: auto;
+    position: relative;
+    margin-right: 12px;
+}
+.lane-legend-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--bg-3);
+    cursor: default;
+    transition: all var(--t-fast) var(--easing);
+}
+.lane-legend-topbar:hover .lane-legend-trigger {
+    color: var(--text-0);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.lane-legend-pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    border: 1px solid var(--border-strong);
+    border-left: 2px solid var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,0.6), 0 0 18px var(--accent-glow);
+    width: 320px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-base) var(--easity), transform var(--t-base) var(--easing);
+    transform: translateY(-4px);
+}
+.lane-legend-topbar:hover .lane-legend-pop {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.status-strip {
+    margin-left: 0;
     display: flex; align-items: center; gap: 10px;
     color: var(--text-3);
     font-family: var(--font-mono);

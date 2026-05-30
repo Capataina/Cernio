@@ -102,11 +102,28 @@ main {
     padding: 20px 24px 60px;
     max-width: 1840px;
     margin: 0 auto;
-    animation: fade-in var(--t-slow) var(--easing);
+    animation: page-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-@keyframes fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+/* Smoother, slightly longer entry — feels like a real page transition
+ * rather than an abrupt swap. Subtle scale + opacity. */
+@keyframes page-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.998); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Pane title hierarchy — distinguish primary (chart-heavy) from secondary.
+ * Primary panes get a 1px accent underline on the h2 to add weight; small
+ * panes stay flat. Apply via .panel-primary class on the section. */
+.panel-primary .panel-head h2 {
+    position: relative;
+}
+.panel-primary .panel-head h2::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: -3px;
+    width: 24px; height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    border-radius: 1px;
 }
 
 .empty {
@@ -127,7 +144,7 @@ main {
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    opacity: 0.45;
+    opacity: 0.85;
 }
 
 /* Grid primitives shared across pages */

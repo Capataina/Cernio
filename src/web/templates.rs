@@ -69,6 +69,12 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                         (tab("/decisions", "Decisions", active == "decisions"))
                         (tab("/activity", "Activity", active == "activity"))
                     }
+                    div.lane-legend-topbar {
+                        span.lane-legend-trigger { "lanes" }
+                        div.lane-legend-pop {
+                            (lane_legend_inline(active))
+                        }
+                    }
                     div.preset-menu {
                         button #preset-btn class="preset-btn" type="button" title="Saved searches" {
                             "★ presets"
@@ -172,25 +178,30 @@ pub fn grade_pill(grade: Option<&str>) -> Markup {
     html! { span.(class) { (g) } }
 }
 
-pub fn lane_legend(page: &str) -> Markup {
-    // Map page → destination prefix. Dashboard / activity default to /jobs
-    // since that is the action page.
+/// Inline lane legend used inside the topbar popover.
+fn lane_legend_inline(page: &str) -> Markup {
     let prefix = match page {
         "companies" => "/companies",
         _ => "/jobs",
     };
     html! {
-        div.lane-legend {
-            @for key in LANE_KEYS.iter() {
-                a.lane-legend-item
-                    href=(format!("{prefix}?lane={key}"))
-                    style=(format!("--lane-color: {}", lane_hex(key))) {
-                    span.lane-legend-dot {}
-                    span.lane-legend-label { (lane_label(key)) }
-                }
+        @for key in LANE_KEYS.iter() {
+            a.lane-legend-item
+                href=(format!("{prefix}?lane={key}"))
+                style=(format!("--lane-color: {}", lane_hex(key))) {
+                span.lane-legend-dot {}
+                span.lane-legend-label { (lane_label(key)) }
             }
         }
     }
+}
+
+/// Lane legend used to render inline on every page. Now a no-op — the
+/// legend lives in the topbar popover (see `lane-legend-topbar` + the
+/// hover-triggered `.lane-legend-pop`). Kept as a function so per-page
+/// handlers don't need to be touched.
+pub fn lane_legend(_page: &str) -> Markup {
+    html! {}
 }
 
 fn ops_item(op: &str, title: &str, desc: &str) -> Markup {

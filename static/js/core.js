@@ -21,17 +21,17 @@
     document.body.appendChild(canvas);
     const ctx = canvas.getContext('2d');
     let w, h, dots;
-    const N = 28;
+    const N = 56;
     function resize() {
       w = canvas.width = window.innerWidth;
       h = canvas.height = window.innerHeight;
       dots = Array.from({ length: N }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.08,
-        vy: (Math.random() - 0.5) * 0.08,
-        r: Math.random() * 1.2 + 0.5,
-        a: Math.random() * 0.4 + 0.15,
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: (Math.random() - 0.5) * 0.12,
+        r: Math.random() * 1.6 + 0.7,
+        a: Math.random() * 0.5 + 0.22,
       }));
     }
     resize();
