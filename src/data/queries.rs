@@ -556,12 +556,18 @@ pub fn fetch_top_companies_by_hits(conn: &Connection) -> Vec<(String, i64)> {
 /// reflect state at emit-time, so events for deleted rows still render).
 /// Ordered by occurred_at descending, capped at 500 rows for view latency.
 pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
-    // By default, hide raw.* SQL-trigger events (they fire alongside every
-    // "real" event and just double up the log). Also hide one-shot migration
-    // backfill noise. The Activity page can opt in to showing them via
-    // fetch_activity_timeline_unfiltered() once a toggle is added.
-    let sql = "
-        SELECT occurred_at,
+    fetch_activity_timeline_opts(conn, false, 2000)
+}
+
+/// Fetch activity timeline with options.
+///   show_raw=false   → exclude raw.* SQL-trigger events (the default; they
+///                      fire alongside every real event and double up the log)
+///   show_raw=true    → include them (for diagnostic deep dives)
+/// Migration/backfill source is always excluded.
+pub fn fetch_activity_timeline_opts(conn: &Connection, show_raw: bool, limit: i64) -> Vec<ActivityEntry> {
+    let raw_clause = if show_raw { "" } else { "AND event_type NOT LIKE 'raw.%'" };
+    let sql = format!(
+        "SELECT occurred_at,
                substr(occurred_at, 1, 10) AS date,
                event_type,
                COALESCE(subject_label, ''),
@@ -569,17 +575,17 @@ pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
                grade,
                source,
                detail_json
-        FROM activity_events
-        WHERE event_type NOT LIKE 'raw.%'
-          AND source NOT LIKE '%backfill%'
-          AND source NOT LIKE '%migration%'
-        ORDER BY occurred_at DESC, id DESC
-        LIMIT 500
-    ";
+         FROM activity_events
+         WHERE source NOT LIKE '%backfill%'
+           AND source NOT LIKE '%migration%'
+           {raw_clause}
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT ?1");
+    let sql = sql.as_str();
 
     conn.prepare(sql)
         .and_then(|mut stmt| {
-            stmt.query_map([], |row| {
+            stmt.query_map([limit], |row| {
                 Ok(ActivityEntry {
                     occurred_at: row.get(0)?,
                     date: row.get(1)?,

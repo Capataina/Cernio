@@ -16,6 +16,8 @@ use crate::web::AppState;
 pub struct ActivityQuery {
     #[serde(default)]
     pub window: Option<String>,
+    #[serde(default)]
+    pub raw: Option<String>,
 }
 
 /// Parse `?window=7d|30d|90d` into a day-count. Unknown / missing → 30.
@@ -27,12 +29,17 @@ fn parse_window(raw: Option<&str>) -> i64 {
     }
 }
 
+fn parse_show_raw(raw: Option<&str>) -> bool {
+    matches!(raw, Some("1") | Some("true") | Some("yes"))
+}
+
 pub async fn page(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ActivityQuery>,
 ) -> Html<String> {
     let days = parse_window(q.window.as_deref());
-    let body = render(&state, days).await;
+    let show_raw = parse_show_raw(q.raw.as_deref());
+    let body = render(&state, days, show_raw).await;
     Html(
         page_with(
             "Activity",
@@ -44,12 +51,12 @@ pub async fn page(
     )
 }
 
-async fn render(state: &AppState, days: i64) -> Markup {
+async fn render(state: &AppState, days: i64, show_raw: bool) -> Markup {
     let Ok(conn) = Connection::open(&state.db_path) else {
         return html! { div.error { "Could not open database." } };
     };
 
-    let timeline = queries::fetch_activity_timeline(&conn);
+    let timeline = queries::fetch_activity_timeline_opts(&conn, show_raw, 2000);
     let groups = group_timeline(&timeline);
 
     // ── KPIs ──
@@ -133,11 +140,12 @@ async fn render(state: &AppState, days: i64) -> Markup {
             // Timeframe toggle (controls both panels below)
             div.timeframe-bar {
                 span.timeframe-label { "Window" }
-                (timeframe_toggle(days))
+                (timeframe_toggle(days, show_raw))
+                (raw_toggle(days, show_raw))
             }
 
             // Windowed sparkline + event-type breakdown
-            div.dash-row.dash-row-2 {
+            div.grid-2 {
                 section.panel {
                     header.panel-head {
                         h2 { (format!("{days}-day events by source")) }
@@ -195,15 +203,28 @@ async fn render(state: &AppState, days: i64) -> Markup {
 /// chip is marked with `timeframe-chip-active` so CSS can highlight it; every
 /// chip points at `/activity?window=Xd` so default browser navigation handles
 /// the round-trip (no JS required).
-fn timeframe_toggle(active_days: i64) -> Markup {
+fn timeframe_toggle(active_days: i64, show_raw: bool) -> Markup {
     let options: [(i64, &str); 3] = [(7, "7D"), (30, "30D"), (90, "90D")];
+    let raw_qs = if show_raw { "&raw=1" } else { "" };
     html! {
         div.timeframe-toggle {
             @for (days, label) in options.iter() {
                 @let is_active = *days == active_days;
                 @let class = if is_active { "timeframe-chip timeframe-chip-active" } else { "timeframe-chip" };
-                a.(class) href=(format!("/activity?window={days}d")) { (label) }
+                a.(class) href=(format!("/activity?window={days}d{raw_qs}")) { (label) }
             }
+        }
+    }
+}
+
+/// "Show raw events" toggle — segmented control on/off.
+fn raw_toggle(days: i64, show_raw: bool) -> Markup {
+    html! {
+        div class="seg-group" {
+            a class="seg" data-active=(!show_raw)
+              href=(format!("/activity?window={days}d")) { "Real events" }
+            a class="seg" data-active=(show_raw)
+              href=(format!("/activity?window={days}d&raw=1")) { "+ raw triggers" }
         }
     }
 }

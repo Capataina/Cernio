@@ -30,6 +30,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/motion.css";
                 link rel="stylesheet" href="/static/css/components.css";
                 link rel="stylesheet" href="/static/css/chrome.css";
+                link rel="stylesheet" href="/static/css/filters.css";
                 link rel="stylesheet" href="/static/css/debug.css";
                 link rel="stylesheet" href="/static/css/ops.css";
                 // Page-specific stylesheet (optional).
@@ -77,10 +78,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                         header.ops-panel-head { "Pipeline operations" }
                         div.ops-list {
                             (ops_item("clean", "Clean DB", "Archive stale jobs by tier (SS=28d → F=3d) and low-grade companies; prune expired archived rows."))
-                            (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per web click."))
-                            (ops_item("check", "Integrity check", "Health, completeness, and staleness report. Read-only."))
-                            (ops_item("search", "Search jobs", "Preview only — full search must be invoked via the CLI."))
-                            (ops_item_unarchive())
+                            (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per click."))
                         }
                     }
                 }
@@ -157,31 +155,11 @@ fn ops_item(op: &str, title: &str, desc: &str) -> Markup {
                 span.ops-preview data-op-preview=(op) { "loading…" }
             }
             p.ops-desc { (desc) }
+            // Structured detail rendered by ops.js (chips / kv grid, not JSON).
+            div.ops-detail data-op-detail=(op) {}
             div.ops-actions {
                 button.ops-run type="button" data-op-run=(op) { "Run" }
             }
-            pre.ops-detail.hidden data-op-detail=(op) {}
-        }
-    }
-}
-
-fn ops_item_unarchive() -> Markup {
-    html! {
-        div.ops-item data-op="unarchive" {
-            header.ops-item-head {
-                h4 { "Unarchive" }
-                span.ops-preview data-op-preview="unarchive" { "loading…" }
-            }
-            p.ops-desc { "Restore archived rows so they can be re-evaluated. Pick a scope." }
-            div.ops-scope {
-                label { input type="radio" name="unarchive-scope" value="jobs" checked; " jobs" }
-                label { input type="radio" name="unarchive-scope" value="companies"; " companies" }
-                label { input type="radio" name="unarchive-scope" value="all"; " all" }
-            }
-            div.ops-actions {
-                button.ops-run type="button" data-op-run="unarchive" { "Run" }
-            }
-            pre.ops-detail.hidden data-op-detail="unarchive" {}
         }
     }
 }

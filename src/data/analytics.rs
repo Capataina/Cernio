@@ -461,6 +461,85 @@ pub fn top_job_titles(conn: &Connection, n: i64) -> Vec<(String, i64)> {
         .unwrap_or_default()
 }
 
+/// Action queue — actionable counts for the dashboard.
+/// Returns a list of (label, count, filter_url) — each is a thing the user
+/// could do something about right now. Clicking the URL pre-filters the
+/// relevant page to the corresponding subset.
+pub fn action_queue(conn: &Connection) -> Vec<(String, i64, String)> {
+    let pending_grade_companies = conn.query_row(
+        "SELECT COUNT(*) FROM companies
+         WHERE grade IS NULL AND status NOT IN ('archived', 'potential')",
+        [], |r| r.get(0)).unwrap_or(0);
+
+    let needs_search = conn.query_row(
+        "SELECT COUNT(*) FROM companies c
+         WHERE c.status = 'resolved'
+         AND c.grade IN ('S','A')
+         AND NOT EXISTS (
+             SELECT 1 FROM jobs j
+             WHERE j.company_id = c.id
+             AND datetime(j.discovered_at) > datetime('now', '-14 days')
+         )",
+        [], |r| r.get(0)).unwrap_or(0);
+
+    let pending_grade_jobs = conn.query_row(
+        "SELECT COUNT(*) FROM jobs WHERE grade IS NULL AND evaluation_status != 'archived'",
+        [], |r| r.get(0)).unwrap_or(0);
+
+    let needs_decision = conn.query_row(
+        "SELECT COUNT(*) FROM jobs j
+         JOIN companies c ON c.id = j.company_id
+         WHERE j.grade IN ('SS','S')
+         AND j.evaluation_status != 'archived'
+         AND c.status != 'archived'
+         AND j.id NOT IN (SELECT job_id FROM user_decisions)",
+        [], |r| r.get(0)).unwrap_or(0);
+
+    let watching_to_followup = conn.query_row(
+        "SELECT COUNT(DISTINCT job_id) FROM user_decisions
+         WHERE decision = 'watching'
+         AND datetime(decided_at) < datetime('now', '-7 days')",
+        [], |r| r.get(0)).unwrap_or(0);
+
+    vec![
+        ("Companies need grading".to_string(), pending_grade_companies,
+         "/companies?grade=?".to_string()),
+        ("Companies need search".to_string(), needs_search,
+         "/companies?grade=S%2CA&status=resolved&has_jobs=no".to_string()),
+        ("Jobs need grading".to_string(), pending_grade_jobs,
+         "/jobs?grade=%3F".to_string()),
+        ("SS/S need decision".to_string(), needs_decision,
+         "/jobs?grade=SS%2CS&decision=none".to_string()),
+        ("Watching > 7d, no follow-up".to_string(), watching_to_followup,
+         "/jobs?decision=watching".to_string()),
+    ]
+}
+
+/// Recent user decisions (last N), most recent first.
+/// Returns (decided_at, decision, title, company, lanes_json, grade, url, job_id).
+pub fn recent_decisions(conn: &Connection, n: i64)
+    -> Vec<(String, String, String, String, Option<String>, Option<String>, String, i64)>
+{
+    let sql = "
+        SELECT ud.decided_at, ud.decision, j.title, c.name, j.lanes, j.grade, j.url, j.id
+        FROM user_decisions ud
+        JOIN jobs j ON j.id = ud.job_id
+        JOIN companies c ON c.id = j.company_id
+        ORDER BY ud.decided_at DESC
+        LIMIT ?1";
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([n], |r| {
+                Ok((
+                    r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,
+                    r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?,
+                ))
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
 /// Recent SS/S ungraded-decision jobs (top of funnel — what to act on next).
 /// Returns (id, grade, title, lanes_json, location, company_name, url).
 pub fn top_actionable_jobs(

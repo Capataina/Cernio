@@ -55,9 +55,10 @@ struct AxisDef {
 
 #[derive(Clone, Copy)]
 enum ChipKind {
-    Lane,
-    Grade,
-    Plain,
+    Lane,       // coloured pill with dot
+    Grade,      // outline pill, grade colour
+    Plain,      // monochrome enum pill
+    Segmented,  // mutually-exclusive segmented control (active/archived, etc.)
 }
 
 const AXES: &[AxisDef] = &[
@@ -109,7 +110,7 @@ const AXES: &[AxisDef] = &[
             ("active", "active"),
             ("archived", "archived"),
         ],
-        kind: ChipKind::Plain,
+        kind: ChipKind::Segmented,
     },
     AxisDef {
         key: "ats",
@@ -146,7 +147,7 @@ const AXES: &[AxisDef] = &[
             ("no", "no"),
             ("unknown", "unknown"),
         ],
-        kind: ChipKind::Plain,
+        kind: ChipKind::Segmented,
     },
 ];
 
@@ -254,6 +255,15 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
     filters.sponsor = axis_set(q, &AXES[6]);
 
     let jobs = queries::fetch_jobs(&conn, None, &filters, SortMode::ByGrade);
+    // Total jobs in the universe (for "X of Y" filter summary).
+    let total_universe: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM jobs j JOIN companies c ON c.id = j.company_id
+             WHERE j.evaluation_status != 'archived' AND c.status != 'archived'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
     // ── Filter-scoped analytics (all computed from `jobs`) ────────────────
     let kpi_total = jobs.len() as i64;
@@ -318,7 +328,13 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                     (render_axis(q, axis))
                 }
                 div.filter-summary-row {
-                    span.filter-count { (kpi_total) " jobs" }
+                    div.filter-summary {
+                        span.filter-count { (kpi_total) }
+                        span.filter-count-total { " of " (total_universe) }
+                        span.filter-count-label {
+                            @if any_active { " filtered jobs" } @else { " jobs" }
+                        }
+                    }
                     @if any_active {
                         a.filter-reset href="/jobs" { "reset all" }
                     }
@@ -380,7 +396,7 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
             }
 
             // ── Pair row: Freshness + Decision funnel ─────────────────────
-            div.jobs-pair {
+            div.grid-2 {
                 section.panel {
                     header.panel-head {
                         h2 { "Posting freshness" }
@@ -414,7 +430,7 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
             }
 
             // ── Pair row: Top companies + Top role titles ─────────────────
-            div.jobs-pair {
+            div.grid-2 {
                 section.panel {
                     header.panel-head {
                         h2 { "Company concentration" }
@@ -500,16 +516,40 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
 
 fn render_axis(q: &JobsQuery, axis: &AxisDef) -> Markup {
     let active = axis_set(q, axis);
-    html! {
-        div.filter-axis {
-            span.filter-axis-label { (axis.label) }
-            div.chips {
-                @for (val, disp) in axis.chips.iter() {
-                    @let is_active = active.contains(*val);
-                    @let href = toggle_href(q, axis, val);
-                    @let (klass, style) = chip_class_and_style(axis.kind, val, is_active);
-                    a class=(klass) href=(href) style=(style) data-active=(is_active) {
-                        (disp)
+    match axis.kind {
+        ChipKind::Segmented => {
+            // Render as a segmented control rather than a flexbox of chips.
+            // Picks one of seg-good / seg-bad styling based on axis identity.
+            let group_class = match axis.key {
+                "sponsor" => "seg-group seg-good",
+                _ => "seg-group",
+            };
+            html! {
+                div.filter-axis {
+                    span.filter-axis-label { (axis.label) }
+                    div class=(group_class) {
+                        @for (val, disp) in axis.chips.iter() {
+                            @let is_active = active.contains(*val);
+                            @let href = toggle_href(q, axis, val);
+                            a class="seg" href=(href) data-active=(is_active) { (disp) }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            html! {
+                div.filter-axis {
+                    span.filter-axis-label { (axis.label) }
+                    div.chips {
+                        @for (val, disp) in axis.chips.iter() {
+                            @let is_active = active.contains(*val);
+                            @let href = toggle_href(q, axis, val);
+                            @let (klass, style) = chip_class_and_style(axis.kind, val, is_active);
+                            a class=(klass) href=(href) style=(style) data-active=(is_active) {
+                                (disp)
+                            }
+                        }
                     }
                 }
             }
@@ -522,24 +562,23 @@ fn chip_class_and_style(kind: ChipKind, val: &str, active: bool) -> (String, Str
     match kind {
         ChipKind::Lane => {
             let kind_class = format!("{base} chip-lane");
-            let style = format!("--chip-color: {}", lane_hex(val));
+            let style = format!("--lane-color: {}", lane_hex(val));
             (kind_class, style)
         }
         ChipKind::Grade => {
-            let var = match val {
-                "SS" => "var(--grade-ss)",
-                "S" => "var(--grade-s)",
-                "A" => "var(--grade-a)",
-                "B" => "var(--grade-b)",
-                "C" => "var(--grade-c)",
-                "F" => "var(--grade-f)",
-                _ => "var(--text-4)",
+            let grade_class = match val {
+                "SS" => "chip-grade-ss",
+                "S"  => "chip-grade-s",
+                "A"  => "chip-grade-a",
+                "B"  => "chip-grade-b",
+                "C"  => "chip-grade-c",
+                "F"  => "chip-grade-f",
+                _    => "chip-grade-ungraded",
             };
-            let kind_class = format!("{base} chip-grade");
-            let style = format!("--chip-color: {var}");
-            (kind_class, style)
+            (format!("{base} chip-grade {grade_class}"), String::new())
         }
-        ChipKind::Plain => (base.to_string(), String::new()),
+        ChipKind::Plain => (format!("{base} chip-plain"), String::new()),
+        ChipKind::Segmented => (base.to_string(), String::new()),
     }
 }
 
@@ -695,7 +734,7 @@ fn heatmap_cell(count: i64, max: i64) -> Markup {
     };
     html! {
         div class=(class) {
-            @if count == 0 { "—" } @else { (count) }
+            (count)
         }
     }
 }

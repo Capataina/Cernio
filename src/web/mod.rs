@@ -36,11 +36,6 @@ pub async fn serve(db_path: &str, port: u16, open_browser: bool) -> std::io::Res
         .route("/ops/clean/run", post(handlers::ops::clean_run))
         .route("/ops/format/preview", get(handlers::ops::format_preview))
         .route("/ops/format/run", post(handlers::ops::format_run))
-        .route("/ops/check/preview", get(handlers::ops::check_preview))
-        .route("/ops/check/run", post(handlers::ops::check_run))
-        .route("/ops/search/preview", get(handlers::ops::search_preview))
-        .route("/ops/unarchive/preview", get(handlers::ops::unarchive_preview))
-        .route("/ops/unarchive/run", post(handlers::ops::unarchive_run))
         .route("/debug/snap-all", post(debug_snap::snap_all))
         .nest_service("/static", ServeDir::new("static"))
         .with_state(state);

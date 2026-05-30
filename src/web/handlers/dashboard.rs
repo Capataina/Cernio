@@ -3,14 +3,18 @@
 //! Layout, top-down:
 //!   1. KPI strip (Companies / Jobs / Strong / Applied / Watching / Pending).
 //!   2. Lane legend bar.
-//!   3. Pipeline funnel  +  Companies × lane donut  (paired row).
+//!   3. Action queue  +  Companies × lane donut  (paired row).
 //!   4. Jobs × lane × grade stacked bar with archived overlay (full width).
-//!   5. ATS provider health  +  30-day events by source (paired row).
+//!   5. 7-day activity sparkline  +  Recent decisions (paired row).
 //!   6. Top actionable jobs (full width footer).
 //!
 //! Charts are rendered through ECharts via the shared `bootEchart` helper in
 //! `static/js/charts.js`; data is shipped to JS through `json_island` script
 //! blocks so the handler stays declarative.
+//!
+//! Note: ATS provider health pane was removed in favour of the canonical
+//! version on /companies. The dashboard focuses on "what should I do today?"
+//! while /companies focuses on the universe-by-ATS shape.
 
 use axum::extract::State;
 use axum::response::Html;
@@ -26,18 +30,6 @@ use crate::web::templates::{
 };
 use crate::web::AppState;
 
-const ATS_ORDER: [&str; 9] = [
-    "greenhouse",
-    "ashby",
-    "lever",
-    "workable",
-    "smartrecruiters",
-    "workday",
-    "eightfold",
-    "bespoke",
-    "potential",
-];
-
 const GRADE_KEYS: [&str; 6] = ["SS", "S", "A", "B", "C", "F"];
 const GRADE_COLORS: [&str; 6] = [
     "#c39df0", // SS
@@ -47,10 +39,6 @@ const GRADE_COLORS: [&str; 6] = [
     "#ff5c5c", // C
     "#4f5762", // F
 ];
-
-const ACCENT_BLUE: &str = "#4f7cff";
-const BESPOKE_AMBER: &str = "#ffc94a";
-const POTENTIAL_GREY: &str = "#4f5762";
 
 pub async fn page(State(state): State<Arc<AppState>>) -> Html<String> {
     let body = render(&state).await;
@@ -84,13 +72,8 @@ async fn render(state: &AppState) -> Markup {
         .map(|(_, c)| *c)
         .sum::<i64>();
 
-    // ── Pipeline funnel ──
-    let funnel = analytics::pipeline_funnel(&conn);
-    let funnel_json = serde_json::json!({
-        "items": funnel.iter()
-            .map(|(name, n)| serde_json::json!({"name": name, "value": n}))
-            .collect::<Vec<_>>(),
-    });
+    // ── Action queue (what needs attention right now) ──
+    let action_queue = analytics::action_queue(&conn);
 
     // ── Companies × lane donut ──
     let companies_lane = analytics::companies_per_lane(&conn);
@@ -119,29 +102,8 @@ async fn render(state: &AppState) -> Markup {
             .collect::<Vec<_>>(),
     });
 
-    // ── ATS provider health ──
-    let ats = analytics::ats_health(&conn);
-    let ats_map: std::collections::HashMap<String, i64> = ats.into_iter().collect();
-    let mut ats_labels: Vec<String> = Vec::with_capacity(ATS_ORDER.len());
-    let mut ats_values: Vec<i64> = Vec::with_capacity(ATS_ORDER.len());
-    let mut ats_colors: Vec<&str> = Vec::with_capacity(ATS_ORDER.len());
-    for key in ATS_ORDER.iter() {
-        ats_labels.push(key.to_string());
-        ats_values.push(ats_map.get(*key).copied().unwrap_or(0));
-        ats_colors.push(match *key {
-            "bespoke" => BESPOKE_AMBER,
-            "potential" => POTENTIAL_GREY,
-            _ => ACCENT_BLUE,
-        });
-    }
-    let ats_json = serde_json::json!({
-        "labels": ats_labels,
-        "values": ats_values,
-        "colors": ats_colors,
-    });
-
-    // ── 30-day events by source ──
-    let activity = analytics::events_by_source_30d(&conn);
+    // ── 7-day events by source ──
+    let activity = analytics::events_by_source_window(&conn, 7);
     let dates: Vec<String> = activity.iter().map(|(d, _)| d.clone()).collect();
     let sources = ["cli", "tui", "web", "script", "trigger", "other"];
     let source_colors = ["#7adf9a", "#7ea8ff", "#ff5c5c", "#ffc94a", "#aab3bf", "#4f5762"];
@@ -157,6 +119,9 @@ async fn render(state: &AppState) -> Markup {
         "colors": source_colors,
         "series": series,
     });
+
+    // ── Recent decisions ──
+    let recent_decisions = analytics::recent_decisions(&conn, 6);
 
     // ── Top actionable jobs ──
     let actionable = analytics::top_actionable_jobs(&conn, 8);
@@ -194,15 +159,22 @@ async fn render(state: &AppState) -> Markup {
             // 2. Lane legend
             (lane_legend())
 
-            // 3. Pipeline funnel + companies × lane donut
-            div.dash-row.dash-row-2 {
+            // 3. Action queue + companies × lane donut
+            div.grid-2 {
                 section.panel {
                     header.panel-head {
-                        h2 { "Pipeline funnel" }
-                        span.panel-sub { "companies → resolved → jobs → graded → decisions" }
+                        h2 { "Action queue" }
+                        span.panel-sub { "what needs attention right now · click to filter" }
                     }
-                    div #chart-pipeline .chart.chart-md {}
-                    (json_island("pipeline", &funnel_json))
+                    div.action-queue {
+                        @for (i, (label, count, url)) in action_queue.iter().enumerate() {
+                            a.action-item href=(url) data-count=(count) {
+                                span.action-rank { (i + 1) }
+                                span.action-label { (label) }
+                                span.action-count { (count) }
+                            }
+                        }
+                    }
                 }
                 section.panel {
                     header.panel-head {
@@ -218,29 +190,42 @@ async fn render(state: &AppState) -> Markup {
             section.panel {
                 header.panel-head {
                     h2 { "Jobs × lane × grade" }
-                    span.panel-sub { "stacked by grade · hatched layer = archived" }
+                    span.panel-sub { "stacked by grade · hatched layer = archived · click cell to filter" }
                 }
                 div #chart-jobs-lane-grade .chart.chart-md {}
                 (json_island("jobs-lane-grade", &lane_grade_json))
             }
 
-            // 5. ATS health + 30-day activity
-            div.dash-row.dash-row-2 {
+            // 5. 7-day activity + recent decisions
+            div.grid-2 {
                 section.panel {
                     header.panel-head {
-                        h2 { "ATS provider health" }
-                        span.panel-sub { "distinct companies per provider" }
+                        h2 { "7-day activity" }
+                        span.panel-sub { "events per day, stacked by source" }
                     }
-                    div #chart-ats-health .chart.chart-md {}
-                    (json_island("ats-health", &ats_json))
+                    div #chart-activity-7d .chart.chart-md {}
+                    (json_island("activity-7d", &activity_json))
                 }
                 section.panel {
                     header.panel-head {
-                        h2 { "30-day activity" }
-                        span.panel-sub { "events per day, stacked by source" }
+                        h2 { "Recent decisions" }
+                        span.panel-sub { "your last applies / watches / rejects" }
                     }
-                    div #chart-activity-30d .chart.chart-md {}
-                    (json_island("activity-30d", &activity_json))
+                    div.decisions-feed {
+                        @if recent_decisions.is_empty() {
+                            div.empty { "No decisions yet — Apply / Watch / Reject a job to start." }
+                        }
+                        @for (decided_at, decision, title, company, lanes_json, grade, url, _id) in &recent_decisions {
+                            a.decision-row href=(url) target="_blank" data-decision=(decision) {
+                                span.decision-when { (short_time(decided_at)) }
+                                span.decision-kind data-kind=(decision) { (decision.as_str()) }
+                                (lane_chip_for(lanes_json.as_deref()))
+                                (grade_pill(grade.as_deref()))
+                                span.decision-title { (title) }
+                                span.decision-co { (company) }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -276,3 +261,17 @@ async fn render(state: &AppState) -> Markup {
     }
 }
 
+/// Render a decided_at timestamp as a short relative-time label.
+fn short_time(ts: &str) -> String {
+    let parsed = chrono::DateTime::parse_from_rfc3339(ts)
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S")
+            .map(|n| n.and_utc().fixed_offset()));
+    let Ok(dt) = parsed else { return ts.to_string(); };
+    let now = chrono::Utc::now();
+    let delta = now.signed_duration_since(dt.with_timezone(&chrono::Utc));
+    let mins = delta.num_minutes();
+    if mins < 1 { "just now".into() }
+    else if mins < 60 { format!("{mins}m") }
+    else if mins < 1440 { format!("{}h", mins / 60) }
+    else { format!("{}d", mins / 1440) }
+}

@@ -131,11 +131,37 @@ main {
 }
 
 /* Grid primitives shared across pages */
-.grid-2     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-.grid-3     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
-.grid-2-asym { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 14px; }
-.grid-1-2   { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+/* Paired-pane grids — use grid-auto-rows: 1fr + align-items: stretch so
+ * sibling panes share the row's height. Children must use height: 100%
+ * (via .pane/.panel rules) to fill. */
+.grid-2     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; grid-auto-rows: 1fr; align-items: stretch; }
+.grid-3     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; grid-auto-rows: 1fr; align-items: stretch; }
+.grid-2-asym { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 14px; grid-auto-rows: 1fr; align-items: stretch; }
+.grid-1-2   { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; grid-auto-rows: 1fr; align-items: stretch; }
 @media (max-width: 1100px) {
-    .grid-2, .grid-3, .grid-2-asym, .grid-1-2 { grid-template-columns: 1fr; }
+    .grid-2, .grid-3, .grid-2-asym, .grid-1-2 {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto;
+    }
 }
-.dual-panels { display: grid; grid-template-columns: minmax(360px, 1fr) 1.4fr; gap: 14px; }
+.dual-panels { display: grid; grid-template-columns: minmax(360px, 1fr) 1.4fr; gap: 14px; grid-auto-rows: 1fr; align-items: stretch; }
+
+/* Grid children that are panels need to fill the row's available height. */
+.grid-2 > .panel, .grid-2 > .pane,
+.grid-3 > .panel, .grid-3 > .pane,
+.grid-2-asym > .panel, .grid-2-asym > .pane,
+.grid-1-2 > .panel, .grid-1-2 > .pane,
+.dual-panels > .panel, .dual-panels > .pane {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+/* Inner content fills the remaining height below the panel header */
+.grid-2 > .panel > .chart,   .grid-2 > .pane > .chart,
+.grid-3 > .panel > .chart,   .grid-3 > .pane > .chart,
+.grid-2-asym > .panel > .chart, .grid-2-asym > .pane > .chart,
+.dual-panels > .panel > .chart, .dual-panels > .pane > .chart {
+    flex: 1 1 auto;
+    min-height: 0;
+}

@@ -9,119 +9,7 @@
  *  - .funnel             decision funnel rows with scaleX bar
  */
 
-/* ── Chip-strip filter ───────────────────────────────────────────── */
-/* Replaces the legacy two-dropdown .filter-bar for /jobs. 7 axes stack
- * vertically; each axis is a label + a flex-wrapped chip row. The strip is
- * sticky beneath the topbar so the filter is always available while the
- * page scrolls.
- */
-
-.filter-strip {
-    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
-    border: 1px solid var(--border);
-    border-radius: var(--pane-radius);
-    padding: 10px 16px;
-    margin-bottom: 14px;
-    display: flex; flex-direction: column;
-    gap: 6px;
-    position: sticky; top: 46px; z-index: 9;
-    backdrop-filter: blur(4px);
-}
-.filter-axis {
-    display: grid;
-    grid-template-columns: 88px 1fr;
-    align-items: center;
-    gap: 12px;
-    padding: 2px 0;
-}
-.filter-axis-label {
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-}
-.chips {
-    display: flex; flex-wrap: wrap; gap: 5px;
-}
-.chip {
-    --chip-color: var(--text-2);
-    display: inline-flex; align-items: center;
-    height: 22px; padding: 0 9px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    color: var(--text-3);
-    background: var(--bg-3);
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    text-decoration: none;
-    cursor: pointer;
-    transition: transform var(--t-fast) var(--easing),
-                box-shadow var(--t-base) var(--easing),
-                background var(--t-base) var(--easing),
-                border-color var(--t-base) var(--easing),
-                color var(--t-base) var(--easing);
-}
-.chip:hover {
-    transform: translateY(-1px);
-    color: var(--text-1);
-    border-color: var(--border-strong);
-    box-shadow: 0 4px 14px -8px var(--accent-glow);
-}
-.chip-active {
-    color: var(--chip-color);
-    border-color: var(--chip-color);
-    background: color-mix(in srgb, var(--chip-color) 18%, var(--bg-3));
-    box-shadow: 0 0 12px color-mix(in srgb, var(--chip-color) 35%, transparent);
-}
-.chip-active:hover {
-    background: color-mix(in srgb, var(--chip-color) 28%, var(--bg-3));
-}
-.chip-lane,
-.chip-grade {
-    /* Lane/grade chips dim their --chip-color when inactive so the colour
-     * vocabulary is consistent across the strip. Hover hints the colour. */
-}
-.chip-lane:hover,
-.chip-grade:hover {
-    color: var(--chip-color);
-    border-color: var(--chip-color);
-}
-
-.filter-summary-row {
-    display: flex; align-items: center;
-    justify-content: flex-end;
-    gap: 16px;
-    padding: 4px 0 0;
-    border-top: 1px dashed var(--border);
-    margin-top: 4px;
-}
-.filter-count {
-    color: var(--text-1);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
-}
-.filter-reset {
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-decoration: none;
-    padding: 3px 9px;
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    transition: color var(--t-base) var(--easing),
-                border-color var(--t-base) var(--easing),
-                background var(--t-base) var(--easing);
-}
-.filter-reset:hover {
-    color: var(--text-0);
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
+/* Filter-strip primitives moved to shared filters.css. */
 
 /* ── Two-column pane row ─────────────────────────────────────────── */
 .jobs-pair {
@@ -184,7 +72,8 @@
 /* Intensity scale — uses accent colour at varying alpha. */
 .heatmap-cell.zero {
     background: var(--bg-3);
-    color: var(--text-4);
+    color: var(--text-5);
+    font-weight: 400;
 }
 .heatmap-cell.low  { background: rgba(126, 168, 255, 0.10); color: var(--text-1); }
 .heatmap-cell.mid  { background: rgba(126, 168, 255, 0.30); color: var(--text-0); }

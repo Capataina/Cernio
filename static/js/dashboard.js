@@ -180,7 +180,7 @@
   }));
 
   // ── 5. 30-day events by source (stacked area) ────────────────────────
-  boot('activity-30d', (data, theme) => ({
+  boot('activity-7d', (data, theme) => ({
     backgroundColor: theme.bg,
     grid: { left: 40, right: 16, top: 28, bottom: 32, containLabel: true },
     tooltip: { ...theme.tooltip, trigger: 'axis' },

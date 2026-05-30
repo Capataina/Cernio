@@ -19,10 +19,9 @@
 //!
 //! Unarchive accepts `?scope=jobs|companies|all`.
 
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::response::Json;
 use rusqlite::Connection;
-use serde::Deserialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::time::Instant;
@@ -65,7 +64,10 @@ pub async fn clean_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
     let tiers: &[(&str, i64)] = &[
         ("SS", 28), ("S", 21), ("A", 14), ("B", 7), ("C", 3), ("F", 3),
     ];
-    let mut by_grade: Vec<Value> = Vec::new();
+    let lanes = ["big-tech","ai-ml","hft","crypto-mm","bank-strats","systems-infra","devtools","fintech"];
+    let mut by_grade = serde_json::Map::new();
+    let mut by_lane = serde_json::Map::new();
+    for l in &lanes { by_lane.insert((*l).to_string(), json!(0)); }
     let mut jobs_total: i64 = 0;
     for (grade, days) in tiers {
         let n: i64 = conn
@@ -80,9 +82,28 @@ pub async fn clean_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
             )
             .unwrap_or(0);
         if n > 0 {
-            by_grade.push(json!({ "grade": grade, "count": n }));
+            by_grade.insert((*grade).to_string(), json!(n));
         }
         jobs_total += n;
+        // Drill into per-lane breakdown for this tier
+        for l in &lanes {
+            let prefix = format!("[\"{l}\"%");
+            let m: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM jobs
+                     WHERE grade = ?1 AND lanes LIKE ?2
+                     AND evaluation_status != 'archived'
+                     AND datetime(discovered_at) < datetime('now', ?3)
+                     AND id NOT IN (SELECT job_id FROM user_decisions)",
+                    rusqlite::params![grade, prefix, format!("-{days} days")],
+                    |r| r.get(0),
+                )
+                .unwrap_or(0);
+            if m > 0 {
+                let prev = by_lane.get(*l).and_then(|v| v.as_i64()).unwrap_or(0);
+                by_lane.insert((*l).to_string(), json!(prev + m));
+            }
+        }
     }
 
     let expired_archived = count(
@@ -109,17 +130,24 @@ pub async fn clean_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
         companies_archivable += n;
     }
 
+    let orphans = count(
+        &conn,
+        "SELECT COUNT(*) FROM user_decisions WHERE job_id NOT IN (SELECT id FROM jobs)",
+    );
+
     let summary = format!(
-        "{jobs_total} jobs would be archived, {expired_archived} expired pruned, {companies_archivable} companies archived"
+        "{jobs_total} jobs archived · {expired_archived} pruned · {companies_archivable} companies"
     );
     Json(json!({
         "ok": true,
         "summary": summary,
         "detail": {
-            "jobs_archivable": jobs_total,
-            "by_grade": by_grade,
-            "expired_archived_pruned": expired_archived,
-            "companies_archivable": companies_archivable,
+            "would_archive_total": jobs_total,
+            "by_grade": Value::Object(by_grade),
+            "by_lane": Value::Object(by_lane),
+            "archived_to_purge": expired_archived,
+            "low_grade_companies": companies_archivable,
+            "orphan_decisions": orphans,
         },
         "elapsed_ms": start.elapsed().as_millis() as u64,
     }))
@@ -233,15 +261,16 @@ pub async fn format_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
         format!("~{touch} rows would be formatted")
     };
 
+    let _ = total_jobs; // kept earlier for context; not surfaced
     Json(json!({
         "ok": true,
         "summary": summary,
         "detail": {
-            "total_jobs": total_jobs,
-            "description_candidates": desc_candidates,
-            "assessment_candidates": assess_candidates,
-            "run_cap": cap,
-            "note": "Counts are an upper bound (LIKE-based heuristic); actual format pass touches only rows whose normalised text differs.",
+            "candidates": desc_candidates + assess_candidates,
+            "jobs_descriptions": desc_candidates,
+            "jobs_assessments": assess_candidates,
+            "cap": cap,
+            "would_mutate": touch.min(cap),
         },
         "elapsed_ms": start.elapsed().as_millis() as u64,
     }))
@@ -292,247 +321,6 @@ pub async fn format_run(State(state): State<Arc<AppState>>) -> Json<Value> {
     }))
 }
 
-// ── check ────────────────────────────────────────────────────────
-
-/// Sync helper — runs all the read-only count queries. Shared by preview
-/// + run so neither handler needs to .await the other (which produced a
-/// non-Send future the axum Handler trait rejects).
-fn check_counts(state: &Arc<AppState>, start: Instant) -> Value {
-    let conn = match open_conn(state) {
-        Ok(c) => c,
-        Err(e) => {
-            return json!({ "ok": false, "error": e, "elapsed_ms": start.elapsed().as_millis() as u64 });
-        }
-    };
-
-    let orphaned = count(
-        &conn,
-        "SELECT COUNT(*) FROM user_decisions WHERE job_id NOT IN (SELECT id FROM jobs)",
-    );
-    let missing_portals = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies
-         WHERE status = 'resolved'
-         AND id NOT IN (SELECT company_id FROM company_portals)",
-    );
-    let dup_companies = count(
-        &conn,
-        "SELECT COUNT(*) FROM (
-            SELECT website, COUNT(*) AS cnt FROM companies GROUP BY website HAVING cnt > 1
-         )",
-    );
-    let ungraded_companies = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies WHERE grade IS NULL AND status != 'archived'",
-    );
-    let ungraded_jobs = count(
-        &conn,
-        "SELECT COUNT(*) FROM jobs WHERE grade IS NULL",
-    );
-    let stale_grades = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies
-         WHERE graded_at IS NOT NULL
-         AND datetime(graded_at) < datetime('now', '-30 days')",
-    );
-
-    let issues = orphaned + missing_portals + dup_companies + stale_grades;
-    json!({
-        "ok": true,
-        "summary": format!("{issues} issues across health/staleness (excl. ATS probe)"),
-        "detail": {
-            "orphaned_decisions": orphaned,
-            "missing_portals": missing_portals,
-            "duplicate_company_websites": dup_companies,
-            "ungraded_companies": ungraded_companies,
-            "ungraded_jobs": ungraded_jobs,
-            "stale_company_grades": stale_grades,
-            "note": "ATS slug probe skipped in preview for speed; full run includes it.",
-        },
-        "elapsed_ms": start.elapsed().as_millis() as u64,
-    })
-}
-
-pub async fn check_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
-    Json(check_counts(&state, Instant::now()))
-}
-
-pub async fn check_run(State(state): State<Arc<AppState>>) -> Json<Value> {
-    let mut value = check_counts(&state, Instant::now());
-    if let Some(obj) = value.as_object_mut() {
-        obj.insert(
-            "summary".to_string(),
-            json!("integrity check (read-only counts; run `cernio check` for ATS probe)"),
-        );
-    }
-    Json(value)
-}
-
-// ── search ───────────────────────────────────────────────────────
-
-pub async fn search_preview(State(state): State<Arc<AppState>>) -> Json<Value> {
-    let start = Instant::now();
-    let conn = match open_conn(&state) {
-        Ok(c) => c,
-        Err(e) => return err(e, start),
-    };
-
-    // Approximate "would search N S/A companies not searched in 7d". We don't
-    // track per-company last_searched_at directly, so this approximates with
-    // resolved S/A companies that have no recent job discovered_at.
-    let candidates = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies c
-         WHERE c.status = 'resolved'
-         AND c.grade IN ('SS','S','A')
-         AND NOT EXISTS (
-             SELECT 1 FROM jobs j
-             WHERE j.company_id = c.id
-             AND datetime(j.discovered_at) > datetime('now', '-7 days')
-         )",
-    );
-    let resolved_total = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies WHERE status = 'resolved'",
-    );
-
-    Json(json!({
-        "ok": true,
-        "summary": format!("would search ~{candidates} S/A companies not seen in 7d"),
-        "detail": {
-            "candidates": candidates,
-            "resolved_total": resolved_total,
-            "note": "Search must be invoked via `cernio search` — long-running, spawns subagents, not safe over HTTP.",
-        },
-        "elapsed_ms": start.elapsed().as_millis() as u64,
-    }))
-}
-
-// ── unarchive ────────────────────────────────────────────────────
-
-#[derive(Debug, Deserialize)]
-pub struct UnarchiveQuery {
-    #[serde(default)]
-    pub scope: Option<String>,
-}
-
-fn scope_value(scope: &Option<String>) -> &str {
-    match scope.as_deref() {
-        Some("jobs") => "jobs",
-        Some("companies") => "companies",
-        Some("all") => "all",
-        _ => "jobs",
-    }
-}
-
-pub async fn unarchive_preview(
-    State(state): State<Arc<AppState>>,
-    Query(q): Query<UnarchiveQuery>,
-) -> Json<Value> {
-    let start = Instant::now();
-    let conn = match open_conn(&state) {
-        Ok(c) => c,
-        Err(e) => return err(e, start),
-    };
-    let scope = scope_value(&q.scope);
-
-    let jobs = count(
-        &conn,
-        "SELECT COUNT(*) FROM jobs WHERE evaluation_status = 'archived'",
-    );
-    let companies_resolved = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies
-         WHERE status = 'archived' AND id IN (SELECT company_id FROM company_portals)",
-    );
-    let companies_bespoke = count(
-        &conn,
-        "SELECT COUNT(*) FROM companies
-         WHERE status = 'archived' AND id NOT IN (SELECT company_id FROM company_portals)",
-    );
-
-    let (would_jobs, would_companies) = match scope {
-        "jobs" => (jobs, 0),
-        "companies" => (0, companies_resolved + companies_bespoke),
-        "all" => (jobs, companies_resolved + companies_bespoke),
-        _ => (0, 0),
-    };
-
-    Json(json!({
-        "ok": true,
-        "summary": format!(
-            "scope={scope}: {would_jobs} jobs, {would_companies} companies would be restored"
-        ),
-        "detail": {
-            "scope": scope,
-            "archived_jobs": jobs,
-            "archived_companies_resolved": companies_resolved,
-            "archived_companies_bespoke": companies_bespoke,
-        },
-        "elapsed_ms": start.elapsed().as_millis() as u64,
-    }))
-}
-
-pub async fn unarchive_run(
-    State(state): State<Arc<AppState>>,
-    Query(q): Query<UnarchiveQuery>,
-) -> Json<Value> {
-    let start = Instant::now();
-    let conn = match open_conn(&state) {
-        Ok(c) => c,
-        Err(e) => return err(e, start),
-    };
-    let scope = scope_value(&q.scope);
-
-    let mut jobs_restored: u64 = 0;
-    let mut companies_restored: u64 = 0;
-    let mut bespoke_restored: u64 = 0;
-
-    if matches!(scope, "jobs" | "all") {
-        jobs_restored = conn
-            .execute(
-                "UPDATE jobs SET evaluation_status = 'pending', grade = NULL,
-                 fit_assessment = NULL,
-                 discovered_at = datetime('now'), archived_at = NULL
-                 WHERE evaluation_status = 'archived'",
-                [],
-            )
-            .map(|n| n as u64)
-            .unwrap_or(0);
-    }
-    if matches!(scope, "companies" | "all") {
-        companies_restored = conn
-            .execute(
-                "UPDATE companies SET status = 'resolved'
-                 WHERE status = 'archived'
-                 AND id IN (SELECT company_id FROM company_portals)",
-                [],
-            )
-            .map(|n| n as u64)
-            .unwrap_or(0);
-        bespoke_restored = conn
-            .execute(
-                "UPDATE companies SET status = 'bespoke'
-                 WHERE status = 'archived'
-                 AND id NOT IN (SELECT company_id FROM company_portals)",
-                [],
-            )
-            .map(|n| n as u64)
-            .unwrap_or(0);
-    }
-
-    Json(json!({
-        "ok": true,
-        "summary": format!(
-            "scope={scope}: {jobs_restored} jobs, {} companies restored",
-            companies_restored + bespoke_restored
-        ),
-        "detail": {
-            "scope": scope,
-            "jobs_restored": jobs_restored,
-            "companies_restored_resolved": companies_restored,
-            "companies_restored_bespoke": bespoke_restored,
-        },
-        "elapsed_ms": start.elapsed().as_millis() as u64,
-    }))
-}
+// Note: check / search / unarchive ops were dropped from the web menu —
+// they require interactive context (check is long-running, search needs
+// subagents, unarchive needs scope reasoning) and live on the CLI instead.

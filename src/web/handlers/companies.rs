@@ -759,13 +759,64 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
     }
 }
 
+#[derive(Clone, Copy)]
+enum ChipKind {
+    Lane,
+    Grade,
+    Plain,
+    Segmented,
+    SegmentedGood,
+}
+
+fn chip_classes_style(kind: ChipKind, val: &str, active: bool) -> (String, String) {
+    let base = if active { "chip chip-active" } else { "chip" };
+    match kind {
+        ChipKind::Lane => {
+            let hex = crate::data::lane::lane_hex(val);
+            (format!("{base} chip-lane"), format!("--lane-color: {hex}"))
+        }
+        ChipKind::Grade => {
+            let g = match val {
+                "S" => "chip-grade-s",
+                "A" => "chip-grade-a",
+                "B" => "chip-grade-b",
+                "C" => "chip-grade-c",
+                _   => "chip-grade-ungraded",
+            };
+            (format!("{base} chip-grade {g}"), String::new())
+        }
+        ChipKind::Plain => (format!("{base} chip-plain"), String::new()),
+        ChipKind::Segmented | ChipKind::SegmentedGood => (base.to_string(), String::new()),
+    }
+}
+
 fn render_axis(
     q: &CompaniesQuery,
     label: &str,
     axis: &str,
     chips: &[&str],
+    kind: ChipKind,
     chip_label: impl Fn(&str) -> String,
 ) -> Markup {
+    let is_seg = matches!(kind, ChipKind::Segmented | ChipKind::SegmentedGood);
+    if is_seg {
+        let group_class = match kind {
+            ChipKind::SegmentedGood => "seg-group seg-good",
+            _ => "seg-group",
+        };
+        return html! {
+            div.filter-axis {
+                span.filter-axis-label { (label) }
+                div class=(group_class) {
+                    @for v in chips {
+                        @let active = is_active(q, axis, v);
+                        @let href = toggle_qs(q, axis, v);
+                        a class="seg" href=(href) data-active=(active) { (PreEscaped(chip_label(v))) }
+                    }
+                }
+            }
+        };
+    }
     html! {
         div.filter-axis {
             span.filter-axis-label { (label) }
@@ -773,8 +824,10 @@ fn render_axis(
                 @for v in chips {
                     @let active = is_active(q, axis, v);
                     @let href = toggle_qs(q, axis, v);
-                    @let class = if active { "chip chip-active" } else { "chip" };
-                    a class=(class) href=(href) { (PreEscaped(chip_label(v))) }
+                    @let (class, style) = chip_classes_style(kind, v, active);
+                    a class=(class) href=(href) style=(style) data-active=(active) {
+                        (PreEscaped(chip_label(v)))
+                    }
                 }
             }
         }
@@ -792,12 +845,12 @@ fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) -> Markup {
 
     html! {
         div.filter-strip {
-            (render_axis(q, "Lane", "lane", &LANE_KEYS, |v| lane_label(v).to_string()))
-            (render_axis(q, "Grade", "grade", &GRADE_CHIPS, |v| v.to_string()))
-            (render_axis(q, "Status", "status", &STATUS_CHIPS, |v| v.to_string()))
-            (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, |v| v.to_string()))
-            (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, |v| v.to_string()))
-            (render_axis(q, "Location", "location", &LOCATION_CHIPS, |v| {
+            (render_axis(q, "Lane", "lane", &LANE_KEYS, ChipKind::Lane, |v| lane_label(v).to_string()))
+            (render_axis(q, "Grade", "grade", &GRADE_CHIPS, ChipKind::Grade, |v| v.to_string()))
+            (render_axis(q, "Status", "status", &STATUS_CHIPS, ChipKind::Plain, |v| v.to_string()))
+            (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, ChipKind::Plain, |v| v.to_string()))
+            (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, ChipKind::SegmentedGood, |v| v.to_string()))
+            (render_axis(q, "Location", "location", &LOCATION_CHIPS, ChipKind::Plain, |v| {
                 match v {
                     "london" => "London".into(),
                     "uk_ex_london" => "UK ex-London".into(),
@@ -806,9 +859,13 @@ fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) -> Markup {
                     _ => "Unknown".into(),
                 }
             }))
-            (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, |v| v.to_string()))
-            div.filter-summary {
-                span.filter-count { (shown) " of " (total) " companies" }
+            (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, ChipKind::Segmented, |v| v.to_string()))
+            div.filter-summary-row {
+                div.filter-summary {
+                    span.filter-count { (shown) }
+                    span.filter-count-total { " of " (total) }
+                    span.filter-count-label { @if any_active { " filtered companies" } @else { " companies" } }
+                }
                 @if any_active {
                     a.filter-reset href="/companies" { "reset all" }
                 }
