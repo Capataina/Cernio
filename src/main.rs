@@ -16,6 +16,7 @@ async fn main() {
     match args.get(1).map(|s| s.as_str()) {
         Some("tui") => cmd_tui(),
         Some("web") => cmd_web(&args).await,
+        Some("snap") => cmd_snap(&args).await,
         Some("import") => cmd_import(&args),
         Some("resolve") => cmd_resolve(&args).await,
         Some("search") => cmd_search(&args).await,
@@ -491,6 +492,55 @@ async fn cmd_web(args: &[String]) {
     }
 }
 
+/// Capture screenshots of every web tab via headless chrome.
+///
+/// Spawns a temporary web server on a free port, runs the snap suite against
+/// it, and tears the server down — so the command is fully self-contained.
+/// Flags: `--temporal` runs the suite twice (3s apart) for animation diffs;
+/// `--port N` uses an explicit port instead of a free one.
+async fn cmd_snap(args: &[String]) {
+    let _db = open_db();
+    let temporal = args.iter().any(|a| a == "--temporal");
+    let port = get_flag_value(args, "--port")
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or_else(|| {
+            // Try 7879 then 7880 etc — first one that binds.
+            (7879..7899)
+                .find(|p| std::net::TcpListener::bind(("127.0.0.1", *p)).is_ok())
+                .unwrap_or(7879)
+        });
+
+    let db_path = db_path_from_env();
+    let db_path_owned = db_path.clone();
+    let server = tokio::spawn(async move {
+        let _ = web::serve(&db_path_owned, port, false).await;
+    });
+
+    // Poll until the server's responding.
+    let host = format!("127.0.0.1:{port}");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+    let mut ready = false;
+    while std::time::Instant::now() < deadline {
+        if std::net::TcpStream::connect(&host).is_ok() {
+            ready = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+    }
+    if !ready {
+        eprintln!("snap: web server didn't come up on {host}");
+        server.abort();
+        return;
+    }
+
+    println!("→ cernio snap: capturing all 4 tabs (temporal={temporal})");
+    match cernio::web::debug_snap::run_cli(host, temporal).await {
+        Ok(_folder) => {}
+        Err(e) => eprintln!("snap failed: {e}"),
+    }
+    server.abort();
+}
+
 fn db_path_from_env() -> String {
     std::env::var("CERNIO_DB_PATH").unwrap_or_else(|_| "state/cernio.db".to_string())
 }
@@ -517,6 +567,7 @@ fn print_usage() {
     println!("UI commands:");
     println!("  tui                                      Terminal UI");
     println!("  web [--port N] [--no-open]               Browser UI (default port 7878)");
+    println!("  snap [--port N] [--temporal]             Headless screenshot suite for debugging");
     println!();
     println!("Pipeline commands:");
     println!("  import [--file PATH] [--dry-run]         Import companies from potential.md into DB");

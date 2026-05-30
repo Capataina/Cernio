@@ -1,0 +1,52 @@
+/* dashboard.css — Dashboard-tab-only layout shims.
+ *
+ * All component primitives (.panel, .kpi, .chart, .lane-chip, .grade-pill,
+ * .role-apply, .bar-list, .top-list, .top-roles, .role-row) live in the
+ * shared base/components/chrome/motion bundle. This file only adds
+ * page-specific layout glue.
+ */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* Force the KPI strip into a 6-column rhythm on wide screens, regardless of
+ * what components.css picks as the default kpi-strip layout. Collapses to
+ * 3-up on tablets, 2-up on phones. */
+.dashboard .kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .dashboard .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Paired dashboard rows — two equal panels side by side, stack on narrow. */
+.dash-row {
+  display: grid;
+  gap: 12px;
+}
+
+.dash-row-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 1000px) {
+  .dash-row-2 { grid-template-columns: 1fr; }
+}
+
+/* The pipeline funnel needs a bit more top breathing room than the default
+ * panel padding gives, since the funnel label sits very close to its edge. */
+.dashboard #chart-pipeline { padding-top: 12px; }
+
+/* Donut panes never want their own grid lines, just the chart itself. */
+.dashboard #chart-companies-lane { padding-top: 4px; }

@@ -1,4 +1,4 @@
-use axum::extract::{Form, State};
+use axum::extract::{Form, Query, State};
 use axum::response::Html;
 use maud::{html, Markup};
 use rusqlite::Connection;
@@ -6,17 +6,45 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::data::activity::{group_timeline, ActivityGroup};
+use crate::data::analytics;
 use crate::data::models::ActivityEntry;
 use crate::data::queries;
-use crate::web::templates::{lane_chip_for, page as chrome};
+use crate::web::templates::{json_island, lane_chip_for, page_with, PageAssets};
 use crate::web::AppState;
 
-pub async fn page(State(state): State<Arc<AppState>>) -> Html<String> {
-    let body = render(&state).await;
-    Html(chrome("Activity", "activity", body).into_string())
+#[derive(Debug, Deserialize, Default)]
+pub struct ActivityQuery {
+    #[serde(default)]
+    pub window: Option<String>,
 }
 
-async fn render(state: &AppState) -> Markup {
+/// Parse `?window=7d|30d|90d` into a day-count. Unknown / missing → 30.
+fn parse_window(raw: Option<&str>) -> i64 {
+    match raw.unwrap_or("30d") {
+        "7d" => 7,
+        "90d" => 90,
+        _ => 30,
+    }
+}
+
+pub async fn page(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ActivityQuery>,
+) -> Html<String> {
+    let days = parse_window(q.window.as_deref());
+    let body = render(&state, days).await;
+    Html(
+        page_with(
+            "Activity",
+            "activity",
+            PageAssets::css_js("/static/css/activity.css", "/static/js/activity.js"),
+            body,
+        )
+        .into_string(),
+    )
+}
+
+async fn render(state: &AppState, days: i64) -> Markup {
     let Ok(conn) = Connection::open(&state.db_path) else {
         return html! { div.error { "Could not open database." } };
     };
@@ -24,26 +52,157 @@ async fn render(state: &AppState) -> Markup {
     let timeline = queries::fetch_activity_timeline(&conn);
     let groups = group_timeline(&timeline);
 
+    // ── KPIs ──
+    let (events_24h, events_7d, decisions_30d, most_active_source) =
+        analytics::activity_kpis(&conn);
+
+    // ── Windowed events by source (stacked area) ──
+    let activity = analytics::events_by_source_window(&conn, days);
+    let dates: Vec<String> = activity.iter().map(|(d, _)| d.clone()).collect();
+    let sources = ["cli", "tui", "web", "script", "trigger", "other"];
+    let source_colors = ["#7adf9a", "#7ea8ff", "#ff5c5c", "#ffc94a", "#aab3bf", "#4f5762"];
+    let mut series: Vec<Vec<i64>> = vec![Vec::with_capacity(activity.len()); sources.len()];
+    for (_, row) in &activity {
+        for (i, n) in row.iter().enumerate() {
+            series[i].push(*n);
+        }
+    }
+    let activity_json = serde_json::json!({
+        "dates": dates,
+        "sources": sources,
+        "colors": source_colors,
+        "series": series,
+        "window": format!("{days}d"),
+    });
+
+    // ── Event-type breakdown (horizontal bar) ──
+    let event_types = analytics::event_type_breakdown_window(&conn, days);
+    let et_labels: Vec<String> = event_types.iter().map(|(k, _)| event_label(k)).collect();
+    let et_values: Vec<i64> = event_types.iter().map(|(_, v)| *v).collect();
+    let event_types_json = serde_json::json!({
+        "labels": et_labels,
+        "values": et_values,
+        "window": format!("{days}d"),
+    });
+
+    // ── Decision velocity (stacked bar) ──
+    let velocity = analytics::decision_velocity_30d(&conn);
+    let v_dates: Vec<String> = velocity.iter().map(|(d, _, _, _)| d.clone()).collect();
+    let v_applied: Vec<i64> = velocity.iter().map(|(_, a, _, _)| *a).collect();
+    let v_watching: Vec<i64> = velocity.iter().map(|(_, _, w, _)| *w).collect();
+    let v_rejected: Vec<i64> = velocity.iter().map(|(_, _, _, r)| *r).collect();
+    let velocity_json = serde_json::json!({
+        "dates": v_dates,
+        "applied": v_applied,
+        "watching": v_watching,
+        "rejected": v_rejected,
+    });
+
     html! {
         div.activity-page {
             div.activity-head {
-                h1 { "Activity" }
-                span.activity-sub { (groups.len()) " groups · " (timeline.len()) " events" }
+                div.activity-head-left {
+                    span.dot {}
+                    h1 { "Activity" }
+                }
+                span.activity-sub {
+                    (groups.len()) " groups · " (timeline.len()) " events"
+                }
             }
 
-            div.activity-feed {
-                @if groups.is_empty() {
-                    div.empty { "No activity yet." }
+            // KPI strip
+            section.kpi-strip {
+                div.kpi {
+                    div.kpi-label { "Events · 24h" }
+                    div.kpi-value data-ticker=(events_24h) { "0" }
                 }
-                @let mut current_date: Option<String> = None;
-                @for group in &groups {
-                    @let date = group.date().to_string();
-                    @if current_date.as_deref() != Some(date.as_str()) {
-                        @let _ = current_date = Some(date.clone());
-                        div.day-header { (format_date(&date)) }
+                div.kpi {
+                    div.kpi-label { "Events · 7d" }
+                    div.kpi-value data-ticker=(events_7d) { "0" }
+                }
+                div.kpi {
+                    div.kpi-label { "Decisions · 30d" }
+                    div.kpi-value data-ticker=(decisions_30d) { "0" }
+                }
+                div.kpi {
+                    div.kpi-label { "Top source · 30d" }
+                    div.kpi-value.kpi-value-text { (most_active_source) }
+                }
+            }
+
+            // Timeframe toggle (controls both panels below)
+            div.timeframe-bar {
+                span.timeframe-label { "Window" }
+                (timeframe_toggle(days))
+            }
+
+            // Windowed sparkline + event-type breakdown
+            div.dash-row.dash-row-2 {
+                section.panel {
+                    header.panel-head {
+                        h2 { (format!("{days}-day events by source")) }
+                        span.panel-sub { "stacked area · cli / tui / web / script / trigger / other" }
                     }
-                    (render_group(group))
+                    div #chart-activity-30d-full .chart.chart-md {}
+                    (json_island("activity-30d-full", &activity_json))
                 }
+                section.panel {
+                    header.panel-head {
+                        h2 { "Event types" }
+                        span.panel-sub { (format!("top 12 · last {days} days")) }
+                    }
+                    div #chart-event-types .chart.chart-md {}
+                    (json_island("event-types", &event_types_json))
+                }
+            }
+
+            // Decision velocity (full width)
+            section.panel {
+                header.panel-head {
+                    h2 { "Decision velocity" }
+                    span.panel-sub { "applied · watching · rejected per day, last 30 days" }
+                }
+                div #chart-velocity .chart.chart-sm {}
+                (json_island("velocity", &velocity_json))
+            }
+
+            // Event log (full width, inside panel for live-wire)
+            section.panel.activity-log-panel {
+                header.panel-head {
+                    h2 { "Event log" }
+                    span.panel-sub { "append-only timeline · grouped by burst" }
+                }
+                div.activity-feed {
+                    @if groups.is_empty() {
+                        div.empty { "No activity yet." }
+                    }
+                    @let mut current_date: Option<String> = None;
+                    @for group in &groups {
+                        @let date = group.date().to_string();
+                        @if current_date.as_deref() != Some(date.as_str()) {
+                            @let _ = current_date = Some(date.clone());
+                            div.day-header { (format_date(&date)) }
+                        }
+                        (render_group(group))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Render the [7D] [30D] [90D] toggle as a row of hyperlinks. The active
+/// chip is marked with `timeframe-chip-active` so CSS can highlight it; every
+/// chip points at `/activity?window=Xd` so default browser navigation handles
+/// the round-trip (no JS required).
+fn timeframe_toggle(active_days: i64) -> Markup {
+    let options: [(i64, &str); 3] = [(7, "7D"), (30, "30D"), (90, "90D")];
+    html! {
+        div.timeframe-toggle {
+            @for (days, label) in options.iter() {
+                @let is_active = *days == active_days;
+                @let class = if is_active { "timeframe-chip timeframe-chip-active" } else { "timeframe-chip" };
+                a.(class) href=(format!("/activity?window={days}d")) { (label) }
             }
         }
     }
@@ -87,7 +246,7 @@ fn render_entry(entry: &ActivityEntry, is_child: bool) -> Markup {
             (lane_chip_for(entry.lane.as_deref()))
             span.activity-icon { (icon_for(&entry.event_type)) }
             span.activity-event-label { (event_label(&entry.event_type)) }
-            span.activity-subject { (entry.subject_label) }
+            span.activity-subject data-marquee=(entry.subject_label) { (entry.subject_label) }
             @if let Some(g) = &entry.grade {
                 span.grade-pill.(format!("grade-{}", g.to_lowercase())) { (g) }
             }

@@ -29,6 +29,8 @@ pub struct CompanyRow {
     pub fit_count: i64,
     /// JSON array of lane keys per the lane-based-relativity refactor.
     pub lanes: Option<String>,
+    /// UK Skilled Worker visa sponsorship: 'yes' / 'no' / 'unknown' / None.
+    pub sponsors_uk: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,6 +106,12 @@ pub struct JobFilters {
     pub archive: HashSet<String>,
     pub evidence: HashSet<String>,
     pub lanes: HashSet<String>,
+    /// Posted-date buckets ("7d" / "30d" / "90d" / "old" / "unknown").
+    /// Empty = no filter. Used by the web chip strip only; TUI ignores it.
+    pub posted_within: HashSet<String>,
+    /// Sponsorship buckets ("yes" / "no" / "unknown"). NULL is mapped to "unknown".
+    /// Empty = no filter. Used by the web chip strip only; TUI ignores it.
+    pub sponsor: HashSet<String>,
 }
 
 impl Default for JobFilters {
@@ -121,6 +129,8 @@ impl Default for JobFilters {
             archive,
             evidence,
             lanes: HashSet::new(),
+            posted_within: HashSet::new(),
+            sponsor: HashSet::new(),
         }
     }
 }
@@ -134,6 +144,8 @@ impl JobFilters {
             + self.archive.len()
             + self.evidence.len()
             + self.lanes.len()
+            + self.posted_within.len()
+            + self.sponsor.len()
     }
 
     pub fn is_default(&self) -> bool {
@@ -147,6 +159,8 @@ impl JobFilters {
             && self.evidence.contains("jd")
             && self.evidence.contains("semantic")
             && self.lanes.is_empty()
+            && self.posted_within.is_empty()
+            && self.sponsor.is_empty()
     }
 
     pub fn reset(&mut self) {
@@ -161,6 +175,8 @@ impl JobFilters {
         self.archive.clear();
         self.evidence.clear();
         self.lanes.clear();
+        self.posted_within.clear();
+        self.sponsor.clear();
     }
 }
 

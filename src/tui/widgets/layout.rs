@@ -1,6 +1,7 @@
 use ratatui::layout::Constraint;
 
 /// A block requesting vertical space in a dynamic layout.
+#[allow(dead_code)]
 pub struct BlockSpec {
     /// Minimum lines of content (not including border).
     pub content_lines: u16,
@@ -15,6 +16,7 @@ pub struct BlockSpec {
 /// Each block gets at least `max(min_height, content_lines + 2)` (the +2 accounts for borders).
 /// Surplus space is distributed proportionally to `grow_priority`.
 /// Returns a `Vec<Constraint>` suitable for `Layout::vertical()`.
+#[allow(dead_code)]
 pub fn distribute(specs: &[BlockSpec], available: u16) -> Vec<Constraint> {
     if specs.is_empty() {
         return vec![];

@@ -3,8 +3,21 @@
 use crate::data::lane::{lane_badge, lane_hex, lane_label, primary_lane, LANE_KEYS};
 use maud::{html, Markup, DOCTYPE};
 
-/// Top-level page chrome (head, nav, body wrapper).
-pub fn page(title: &str, active: &str, body: Markup) -> Markup {
+/// Per-page asset bundle. The chrome injects shared assets; the page passes
+/// its own page-specific stylesheet + script paths (one each, may be empty).
+pub struct PageAssets<'a> {
+    pub page_css: Option<&'a str>,
+    pub page_js: Option<&'a str>,
+}
+
+impl<'a> PageAssets<'a> {
+    pub const fn css_js(css: &'a str, js: &'a str) -> Self {
+        Self { page_css: Some(css), page_js: Some(js) }
+    }
+}
+
+/// Top-level page chrome with explicit per-page asset paths.
+pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) -> Markup {
     html! {
         (DOCTYPE)
         html lang="en" data-theme="palantir" {
@@ -12,9 +25,29 @@ pub fn page(title: &str, active: &str, body: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 title { "cernio · " (title) }
-                link rel="stylesheet" href="/static/style.css";
+                // Shared stylesheets — loaded on every page.
+                link rel="stylesheet" href="/static/css/base.css";
+                link rel="stylesheet" href="/static/css/motion.css";
+                link rel="stylesheet" href="/static/css/components.css";
+                link rel="stylesheet" href="/static/css/chrome.css";
+                link rel="stylesheet" href="/static/css/debug.css";
+                link rel="stylesheet" href="/static/css/ops.css";
+                // Page-specific stylesheet (optional).
+                @if let Some(css) = assets.page_css {
+                    link rel="stylesheet" href=(css);
+                }
+                // External libs.
                 script src="https://unpkg.com/htmx.org@1.9.12" {}
                 script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js" {}
+                // Shared JS — defer so DOM is parsed first.
+                script src="/static/js/core.js" defer {}
+                script src="/static/js/charts.js" defer {}
+                script src="/static/js/debug.js" defer {}
+                script src="/static/js/ops.js" defer {}
+                // Page-specific JS (optional, deferred).
+                @if let Some(js) = assets.page_js {
+                    script src=(js) defer {}
+                }
             }
             body {
                 header.topbar {
@@ -34,6 +67,29 @@ pub fn page(title: &str, active: &str, body: Markup) -> Markup {
                     }
                 }
                 main { (body) }
+                // Ops menu — floating top-right; opens a panel of pipeline operations.
+                div #ops-menu {
+                    button #ops-btn class="ops-btn" type="button" title="Pipeline operations" {
+                        span.ops-gear { "⚙" }
+                        span.ops-label { "ops" }
+                    }
+                    div #ops-panel class="ops-panel hidden" {
+                        header.ops-panel-head { "Pipeline operations" }
+                        div.ops-list {
+                            (ops_item("clean", "Clean DB", "Archive stale jobs by tier (SS=28d → F=3d) and low-grade companies; prune expired archived rows."))
+                            (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per web click."))
+                            (ops_item("check", "Integrity check", "Health, completeness, and staleness report. Read-only."))
+                            (ops_item("search", "Search jobs", "Preview only — full search must be invoked via the CLI."))
+                            (ops_item_unarchive())
+                        }
+                    }
+                }
+                // Debug screenshot trigger — bottom-right floating button.
+                button #snap-all class="snap-btn" title="Capture all 4 tabs as PNGs into /tmp/cernio-debug/" {
+                    span.snap-dot {}
+                    span.snap-label { "snap all" }
+                }
+                div #snap-toast class="snap-toast" {}
             }
         }
     }
@@ -89,6 +145,54 @@ pub fn lane_legend() -> Markup {
                     span.lane-legend-label { (lane_label(key)) }
                 }
             }
+        }
+    }
+}
+
+fn ops_item(op: &str, title: &str, desc: &str) -> Markup {
+    html! {
+        div.ops-item data-op=(op) {
+            header.ops-item-head {
+                h4 { (title) }
+                span.ops-preview data-op-preview=(op) { "loading…" }
+            }
+            p.ops-desc { (desc) }
+            div.ops-actions {
+                button.ops-run type="button" data-op-run=(op) { "Run" }
+            }
+            pre.ops-detail.hidden data-op-detail=(op) {}
+        }
+    }
+}
+
+fn ops_item_unarchive() -> Markup {
+    html! {
+        div.ops-item data-op="unarchive" {
+            header.ops-item-head {
+                h4 { "Unarchive" }
+                span.ops-preview data-op-preview="unarchive" { "loading…" }
+            }
+            p.ops-desc { "Restore archived rows so they can be re-evaluated. Pick a scope." }
+            div.ops-scope {
+                label { input type="radio" name="unarchive-scope" value="jobs" checked; " jobs" }
+                label { input type="radio" name="unarchive-scope" value="companies"; " companies" }
+                label { input type="radio" name="unarchive-scope" value="all"; " all" }
+            }
+            div.ops-actions {
+                button.ops-run type="button" data-op-run="unarchive" { "Run" }
+            }
+            pre.ops-detail.hidden data-op-detail="unarchive" {}
+        }
+    }
+}
+
+/// JSON island helper — emits a `<script type="application/json" id="data-<kind>">…</script>`
+/// for per-page JS to read.
+pub fn json_island(kind: &str, value: &serde_json::Value) -> Markup {
+    let id = format!("data-{kind}");
+    html! {
+        script type="application/json" id=(id) {
+            (maud::PreEscaped(value.to_string()))
         }
     }
 }

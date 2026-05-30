@@ -14,7 +14,8 @@ pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id),
                (SELECT COUNT(*) FROM jobs j WHERE j.company_id = c.id
                 AND j.grade IN ('SS', 'S', 'A')),
-               c.lanes
+               c.lanes,
+               c.sponsors_uk
         FROM companies c
         {archive_filter}
         ORDER BY
@@ -47,6 +48,7 @@ pub fn fetch_companies(conn: &Connection, show_archived: bool) -> Vec<CompanyRow
             job_count: row.get(13)?,
             fit_count: row.get(14)?,
             lanes: row.get(15)?,
+            sponsors_uk: row.get(16)?,
         })
     })
     .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -195,6 +197,52 @@ pub fn fetch_jobs(
         format!(" AND ({})", parts.join(" OR "))
     };
 
+    // ── Posted-within axis ──
+    let posted_filter = if filters.posted_within.is_empty() {
+        String::new()
+    } else {
+        let mut parts: Vec<String> = Vec::new();
+        for bucket in filters.posted_within.iter() {
+            match bucket.as_str() {
+                "7d" => parts.push(
+                    "(j.posted_date IS NOT NULL AND datetime(j.posted_date) >= datetime('now', '-7 days'))".to_string()),
+                "30d" => parts.push(
+                    "(j.posted_date IS NOT NULL AND datetime(j.posted_date) >= datetime('now', '-30 days') AND datetime(j.posted_date) < datetime('now', '-7 days'))".to_string()),
+                "90d" => parts.push(
+                    "(j.posted_date IS NOT NULL AND datetime(j.posted_date) >= datetime('now', '-90 days') AND datetime(j.posted_date) < datetime('now', '-30 days'))".to_string()),
+                "old" => parts.push(
+                    "(j.posted_date IS NOT NULL AND datetime(j.posted_date) < datetime('now', '-90 days'))".to_string()),
+                "unknown" => parts.push("j.posted_date IS NULL".to_string()),
+                _ => {}
+            }
+        }
+        if parts.is_empty() { String::new() } else {
+            parts.sort();
+            format!(" AND ({})", parts.join(" OR "))
+        }
+    };
+
+    // ── Sponsor axis ──
+    let sponsor_filter = if filters.sponsor.is_empty() {
+        String::new()
+    } else {
+        let mut parts: Vec<String> = Vec::new();
+        let mut concrete: Vec<String> = filters
+            .sponsor
+            .iter()
+            .filter(|s| s.as_str() != "unknown")
+            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .collect();
+        concrete.sort();
+        if !concrete.is_empty() {
+            parts.push(format!("c.sponsors_uk IN ({})", concrete.join(", ")));
+        }
+        if filters.sponsor.contains("unknown") {
+            parts.push("(c.sponsors_uk IS NULL OR c.sponsors_uk = 'unknown')".to_string());
+        }
+        format!(" AND ({})", parts.join(" OR "))
+    };
+
     let base = format!("
         SELECT j.id, j.company_id, c.name, j.title, j.url, j.location,
                j.remote_policy, j.posted_date, j.evaluation_status, j.fit_assessment,
@@ -205,7 +253,7 @@ pub fn fetch_jobs(
                j.lanes
         FROM jobs j
         JOIN companies c ON c.id = j.company_id
-        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}{lane_filter}");
+        WHERE 1=1{archive_filter}{grade_filter}{ats_filter}{decision_filter}{package_filter}{evidence_filter}{lane_filter}{posted_filter}{sponsor_filter}");
 
     let order = match sort_mode {
         SortMode::ByGrade => "
@@ -508,6 +556,10 @@ pub fn fetch_top_companies_by_hits(conn: &Connection) -> Vec<(String, i64)> {
 /// reflect state at emit-time, so events for deleted rows still render).
 /// Ordered by occurred_at descending, capped at 500 rows for view latency.
 pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
+    // By default, hide raw.* SQL-trigger events (they fire alongside every
+    // "real" event and just double up the log). Also hide one-shot migration
+    // backfill noise. The Activity page can opt in to showing them via
+    // fetch_activity_timeline_unfiltered() once a toggle is added.
     let sql = "
         SELECT occurred_at,
                substr(occurred_at, 1, 10) AS date,
@@ -518,6 +570,9 @@ pub fn fetch_activity_timeline(conn: &Connection) -> Vec<ActivityEntry> {
                source,
                detail_json
         FROM activity_events
+        WHERE event_type NOT LIKE 'raw.%'
+          AND source NOT LIKE '%backfill%'
+          AND source NOT LIKE '%migration%'
         ORDER BY occurred_at DESC, id DESC
         LIMIT 500
     ";

@@ -9,7 +9,7 @@ use super::super::theme::Theme;
 // Data models live in src/data/models.rs so the web frontend shares them.
 // Re-exported here for backwards-compat with `crate::tui::app::CompanyRow` etc.
 pub use crate::data::models::{
-    ActivityEntry, CompanyRow, DashboardStats, FilterAxis, JobFilters, JobRow, SortMode, TopMatch,
+    ActivityEntry, CompanyRow, DashboardStats, FilterAxis, JobFilters, JobRow, SortMode,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

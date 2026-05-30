@@ -3,3 +3,4 @@ pub mod api;
 pub mod companies;
 pub mod dashboard;
 pub mod jobs;
+pub mod ops;

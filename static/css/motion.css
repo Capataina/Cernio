@@ -1,0 +1,102 @@
+/* motion.css — the four motion archetypes
+ *   lift   — interactive elements rise + glow on hover
+ *   flash  — value-change wash
+ *   pulse  — slow breath on live indicators
+ *   drift  — ambient idle motion (marquee + constellation)
+ * plus click ripple + reduced-motion override.
+ *
+ * Reusable across every page. Components opt in via class.
+ */
+
+/* ── Lift (hover) ──────────────────────────────────────────────────
+ * Apply via .lift class OR scoped to existing components in their own
+ * file. This file defines the base behaviour.
+ */
+.lift {
+    transition: transform var(--t-base) var(--easing),
+                box-shadow var(--t-base) var(--easing),
+                border-color var(--t-base) var(--easing);
+}
+.lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -16px var(--accent-glow);
+    border-color: var(--border-glow);
+}
+
+/* ── Flash (value changed) ─────────────────────────────────────── */
+.flash       { animation: flash-cell var(--t-flash) ease-out; }
+.flash-good  { animation: flash-good var(--t-flash) ease-out; }
+.flash-bad   { animation: flash-bad  var(--t-flash) ease-out; }
+
+@keyframes flash-cell {
+    0%   { background: var(--accent-glow); box-shadow: 0 0 16px var(--accent-glow); }
+    100% { background: transparent;        box-shadow: none; }
+}
+@keyframes flash-good {
+    0%   { background: #4ade8044; box-shadow: 0 0 16px var(--good-glow); }
+    100% { background: transparent; box-shadow: none; }
+}
+@keyframes flash-bad {
+    0%   { background: #ff5c5c44; box-shadow: 0 0 16px var(--bad-glow); }
+    100% { background: transparent; box-shadow: none; }
+}
+
+/* ── Pulse (live indicators) ───────────────────────────────────── */
+.pulse {
+    animation: pulse-dot var(--t-pulse) ease-in-out infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1;    box-shadow: 0 0 10px var(--good-glow); }
+    50%      { opacity: 0.55; box-shadow: 0 0 4px  var(--good-glow); }
+}
+
+/* ── Drift: marquee on overflow ─────────────────────────────────
+ * Applied via JS (core.js → applyMarquee) when scrollWidth > clientWidth.
+ */
+.marquee {
+    display: block;
+    overflow: hidden;
+    position: relative;
+    white-space: nowrap;
+}
+.marquee > .marquee-inner {
+    display: inline-block;
+    padding-right: 32px;
+    animation: marquee-scroll 14s linear infinite;
+    animation-delay: 2.5s;
+}
+.marquee:hover > .marquee-inner { animation-play-state: paused; }
+
+@keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    8%   { transform: translateX(0); }
+    92%  { transform: translateX(calc(-1 * var(--marquee-shift, 100%))); }
+    100% { transform: translateX(calc(-1 * var(--marquee-shift, 100%))); }
+}
+
+/* ── Click ripple (buttons + apply link) ────────────────────────
+ * The ::after layer is positioned in components.css; the animation
+ * lives here so motion is in one place.
+ */
+@keyframes ripple {
+    0%   { opacity: 0.6; transform: scale(0.4); }
+    100% { opacity: 0;   transform: scale(1.6); }
+}
+
+/* ── Live wire (focused pane top-edge sweep) ──────────────────── */
+@keyframes live-wire {
+    0%   { background: linear-gradient(90deg, transparent  0%, var(--accent)   0%, transparent   0%); }
+    50%  { background: linear-gradient(90deg, transparent 30%, var(--accent)  50%, transparent  70%); }
+    100% { background: linear-gradient(90deg, transparent 100%, var(--accent) 100%, transparent 100%); }
+}
+
+/* ── Reduced motion override ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+    .marquee > .marquee-inner { animation: none; }
+    #ambient-canvas { display: none; }
+}

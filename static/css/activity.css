@@ -1,0 +1,145 @@
+/* activity.css — Activity-tab-specific tweaks.
+ *
+ * Shared activity styles (rows, groups, day headers, .kpi-strip, .panel,
+ * .chart sizing, .dash-row) live in components.css. Only page-local layout
+ * + tightening for the embedded event log lives here.
+ */
+
+.activity-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 32px;
+}
+
+.activity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.activity-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-head h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+
+.activity-head .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7adf9a;
+  box-shadow: 0 0 10px rgba(122, 223, 154, 0.55);
+}
+
+.activity-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #7a838f;
+  letter-spacing: 0.04em;
+}
+
+/* KPI text variant — for the "Top source" tile which holds a label
+   instead of a number. */
+.kpi-value-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #eef2f8;
+}
+
+/* Event-log panel — keeps the bordered card around the existing feed and
+   tightens spacing so the log reads as one column. */
+.activity-log-panel .activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.activity-log-panel .day-header {
+  margin-top: 14px;
+}
+
+.activity-log-panel .day-header:first-child {
+  margin-top: 4px;
+}
+
+.activity-log-panel .empty {
+  color: #7a838f;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 16px 4px;
+}
+
+/* ── Timeframe toggle ──────────────────────────────────────────────
+ * Single sticky toggle above the two windowed panels. The chips are
+ * plain hyperlinks (`/activity?window=Xd`); the server re-renders both
+ * charts with the chosen window in a full round-trip, so no JS is needed.
+ */
+.timeframe-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: -4px;
+}
+
+.timeframe-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a838f;
+}
+
+.timeframe-toggle {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.timeframe-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 3px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: #7a838f;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.08s ease, color 0.12s ease, background 0.12s ease,
+              border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.timeframe-chip:hover {
+  color: #eef2f8;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.timeframe-chip-active,
+.timeframe-chip-active:hover {
+  color: #0c1118;
+  background: #7adf9a;
+  border-color: #7adf9a;
+  box-shadow: 0 0 10px rgba(122, 223, 154, 0.45);
+}

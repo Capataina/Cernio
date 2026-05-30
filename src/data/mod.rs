@@ -5,6 +5,7 @@
 //! stays in `src/tui/` and `src/web/` respectively.
 
 pub mod activity;
+pub mod analytics;
 pub mod lane;
 pub mod models;
 pub mod queries;

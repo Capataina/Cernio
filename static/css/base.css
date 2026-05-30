@@ -1,0 +1,141 @@
+/* base.css — design tokens, reset, typography, ambient canvas
+ * Loaded on every page. No component or page rules here.
+ */
+
+:root {
+    /* Background ladder */
+    --bg-0: #05070a;
+    --bg-1: #0a0e13;
+    --bg-2: #10151c;
+    --bg-3: #161c24;
+    --bg-4: #1c232c;
+    --bg-5: #242c37;
+
+    /* Borders */
+    --border: #1f2630;
+    --border-strong: #2a3038;
+    --border-glow: #3a4452;
+
+    /* Text ladder */
+    --text-0: #eef2f8;
+    --text-1: #cbd2db;
+    --text-2: #aab3bf;
+    --text-3: #7a838f;
+    --text-4: #4f5762;
+    --text-5: #353c46;
+
+    /* Accents */
+    --accent: #4f7cff;
+    --accent-2: #7ea8ff;
+    --accent-glow: #4f7cff55;
+    --good: #4ade80;
+    --good-glow: #4ade8077;
+    --bad: #ff5c5c;
+    --bad-glow: #ff5c5c77;
+    --warn: #ffc94a;
+
+    /* Grade colour mapping (job grades; company grades reuse) */
+    --grade-ss: #c39df0;
+    --grade-s:  #7adf9a;
+    --grade-a:  #7ea8ff;
+    --grade-b:  #ffc94a;
+    --grade-c:  #ff8a5c;
+    --grade-f:  #6a7280;
+
+    /* Fonts */
+    --font-sans: 'Inter', 'Helvetica Neue', -apple-system, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+    /* Layout */
+    --row-h: 32px;
+    --radius: 2px;
+    --pane-radius: 3px;
+
+    /* Motion timing */
+    --t-fast: 90ms;
+    --t-base: 160ms;
+    --t-slow: 320ms;
+    --t-flash: 480ms;
+    --t-pulse: 2400ms;
+    --easing: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background:
+        radial-gradient(ellipse 1400px 700px at 50% -10%, #0c1320 0%, transparent 60%),
+        var(--bg-0);
+    color: var(--text-0);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    font-feature-settings: "ss01", "cv11", "tnum";
+}
+
+h1, h2, h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    margin: 0;
+}
+h1 { font-size: 18px; }
+h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-1); }
+h3 { font-size: 12px; color: var(--text-2); }
+
+/* Tabular numbers across all data surfaces */
+.stat-value, .panel-sub, .role-company, .activity-time,
+.col-jobs, .col-ats, .col-loc, .col-grade, .col-lane,
+.grade-pill, .lane-chip, .hit-rate-pct, .hit-rate-total,
+.metric, .funnel-num, .funnel-pct, .ticker, .kpi-value,
+.bar-list-num, .top-list-num {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Main layout shell */
+main {
+    padding: 20px 24px 60px;
+    max-width: 1840px;
+    margin: 0 auto;
+    animation: fade-in var(--t-slow) var(--easing);
+}
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.empty {
+    color: var(--text-3);
+    font-size: 12px;
+    padding: 24px; text-align: center;
+    font-family: var(--font-mono);
+}
+.error {
+    background: #2a1010; color: #ff7676;
+    padding: 12px 16px; border: 1px solid #5a2424;
+    border-radius: var(--radius);
+}
+
+/* Ambient constellation canvas (drift) — drawn by core.js */
+#ambient-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.45;
+}
+
+/* Grid primitives shared across pages */
+.grid-2     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.grid-3     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+.grid-2-asym { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 14px; }
+.grid-1-2   { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1100px) {
+    .grid-2, .grid-3, .grid-2-asym, .grid-1-2 { grid-template-columns: 1fr; }
+}
+.dual-panels { display: grid; grid-template-columns: minmax(360px, 1fr) 1.4fr; gap: 14px; }

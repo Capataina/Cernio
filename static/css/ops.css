@@ -1,0 +1,188 @@
+/* ops.css — floating ops button + popover panel.
+ * Mirrors snap-btn aesthetic, sits top-right next to the status strip.
+ * Loaded globally via templates.rs.
+ */
+
+#ops-menu {
+    position: fixed;
+    /* Sit further right of the LOCALHOST status strip and lower so the topbar
+     * tabs / strip don't overlap the button. */
+    top: 9px;
+    right: 220px;
+    z-index: 200;
+    font-family: var(--font-mono);
+}
+
+.ops-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg-3));
+    border: 1px solid var(--border-strong);
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+    border-radius: 2px;
+    box-shadow: 0 6px 20px -8px rgba(0,0,0,0.6);
+    transition: all var(--t-base) var(--easing);
+}
+.ops-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-0);
+    box-shadow: 0 0 18px var(--accent-glow), 0 6px 20px -8px rgba(0,0,0,0.6);
+    transform: translateY(-1px);
+}
+.ops-btn[data-open="1"] {
+    border-color: var(--accent);
+    color: var(--text-0);
+}
+.ops-gear {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.ops-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 380px;
+    max-height: 78vh;
+    overflow-y: auto;
+    padding: 12px;
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    border: 1px solid var(--border-strong);
+    border-left: 2px solid var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,0.6), 0 0 18px var(--accent-glow);
+    animation: ops-panel-in var(--t-base) var(--easing);
+}
+.ops-panel.hidden { display: none; }
+
+.ops-panel-head {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-3);
+    margin: 0 0 10px 2px;
+}
+
+.ops-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ops-item {
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    border-radius: 2px;
+    transition: border-color var(--t-fast) var(--easing);
+}
+.ops-item:hover {
+    border-color: var(--border-strong);
+}
+
+.ops-item-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.ops-item-head h4 {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-0);
+}
+.ops-preview {
+    font-size: 10px;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    text-align: right;
+}
+
+.ops-desc {
+    margin: 0 0 8px 0;
+    font-size: 10.5px;
+    color: var(--text-3);
+    line-height: 1.5;
+}
+
+.ops-scope {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 10px;
+    color: var(--text-2);
+}
+.ops-scope label {
+    cursor: pointer;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.ops-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ops-run {
+    padding: 5px 14px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all var(--t-fast) var(--easing);
+}
+.ops-run:hover {
+    border-color: var(--accent);
+    color: var(--text-0);
+    background: var(--bg-2);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.ops-run:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.ops-detail {
+    margin: 8px 0 0 0;
+    padding: 7px 9px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-size: 10px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-radius: 2px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.ops-detail.hidden { display: none; }
+
+.ops-item:hover .ops-detail:not(.hidden) {
+    border-color: var(--border-strong);
+}
+
+@keyframes ops-panel-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
