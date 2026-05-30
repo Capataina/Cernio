@@ -43,8 +43,8 @@ pub struct LocationConfig {
 #[derive(Debug, Deserialize)]
 pub struct CleanupConfig {
     /// Job grades to remove during cleanup.
-    #[serde(default = "default_remove_grades")]
-    pub remove_job_grades: Vec<String>,
+    #[serde(default = "default_archive_job_grades")]
+    pub archive_job_grades: Vec<String>,
 
     /// Job age threshold in days.
     #[serde(default = "default_stale_days")]
@@ -58,7 +58,7 @@ pub struct CleanupConfig {
 fn default_min_grade() -> String {
     "B".to_string()
 }
-fn default_remove_grades() -> Vec<String> {
+fn default_archive_job_grades() -> Vec<String> {
     vec!["F".to_string(), "C".to_string()]
 }
 fn default_stale_days() -> u32 {
@@ -82,7 +82,7 @@ impl Default for SearchFilters {
 impl Default for CleanupConfig {
     fn default() -> Self {
         Self {
-            remove_job_grades: default_remove_grades(),
+            archive_job_grades: default_archive_job_grades(),
             stale_days: default_stale_days(),
             archive_company_grades: default_archive_grades(),
         }
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(prefs.search_filters.min_company_grade, "B");
         assert!(prefs.search_filters.include_keywords.is_empty());
         assert_eq!(prefs.cleanup.stale_days, 14);
-        assert_eq!(prefs.cleanup.remove_job_grades, vec!["F", "C"]);
+        assert_eq!(prefs.cleanup.archive_job_grades, vec!["F", "C"]);
     }
 
     #[test]
@@ -466,7 +466,7 @@ mod tests {
             patterns = ["London", "Cambridge", "UK"]
 
             [cleanup]
-            remove_job_grades = ["F"]
+            archive_job_grades = ["F"]
             stale_days = 7
             archive_company_grades = []
         "#;
@@ -474,7 +474,7 @@ mod tests {
         let prefs = Preferences::load_from(tmp.path());
         assert_eq!(prefs.search_filters.min_company_grade, "C");
         assert_eq!(prefs.cleanup.stale_days, 7);
-        assert_eq!(prefs.cleanup.remove_job_grades, vec!["F"]);
+        assert_eq!(prefs.cleanup.archive_job_grades, vec!["F"]);
         assert!(prefs.cleanup.archive_company_grades.is_empty());
 
         assert_eq!(

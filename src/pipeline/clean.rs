@@ -78,7 +78,7 @@ fn preview(conn: &Connection, config: &CleanupConfig, jobs_only: bool) -> Cleanu
              WHERE j.grade IN (SELECT value FROM json_each(?1))
              OR datetime(j.discovered_at) < datetime('now', ?2)",
             params![
-                serde_json::to_string(&config.remove_job_grades).unwrap_or_default(),
+                serde_json::to_string(&config.archive_job_grades).unwrap_or_default(),
                 format!("-{} days", config.stale_days)
             ],
             |row| row.get(0),

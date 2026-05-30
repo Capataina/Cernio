@@ -38,7 +38,7 @@ const PREFERENCES_FILE: &str = "profile/preferences.toml";
 /// Valid `min_company_grade` values per `src/config.rs::included_grades`.
 const VALID_COMPANY_GRADES: &[&str] = &["S", "A", "B", "C"];
 
-/// Valid `remove_job_grades` values per the job grading rubric.
+/// Valid `archive_job_grades` values per the job grading rubric.
 const VALID_JOB_GRADES: &[&str] = &["SS", "S", "A", "B", "C", "F"];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ fn cleanup_section_exists_with_required_fields() {
     let root = parse_as_toml_value();
     let _ = dotted_get(&root, "cleanup")
         .unwrap_or_else(|| panic!("missing `[cleanup]` section. src/config.rs reads this for `cernio clean` operations."));
-    assert_array_at(&root, "cleanup.remove_job_grades");
+    assert_array_at(&root, "cleanup.archive_job_grades");
     assert_integer_at(&root, "cleanup.stale_days");
     assert_array_at(&root, "cleanup.archive_company_grades");
 }
@@ -332,14 +332,14 @@ fn cleanup_stale_days_is_positive() {
 }
 
 #[test]
-fn cleanup_remove_job_grades_uses_valid_letters() {
+fn cleanup_archive_job_grades_uses_valid_letters() {
     let root = parse_as_toml_value();
-    let arr = assert_array_at(&root, "cleanup.remove_job_grades");
+    let arr = assert_array_at(&root, "cleanup.archive_job_grades");
     for v in arr {
-        let s = v.as_str().unwrap_or_else(|| panic!("non-string entry in cleanup.remove_job_grades: {v:?}"));
+        let s = v.as_str().unwrap_or_else(|| panic!("non-string entry in cleanup.archive_job_grades: {v:?}"));
         assert!(
             VALID_JOB_GRADES.contains(&s),
-            "cleanup.remove_job_grades contains `{s}`, not in {VALID_JOB_GRADES:?}. The cleanup script would silently skip jobs with this grade."
+            "cleanup.archive_job_grades contains `{s}`, not in {VALID_JOB_GRADES:?}. The cleanup script would silently skip jobs with this grade."
         );
     }
 }
