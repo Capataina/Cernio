@@ -81,7 +81,7 @@ Selection criteria. The 30 stability-pattern jobs are picked from:
 |---|---|
 | **Wide-funnel graduate roles** | Title contains "Graduate" / "New Grad" / "2026 Grad"; company is mid-or-large tech firm with structured graduate intake (Cloudflare, Stripe, Spotify, Palantir, B2C2, Wise, Monzo, GitLab) |
 | **Hard years-floor** | Description states "4+ years" / "5+ years" / "5-10 years" experience required |
-| **Hard location exclusion** | Job location not in `preferences.toml::hard.locations` (Bristol, Edinburgh, Manchester, Berlin, non-Remote-UK) |
+| **Hard location exclusion** | Job location outside the tier table in `profile/career-goals.md` §Soft preferences (Manchester, Leeds, Liverpool, Newcastle, Cardiff, Berlin, any non-UK / non-Remote-UK) |
 | **Mid-tier UK fintech, junior tier** | Company in {Lendable, Trainline, Monzo, Zopa, Starling, Wise, Cleo}; role is graduate-or-junior |
 | **Off-stack mid-level** | Description requires Kotlin/Android/iOS/Salesforce or similar non-portfolio stack at mid-level |
 | **Standard junior engineering at recognised firm** | Description is graduate-explicit + portfolio-anchored stack (Rust, Python, TypeScript) + recognised firm |

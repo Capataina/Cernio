@@ -6,22 +6,28 @@
 //! a stderr warning. A typo would not surface as a build failure; it would
 //! surface as the search pipeline running with default filters (effectively
 //! ignoring all of the user's tuning, returning thousands of off-target
-//! jobs). The same file is also read by every Cernio Claude Code skill as
-//! profile data — `[hard]` and `[soft]` sections drive grading judgments.
+//! jobs).
+//!
+//! Scope: this file holds ONLY mechanical Rust pipeline configuration —
+//! search keyword filters, per-ATS location patterns, min_company_grade,
+//! and cleanup thresholds. Everything preference-shaped (taste, sectors,
+//! role exclusions, signals, seniority, lifestyle) lives in profile/ as
+//! prose and is read by grading skills directly. There is no [hard] or
+//! [soft] section here anymore.
 //!
 //! These tests assert that the actual file in the repo:
 //! - Is readable from the standard path
 //! - Parses as valid TOML
 //! - Survives strict parsing through the `Preferences` struct (no fallback)
-//! - Contains every section + key the runtime + skills depend on
-//! - Has the right shape (arrays vs strings vs numbers vs booleans) per value
+//! - Contains every section + key the runtime depends on
+//! - Has the right shape (arrays vs strings vs numbers) per value
 //! - Has location-pattern coverage for every ATS provider in `src/ats/`
 //! - Holds sensible values (positive numbers, valid grade letters, non-empty
 //!   keyword lists, seniority terms in the exclusion list)
 //!
 //! When this file fails: stop. Do not commit changes to preferences.toml that
 //! make these tests fail without first updating the tests in lockstep — the
-//! tests document the contract that `src/config.rs` and the skills depend on.
+//! tests document the contract that `src/config.rs` depends on.
 
 use cernio::config::Preferences;
 use std::fs;
@@ -89,13 +95,6 @@ fn assert_string_at<'a>(root: &'a toml::Value, path: &str) -> &'a str {
         .unwrap_or_else(|| panic!("`{path}` must be a string, got {v:?}"))
 }
 
-fn assert_bool_at(root: &toml::Value, path: &str) -> bool {
-    let v = dotted_get(root, path)
-        .unwrap_or_else(|| panic!("missing key `{path}` in preferences.toml"));
-    v.as_bool()
-        .unwrap_or_else(|| panic!("`{path}` must be a boolean, got {v:?}"))
-}
-
 fn assert_integer_at(root: &toml::Value, path: &str) -> i64 {
     let v = dotted_get(root, path)
         .unwrap_or_else(|| panic!("missing key `{path}` in preferences.toml"));
@@ -156,48 +155,25 @@ fn loader_does_not_silently_fall_back_to_defaults() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [hard] section — read by skills, not by Rust code
+// No-[hard]-or-[soft] regression guard
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
-fn hard_section_exists_with_required_fields() {
+fn no_hard_or_soft_sections_present() {
+    // preferences.toml was pruned to mechanical-only in May 2026. The [hard]
+    // and [soft] sections were duplicating profile/ content and acting as a
+    // snapshot of taste that the grading skills now infer from career-goals.md,
+    // lifestyle-preferences.md, skills/, and projects/. A re-introduction
+    // would reintroduce the snapshot anti-pattern.
     let root = parse_as_toml_value();
-    let _ = dotted_get(&root, "hard")
-        .unwrap_or_else(|| panic!("missing `[hard]` section. Skills load this for grading."));
-    assert_array_at(&root, "hard.locations");
-    assert_array_at(&root, "hard.exclude_locations");
-    assert_bool_at(&root, "hard.requires_sponsorship");
-    assert_string_at(&root, "hard.seniority_min");
-    assert_string_at(&root, "hard.seniority_max");
-    assert_array_at(&root, "hard.exclude_role_types");
-    assert_array_at(&root, "hard.exclude_sectors");
-    assert_array_at(&root, "hard.tech_must_have");
-}
-
-#[test]
-fn hard_locations_includes_uk_target() {
-    let root = parse_as_toml_value();
-    let locs = assert_array_at(&root, "hard.locations");
-    let strings: Vec<&str> = locs.iter().filter_map(|v| v.as_str()).collect();
     assert!(
-        strings.iter().any(|s| s.contains("London") || s.contains("UK") || s.contains("Remote-UK")),
-        "hard.locations does not include any UK target (London/UK/Remote-UK). Cernio is a UK-focused job-discovery tool — removing UK targets would break the entire premise. Found: {strings:?}"
+        dotted_get(&root, "hard").is_none(),
+        "preferences.toml has re-grown a [hard] section. Preference-shaped data belongs in profile/ as prose, not here. This file is for mechanical Rust pipeline config only."
     );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// [soft] section — read by skills
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[test]
-fn soft_section_exists_with_required_arrays() {
-    let root = parse_as_toml_value();
-    let _ = dotted_get(&root, "soft")
-        .unwrap_or_else(|| panic!("missing `[soft]` section. Skills load this for grading."));
-    assert_array_at(&root, "soft.tech_preferred");
-    assert_array_at(&root, "soft.sectors_preferred");
-    assert_array_at(&root, "soft.positive_signals");
-    assert_array_at(&root, "soft.negative_signals");
+    assert!(
+        dotted_get(&root, "soft").is_none(),
+        "preferences.toml has re-grown a [soft] section. Preference-shaped data belongs in profile/ as prose, not here. This file is for mechanical Rust pipeline config only."
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

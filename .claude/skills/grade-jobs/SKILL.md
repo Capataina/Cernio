@@ -312,7 +312,7 @@ The structured format from step 5 is the same shape for every grade. What change
 **F — the assessment should name the specific dealbreaker by JD quote (or by company-context reasoning on the semantic path):**
 
 - A hard floor cited by JD quote: *"the description states: 'minimum 5 years of production experience' — hard floor, no portfolio substitute available at this seniority"*.
-- A hard preference exclusion: *"role is 60% customer-facing per the JD's responsibilities list — excluded by preferences.toml.hard.exclude_role_types"*.
+- A hard preference exclusion: *"role is 60% customer-facing per the JD's responsibilities list — excluded by the role-truth-at-hire hard rule in `profile/career-goals.md`"*.
 - A hard location/sector exclusion.
 
 **Unacceptable (any tier):** *"Good role at a strong company. Decent fit with the profile. Worth considering."* — no JD quote, no project name, no career-axis reasoning, no Verdict prose. Every Q-slot must carry its own load.

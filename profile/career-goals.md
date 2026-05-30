@@ -72,6 +72,10 @@ Fails (auto-downgrade or auto-reject in `grade-jobs` Q2):
 
 **No hardcoded calibration anchors.** No file says "X company is SS in Y lane". Lane-pinnacle positioning emerges from the relativity pass in `grade-companies` Phase 2. `lanes.md` does NOT exist as a separate file — the lane LIST lives here, the lane CONTENT lives in the DB.
 
+**Ethical exclusions.** Three sectors are categorical no-gos regardless of role quality, compensation, or company prestige: **gambling** (sportsbooks, casino, sports-betting infrastructure), **adtech** (consumer ad-targeting / programmatic ad networks / surveillance ad-buying), and **consumer-crypto** (retail wallets, retail exchanges, NFT marketplaces, meme/speculation tokens). These are values calls, not taste calls — `discover-companies` does not surface them; `grade-companies` deletes any that slip through (cascade-deletes their jobs).
+
+The crypto line is **consumer-facing speculation/exploitation vs B2B institutional infrastructure**. Institutional digital-asset infrastructure (B2C2-style liquidity, exchange tech, settlement rails, market-making engines, on-chain payment rails) is fine and represents the `crypto-mm` lane. Same logic for adtech: consumer ad-targeting is out, B2B martech/CRM/marketing-data-infra is in.
+
 ---
 
 ## Soft preferences
