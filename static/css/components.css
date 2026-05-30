@@ -80,7 +80,8 @@
     font-size: 10px; font-family: var(--font-mono);
     text-transform: uppercase; letter-spacing: 0.08em;
     transition: color var(--t-base) var(--easing);
-    cursor: default;
+    cursor: pointer;
+    text-decoration: none;
 }
 .lane-legend-item:hover { color: var(--lane-color, var(--text-0)); }
 .lane-legend-dot {
@@ -664,3 +665,33 @@ table.company-table td a:visited {
 }
 .activity-group-summary:hover { background: var(--bg-3); }
 .activity-children { background: var(--bg-1); border-top: 1px solid var(--border); }
+
+/* ── Click-to-filter affordances ─────────────────────────────────────────
+ * Row/cell wrappers that became <a> tags for cross-filter navigation:
+ *   .row-clickable      — top-list rows, funnel rows
+ *   .heatmap-cell-link  — jobs-page grade × lane heatmap cells (incl. heads)
+ * Goal: lift + glow on hover, preserve inherited colour, no underline.
+ */
+.row-clickable,
+.heatmap-cell-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: transform var(--t-fast) var(--easing),
+                box-shadow var(--t-fast) var(--easing),
+                background var(--t-fast) var(--easing);
+}
+.row-clickable:hover {
+    background: var(--bg-3);
+    transform: translateY(-1px);
+}
+.heatmap-cell-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px -4px rgba(126, 168, 255, 0.45);
+    z-index: 1;
+}
+.heatmap-cell-link:focus-visible,
+.row-clickable:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+}

@@ -12,10 +12,11 @@
   const boot = window.cernio.bootEchart;
 
   // ── Companies × lane donut (large) ──────────────────────────────────────────
-  boot('companies-lane-large', (data, theme) => {
+  const companiesLaneLargeChart = boot('companies-lane-large', (data, theme) => {
     const items = (data.items || []).map((i) => ({
       name: i.label,
       value: i.value,
+      key: i.key,
       itemStyle: { color: i.color },
     }));
     return {
@@ -47,8 +48,17 @@
     };
   });
 
+  if (companiesLaneLargeChart) {
+    companiesLaneLargeChart.on('click', (params) => {
+      if (params.componentType !== 'series') return;
+      const key = params.data && params.data.key;
+      if (!key) return;
+      window.location.href = '/companies?lane=' + encodeURIComponent(key);
+    });
+  }
+
   // ── ATS / job-board health (horizontal bar) ─────────────────────────────────
-  boot('ats-health-companies', (data, theme) => {
+  const atsHealthChart = boot('ats-health-companies', (data, theme) => {
     const labels = data.labels || [];
     const values = data.values || [];
     const colors = data.colors || [];
@@ -90,12 +100,29 @@
     };
   });
 
+  if (atsHealthChart) {
+    // y-axis category (label) is the ATS provider key for the real providers,
+    // "bespoke", or "potential". The first two filter by `ats=<provider>`;
+    // bespoke + potential map onto `status=...`.
+    atsHealthChart.on('click', (params) => {
+      if (params.componentType !== 'series') return;
+      const label = params.name;
+      if (!label) return;
+      if (label === 'bespoke' || label === 'potential') {
+        window.location.href = '/companies?status=' + encodeURIComponent(label);
+      } else {
+        window.location.href = '/companies?ats=' + encodeURIComponent(label);
+      }
+    });
+  }
+
   // ── Geography donut ─────────────────────────────────────────────────────────
-  boot('geography', (data, theme) => {
+  const geographyChart = boot('geography', (data, theme) => {
     const palette = ['#7ea8ff', '#7adf9a', '#c39df0', '#ffc94a', '#ff8a5c', '#aab3bf', '#4f5762'];
     const items = (data.items || []).map((i, idx) => ({
       name: i.name,
       value: i.value,
+      key: i.key,
       itemStyle: { color: palette[idx % palette.length] },
     }));
     return {
@@ -126,6 +153,15 @@
       }],
     };
   });
+
+  if (geographyChart) {
+    geographyChart.on('click', (params) => {
+      if (params.componentType !== 'series') return;
+      const key = params.data && params.data.key;
+      if (!key) return;
+      window.location.href = '/companies?location=' + encodeURIComponent(key);
+    });
+  }
 
   // ── Recently-discovered timeline (vertical bar) ─────────────────────────────
   boot('discovered', (data, theme) => {

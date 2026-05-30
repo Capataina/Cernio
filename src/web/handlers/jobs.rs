@@ -25,6 +25,10 @@ pub struct JobsQuery {
     pub ats: Option<String>,
     pub posted: Option<String>,
     pub sponsor: Option<String>,
+    /// Single-value company-name filter (exact match on companies.name).
+    /// Driven by click-to-filter from Top-companies rows; not part of the
+    /// chip-strip axes, so it does not appear in `AXES`.
+    pub company: Option<String>,
 }
 
 pub async fn page(
@@ -223,6 +227,20 @@ fn toggle_href(q: &JobsQuery, axis: &AxisDef, value: &str) -> String {
     }
 }
 
+/// Build a click-navigation URL that *sets* a fixed set of axes (rather than
+/// toggling). Used by heatmap cells / funnel rows / top-list rows.
+fn set_href(pairs: &[(&str, &str)]) -> String {
+    if pairs.is_empty() {
+        return "/jobs".to_string();
+    }
+    let qs = pairs
+        .iter()
+        .map(|(k, v)| format!("{k}={}", urlencode(v)))
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("/jobs?{qs}")
+}
+
 fn urlencode(s: &str) -> String {
     // Only commas + safe ASCII; encode comma → %2C, space → %20, ? → %3F.
     s.chars()
@@ -254,7 +272,22 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
     filters.posted_within = axis_set(q, &AXES[5]);
     filters.sponsor = axis_set(q, &AXES[6]);
 
-    let jobs = queries::fetch_jobs(&conn, None, &filters, SortMode::ByGrade);
+    // Optional click-driven company filter — resolve name → id, then pass to
+    // fetch_jobs's existing `company_filter` Option<i64>. Empty / unknown names
+    // collapse to None so the page still renders the universe.
+    let company_id: Option<i64> = q.company.as_deref().and_then(|name| {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        conn.query_row(
+            "SELECT id FROM companies WHERE name = ?1 LIMIT 1",
+            rusqlite::params![trimmed],
+            |r| r.get::<_, i64>(0),
+        )
+        .ok()
+    });
+    let jobs = queries::fetch_jobs(&conn, company_id, &filters, SortMode::ByGrade);
     // Total jobs in the universe (for "X of Y" filter summary).
     let total_universe: i64 = conn
         .query_row(
@@ -316,11 +349,11 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
         } else {
             !s.is_empty()
         }
-    });
+    }) || q.company.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false);
 
     html! {
         div.jobs-page {
-            (lane_legend())
+            (lane_legend("jobs"))
 
             // ── Chip strip filter ─────────────────────────────────────────
             div.filter-strip {
@@ -376,20 +409,26 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                     span.panel-sub { "filtered jobs · cell shade scales to volume" }
                 }
                 div.heatmap-grid {
+                    // Corner cell — no link.
                     div.heatmap-cell.heatmap-corner { "" }
+                    // Column heads — lane → /jobs?lane=<key>.
                     @for key in LANE_KEYS.iter() {
-                        div.heatmap-cell.heatmap-head
+                        a.heatmap-cell.heatmap-head.heatmap-cell-link
+                            href=(set_href(&[("lane", key)]))
                             title=(lane_label(key))
                             style=(format!("--lane-color: {}", lane_hex(key))) {
                             (key)
                         }
                     }
                     @for (grade, row) in &heatmap {
-                        div.heatmap-cell.heatmap-row-head {
+                        // Row head — grade → /jobs?grade=<G>.
+                        a.heatmap-cell.heatmap-row-head.heatmap-cell-link
+                            href=(set_href(&[("grade", grade.as_str())])) {
                             (grade_pill(Some(grade.as_str())))
                         }
-                        @for n in row {
-                            (heatmap_cell(*n, heatmap_max))
+                        @for (li, n) in row.iter().enumerate() {
+                            @let lane_key = LANE_KEYS[li];
+                            (heatmap_cell_link(*n, heatmap_max, grade, lane_key))
                         }
                     }
                 }
@@ -415,7 +454,13 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                             @let pct = if funnel_total > 0 {
                                 (*count as f64 * 100.0 / funnel_total as f64) as i32
                             } else { 0 };
-                            div.funnel-row data-decision=(label) {
+                            // Decision-axis key — "untouched" maps to the
+                            // "none" filter value, every other label matches
+                            // its filter key 1:1.
+                            @let dec_key = if label == "untouched" { "none" } else { label.as_str() };
+                            a.funnel-row.row-clickable
+                                href=(set_href(&[("decision", dec_key)]))
+                                data-decision=(label) {
                                 span.funnel-label { (label) }
                                 div.funnel-bar-track {
                                     div.funnel-bar
@@ -442,7 +487,9 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                         }
                         @for (i, (name, total)) in top_companies.iter().enumerate() {
                             @let pct = if companies_max > 0 { *total * 100 / companies_max } else { 0 };
-                            div.top-list-row {
+                            a.top-list-row.row-clickable
+                                href=(set_href(&[("company", name.as_str())]))
+                                title=(format!("Filter jobs by company: {name}")) {
                                 span.top-list-rank { (i + 1) }
                                 span.top-list-name { (name) }
                                 div.top-list-bar {
@@ -464,7 +511,11 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                         }
                         @for (i, (title, count)) in top_titles.iter().enumerate() {
                             @let pct = if titles_max > 0 { *count * 100 / titles_max } else { 0 };
-                            div.top-list-row {
+                            // Title-filter axis not yet wired; render as a
+                            // hoverable row with a tooltip so the affordance is
+                            // visible without a dead click target.
+                            div.top-list-row
+                                title=(format!("{title} (title filter coming)")) {
                                 span.top-list-rank { (i + 1) }
                                 span.top-list-name { (title) }
                                 div.top-list-bar {
@@ -496,7 +547,8 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                     }
                     tbody {
                         @for j in &jobs {
-                            tr.job-row id=(format!("job-{}", j.id)) {
+                            tr.job-row.row-clickable id=(format!("job-{}", j.id))
+                                data-detail=(format!("job-{}", j.id)) {
                                 td.col-grade { (grade_pill(j.grade.as_deref())) }
                                 td.col-lane  { (lane_chip_for(j.lanes.as_deref())) }
                                 td.col-title { div.job-title data-marquee="" { (j.title) } }
@@ -719,21 +771,18 @@ fn freshness_median_bucket(buckets: &[(String, i64)]) -> String {
         .unwrap_or_else(|| "—".to_string())
 }
 
-fn heatmap_cell(count: i64, max: i64) -> Markup {
-    let class = if count == 0 || max == 0 {
-        "heatmap-cell zero"
+/// Click-navigable heatmap cell linking to /jobs?lane=L&grade=G.
+fn heatmap_cell_link(count: i64, max: i64, grade: &str, lane: &str) -> Markup {
+    let shade = if count == 0 || max == 0 {
+        "zero"
     } else {
         let ratio = count as f64 / max as f64;
-        if ratio < 0.15 {
-            "heatmap-cell low"
-        } else if ratio < 0.5 {
-            "heatmap-cell mid"
-        } else {
-            "heatmap-cell hot"
-        }
+        if ratio < 0.15 { "low" } else if ratio < 0.5 { "mid" } else { "hot" }
     };
+    let class = format!("heatmap-cell heatmap-cell-link {shade}");
+    let href = set_href(&[("lane", lane), ("grade", grade)]);
     html! {
-        div class=(class) {
+        a class=(class) href=(href) title=(format!("{} · {}: {} jobs", grade, lane, count)) {
             (count)
         }
     }

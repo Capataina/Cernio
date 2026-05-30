@@ -42,6 +42,20 @@ const SPONSOR_CHIPS: [&str; 3] = ["yes", "unknown", "no"];
 const LOCATION_CHIPS: [&str; 5] = ["london", "uk_ex_london", "remote", "intl", "unknown"];
 const HAS_JOBS_CHIPS: [&str; 2] = ["yes", "no"];
 
+/// Map the human-readable geography bucket the donut renders into the URL
+/// `location=` filter key consumed by `CompaniesQuery`. The geography donut
+/// has finer buckets than the filter axis, so a few names collapse together
+/// (e.g. "UK other" → uk_ex_london).
+fn geo_bucket_to_filter_key(name: &str) -> &'static str {
+    match name {
+        "Remote" => "remote",
+        "London" | "London + intl" => "london",
+        "UK ex-London" | "UK other" => "uk_ex_london",
+        "International" => "intl",
+        _ => "unknown",
+    }
+}
+
 fn ats_color(key: &str) -> &'static str {
     match key {
         "greenhouse" => "#4ade80",
@@ -320,6 +334,7 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
     let companies_lane_json = serde_json::json!({
         "items": LANE_KEYS.iter().map(|k| serde_json::json!({
             "label": lane_label(k),
+            "key": k,
             "value": lane_counts.get(*k).copied().unwrap_or(0),
             "color": lane_hex(k),
         })).collect::<Vec<_>>(),
@@ -408,7 +423,11 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
     geo.sort_by(|a, b| b.1.cmp(&a.1));
     let geography_json = serde_json::json!({
         "items": geo.iter()
-            .map(|(name, n)| serde_json::json!({"name": name, "value": n}))
+            .map(|(name, n)| serde_json::json!({
+                "name": name,
+                "value": n,
+                "key": geo_bucket_to_filter_key(name),
+            }))
             .collect::<Vec<_>>(),
     });
 
@@ -488,12 +507,12 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
     // ── Top companies by job count (filtered) ──
     let mut top_sorted: Vec<&CompanyRow> = companies.iter().filter(|c| c.job_count > 0).collect();
     top_sorted.sort_by(|a, b| b.job_count.cmp(&a.job_count));
-    let top_companies: Vec<(String, i64, i64)> = top_sorted
+    let top_companies: Vec<(i64, String, i64, i64)> = top_sorted
         .iter()
         .take(10)
-        .map(|c| (c.name.clone(), c.job_count, c.fit_count))
+        .map(|c| (c.id, c.name.clone(), c.job_count, c.fit_count))
         .collect();
-    let top_max = top_companies.iter().map(|(_, n, _)| *n).max().unwrap_or(1).max(1);
+    let top_max = top_companies.iter().map(|(_, _, n, _)| *n).max().unwrap_or(1).max(1);
 
     // ── Discovered timeline (filtered) ──
     // Fetch discovered_at per id from DB (filtered set only), then bucket by
@@ -537,7 +556,7 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
     html! {
         div.companies-page {
             // Lane legend
-            (lane_legend())
+            (lane_legend("companies"))
 
             // Filter strip
             (filter_strip_markup)
@@ -673,9 +692,15 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
                         @if top_companies.is_empty() {
                             div.empty { "No companies with active jobs." }
                         }
-                        @for (i, (name, total, strong)) in top_companies.iter().enumerate() {
+                        @for (i, (cid, name, total, strong)) in top_companies.iter().enumerate() {
                             @let pct = (total * 100 / top_max) as i32;
-                            div.top-list-row {
+                            // Detail-drawer URL — the drawer system auto-opens
+                            // from `?detail=co-<id>` when its JS is present;
+                            // otherwise the page renders normally with the
+                            // param dangling, preserving the click affordance.
+                            a.top-list-row.row-clickable
+                                href=(format!("/companies?detail=co-{cid}"))
+                                title=(format!("Open {name} details")) {
                                 span.top-list-rank { (i + 1) }
                                 span.top-list-name data-marquee=(name) { (name) }
                                 div.top-list-bar {
@@ -721,7 +746,7 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
                     }
                     tbody {
                         @for c in &companies {
-                            tr.company-row {
+                            tr.company-row.row-clickable data-detail=(format!("co-{}", c.id)) {
                                 td.col-grade { (grade_pill(c.grade.as_deref())) }
                                 td.col-lane {
                                     div.lane-chip-list {

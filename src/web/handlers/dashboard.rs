@@ -81,6 +81,7 @@ async fn render(state: &AppState) -> Markup {
         "items": companies_lane.iter()
             .map(|(k, n)| serde_json::json!({
                 "label": lane_label(k),
+                "key": k,
                 "value": n,
                 "color": lane_hex(k),
             }))
@@ -157,7 +158,7 @@ async fn render(state: &AppState) -> Markup {
             }
 
             // 2. Lane legend
-            (lane_legend())
+            (lane_legend("dashboard"))
 
             // 3. Action queue + companies × lane donut
             div.grid-2 {

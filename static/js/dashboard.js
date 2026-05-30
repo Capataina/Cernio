@@ -48,7 +48,9 @@
   }));
 
   // ── 2. Companies × lane donut ────────────────────────────────────────
-  boot('companies-lane', (data, theme) => ({
+  // Each slice carries `key` so the click handler navigates to the lane
+  // filter directly rather than reverse-mapping label → key.
+  const companiesLaneChart = boot('companies-lane', (data, theme) => ({
     backgroundColor: theme.bg,
     tooltip: { ...theme.tooltip, trigger: 'item', formatter: '{b}<br/>{c} ({d}%)' },
     legend: { ...theme.legend, orient: 'vertical', left: 8, top: 'middle' },
@@ -69,13 +71,25 @@
       data: data.items.map(it => ({
         name: it.label,
         value: it.value,
+        key: it.key,
         itemStyle: { color: it.color },
       })),
     }],
   }));
+  if (companiesLaneChart) {
+    companiesLaneChart.on('click', (params) => {
+      if (params.componentType !== 'series') return;
+      const key = params.data && params.data.key;
+      if (!key) return;
+      window.location.href = '/companies?lane=' + encodeURIComponent(key);
+    });
+  }
 
   // ── 3. Jobs × lane × grade with archived overlay ─────────────────────
-  boot('jobs-lane-grade', (data, theme) => {
+  // Each cell click → /jobs?lane=<lane>&grade=<grade>. Lane comes from
+  // params.name (the y-axis category, a label); we re-map it through
+  // data.lane_keys via the index for stable URL keys.
+  const jobsLaneGradeChart = boot('jobs-lane-grade', (data, theme) => {
     const series = [];
     // Active series — solid blocks per grade.
     data.grades.forEach((g, gi) => {
@@ -139,6 +153,30 @@
       series,
     };
   });
+  if (jobsLaneGradeChart) {
+    // Cache the JSON island once so we can look up the lane key for the
+    // clicked y-axis category. ECharts only exposes the label (params.name).
+    const jlgData = (window.cernio.readJsonIsland('data-jobs-lane-grade')) || {};
+    const laneLabels = jlgData.lanes || [];
+    const laneKeys = jlgData.lane_keys || [];
+    jobsLaneGradeChart.on('click', (params) => {
+      if (params.componentType !== 'series') return;
+      const idx = laneLabels.indexOf(params.name);
+      const laneKey = idx >= 0 ? laneKeys[idx] : null;
+      // seriesName is either a grade (e.g. "SS") or "<G> archived"; strip the
+      // archived suffix and switch archive=archived in that case.
+      let grade = params.seriesName || '';
+      let archived = false;
+      if (grade.endsWith(' archived')) {
+        archived = true;
+        grade = grade.slice(0, -' archived'.length);
+      }
+      if (!laneKey || !grade) return;
+      const qs = ['lane=' + encodeURIComponent(laneKey), 'grade=' + encodeURIComponent(grade)];
+      if (archived) qs.push('archive=archived');
+      window.location.href = '/jobs?' + qs.join('&');
+    });
+  }
 
   // ── 4. ATS provider health (horizontal bar) ──────────────────────────
   boot('ats-health', (data, theme) => ({

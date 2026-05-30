@@ -33,6 +33,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/filters.css";
                 link rel="stylesheet" href="/static/css/debug.css";
                 link rel="stylesheet" href="/static/css/ops.css";
+                link rel="stylesheet" href="/static/css/drawer.css";
                 // Page-specific stylesheet (optional).
                 @if let Some(css) = assets.page_css {
                     link rel="stylesheet" href=(css);
@@ -45,6 +46,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 script src="/static/js/charts.js" defer {}
                 script src="/static/js/debug.js" defer {}
                 script src="/static/js/ops.js" defer {}
+                script src="/static/js/drawer.js" defer {}
                 // Page-specific JS (optional, deferred).
                 @if let Some(js) = assets.page_js {
                     script src=(js) defer {}
@@ -81,6 +83,15 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                             (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per click."))
                         }
                     }
+                }
+                // Side drawer — populated by /static/js/drawer.js via fetch.
+                div #detail-drawer-backdrop class="hidden" {}
+                aside #detail-drawer class="detail-drawer hidden" {
+                    header.drawer-head {
+                        span.drawer-kind {}
+                        button.drawer-close type="button" aria-label="close" title="close (esc)" { "×" }
+                    }
+                    div.drawer-body { "loading…" }
                 }
                 // Debug screenshot trigger — bottom-right floating button.
                 button #snap-all class="snap-btn" title="Capture all 4 tabs as PNGs into /tmp/cernio-debug/" {
@@ -134,11 +145,19 @@ pub fn grade_pill(grade: Option<&str>) -> Markup {
     html! { span.(class) { (g) } }
 }
 
-pub fn lane_legend() -> Markup {
+pub fn lane_legend(page: &str) -> Markup {
+    // Map page → destination prefix. Dashboard / activity default to /jobs
+    // since that is the action page.
+    let prefix = match page {
+        "companies" => "/companies",
+        _ => "/jobs",
+    };
     html! {
         div.lane-legend {
             @for key in LANE_KEYS.iter() {
-                span.lane-legend-item style=(format!("--lane-color: {}", lane_hex(key))) {
+                a.lane-legend-item
+                    href=(format!("{prefix}?lane={key}"))
+                    style=(format!("--lane-color: {}", lane_hex(key))) {
                     span.lane-legend-dot {}
                     span.lane-legend-label { (lane_label(key)) }
                 }

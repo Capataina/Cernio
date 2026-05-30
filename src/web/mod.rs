@@ -29,6 +29,8 @@ pub async fn serve(db_path: &str, port: u16, open_browser: bool) -> std::io::Res
         .route("/jobs", get(handlers::jobs::page))
         .route("/jobs/:id/decision", post(handlers::jobs::decision))
         .route("/companies", get(handlers::companies::page))
+        .route("/detail/job/:id", get(handlers::detail::job_detail))
+        .route("/detail/company/:id", get(handlers::detail::company_detail))
         .route("/activity", get(handlers::activity::page))
         .route("/activity/group", post(handlers::activity::toggle_group))
         .route("/api/stats.json", get(handlers::api::stats))
