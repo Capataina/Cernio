@@ -105,14 +105,18 @@ patterns = [
 
 [cleanup]
 
-# Job grades to remove during cleanup. Jobs with these grades are deleted
-# unless they have a user decision (watching/applied/rejected).
+# Job grades to ARCHIVE during cleanup (field is named `remove_job_grades`
+# for historical reasons but the operation is archival, not deletion).
+# Jobs with these grades get evaluation_status='archived' + archived_at=now
+# unless they have a user decision (watching/applied/rejected). A separate
+# second-phase sweep in `cernio clean` later DELETEs jobs that have been
+# in the archived state for 14+ days as housekeeping.
 # Valid: SS / S / A / B / C / F.
 remove_job_grades = ["F", "C"]
 
-# Job age threshold in days. Older jobs with no user decision are removed
-# regardless of grade — EXCEPT SS and S, which are always kept as records
-# of what companies look for.
+# Job age threshold in days for the second-phase delete sweep. Archived
+# jobs older than this are removed from the DB. SS and S grades are
+# always kept regardless of age, as records of what companies look for.
 stale_days = 14
 
 # Company grades to archive during cleanup. Empty = cleanup does NOT
