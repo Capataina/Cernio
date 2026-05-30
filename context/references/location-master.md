@@ -619,9 +619,9 @@ The agent consensus suggests specific updates to the profile and notes files. Th
 
 ### `profile/preferences.toml`
 
-**Current state:** `locations` hard filter is `["London", "Cambridge", "Remote-UK"]`.
+**Current state:** `[hard]` section was retired May 2026 — UK location scope is now in `profile/career-goals.md` §Soft preferences (Tier 1/2/3 table). Rust search reads the shared `[search_filters.locations].patterns` list in `preferences.toml`.
 
-**Recommended update:** Expand `locations` to include `Dublin`, `Amsterdam`, `Berlin`, `Sydney`, and `Zuidas` (as a specific neighbourhood hint). Update the per-ATS location filter patterns to match.
+**Recommended update:** When/if expanding scope beyond the UK (Dublin, Amsterdam, Berlin, Sydney, Zuidas), update both the career-goals.md tier table AND the shared `[search_filters.locations].patterns` list.
 
 ### New file recommendation
 

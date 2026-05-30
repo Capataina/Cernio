@@ -1,130 +1,75 @@
 # Job Search — Mechanical Configuration
 #
-# This file holds ONLY what the Rust pipeline needs at runtime: keyword
-# filters, per-ATS location patterns, the minimum company grade for searches,
-# and cleanup thresholds. Nothing else.
+# Holds ONLY what the Rust pipeline needs at runtime: keyword filters,
+# the shared location-pattern list, the minimum company grade, and the
+# cleanup thresholds. Nothing preference-shaped. Taste, sectors, role
+# exclusions, signals, seniority, lifestyle all live in profile/ as prose
+# and are inferred by the grading skills directly (see CLAUDE.md
+# "Living System Philosophy"). If you reach for a "preferred X" list here,
+# stop and write prose in profile/ instead.
 #
-# Everything that used to live here as "preferences" (preferred tech, preferred
-# sectors, role-type exclusions, seniority bands, positive/negative signals,
-# remote preference, company size, location tiers) has been moved out. The
-# grading skills read profile/ directly — they infer taste, fit, and policy
-# from career-goals.md, lifestyle-preferences.md, skills/, projects/, and the
-# rest of the profile. Hardcoded preference lists are the snapshot anti-pattern
-# this project explicitly opposes (see CLAUDE.md "Living System Philosophy").
-#
-# If you find yourself wanting to add a "preferred X" or "exclude Y" list
-# here, the answer is almost always to write it as prose in profile/ instead.
-# This file is for things scripts cannot infer.
+# Cardinal rule (applies to every filter below): false positives are cheap
+# (AI grades them F in 30 seconds), false negatives are unrecoverable
+# (a perfect job silently filtered out is lost forever). When in doubt,
+# INCLUDE.
 
 # ─────────────────────────────────────────────────────────────────
 # SEARCH FILTERS
 # ─────────────────────────────────────────────────────────────────
-# These filters control the mechanical job search pipeline (cernio search).
-# They run BEFORE any AI grading — their job is to reduce thousands of
-# raw ATS listings to hundreds of plausible candidates, which the AI
-# then grades with full judgment.
-#
-# The cardinal rule: false positives are cheap (AI grades them F in
-# 30 seconds), false negatives are unrecoverable (a perfect job
-# silently filtered out is lost forever). When in doubt, INCLUDE.
 
 [search_filters]
-# Minimum company grade to include in job searches.
-# Companies below this threshold are skipped entirely — their jobs
-# are never fetched.
-#
-# Valid grades (from best to worst): S / A / B / C
-# Default: "C" (searches all non-archived companies)
+
+# Minimum company grade to include in searches. Companies below this are
+# skipped entirely (their jobs are never fetched). Valid: S / A / B / C.
 min_company_grade = "C"
 
-# Title must contain at least one of these keywords (OR logic).
-# Case-insensitive matching. A job is KEPT if its title contains
-# ANY of these. If a title matches NONE, the job is removed.
+# Title must contain at least one of these (OR logic, case-insensitive
+# substring match). A title matching NONE is dropped. Stay generic —
+# tokens that occur across many roles, not job-title-specific phrases.
+# Companies invent new titles constantly; broad tokens survive that drift.
 #
-# Bias toward inclusion — add generously. A false positive costs
-# the AI 30 seconds to grade as F. A false negative is a lost
-# opportunity that can never be recovered.
-#
-# "Senior" was previously included but is now excluded. While some
-# companies use "Senior" for 2-year roles, historically 742 Senior
-# jobs graded F/C vs only 18 at B+ — a 41:1 noise ratio. The few
-# genuine opportunities at accessible "Senior" titles are lost, but
-# the token savings from not grading 742 noise jobs are substantial.
+# "Senior" was previously here but is now in exclude_keywords (742 Senior
+# F/C vs 18 B+ historically — a 41:1 noise ratio).
 include_keywords = [
-    # Core engineering roles
-    "Engineer", "Engineering", "Developer", "Dev", "SWE", "Software",
-    # Systems and infrastructure
-    "Systems", "System", "Infrastructure", "Infra", "Platform",
-    # Backend
-    "Backend", "Back-end", "Back End",
-    # Full-stack (might have backend-heavy work)
-    "Fullstack", "Full-stack", "Full Stack",
-    # AI/ML
-    "ML", "Machine Learning", "AI", "Data",
-    # Specialist domains
-    "Compiler", "Runtime", "Database", "Distributed",
+    "Engineer", "Engineering", "Developer", "Dev", "SWE", "Software",     # core engineering
+    "Systems", "System", "Infrastructure", "Infra", "Platform",           # systems/infra
+    "Backend", "Back-end", "Back End",                                    # backend
+    "Fullstack", "Full-stack", "Full Stack",                              # full-stack
+    "ML", "Machine Learning", "AI", "Data",                               # AI/ML
+    "Compiler", "Runtime", "Database", "Distributed",                     # specialist domains
     "Embedded", "Low-latency", "Performance", "HFT",
-    # Operations/reliability
-    "DevOps", "SRE", "Reliability", "Cloud",
-    # Security
-    "Security", "Cryptography", "Cyber",
-    # Quant
-    "Quantitative", "Quant", "Research",
-    # AI/ML specialisms
-    "Deep Learning", "Neural Network", "Computer Vision",
+    "DevOps", "SRE", "Reliability", "Cloud",                              # ops/reliability
+    "Security", "Cryptography", "Cyber",                                  # security
+    "Quantitative", "Quant", "Research",                                  # quant + research
+    "Deep Learning", "Neural Network", "Computer Vision",                 # AI/ML specialisms
     "NLP", "Reinforcement Learning",
-    # Low-level / specialist
-    "Firmware", "Trading", "Kernel", "Protocol",
-    # Entry-level indicators
-    "Graduate", "Grad", "Junior", "Entry",
-    "Intern", "Internship",
-    # Broad catch-all
-    "Analyst",
+    "Firmware", "Trading", "Kernel", "Protocol",                          # low-level
+    "Graduate", "Grad", "Junior", "Entry", "Intern", "Internship",        # entry-level
+    "Analyst",                                                            # broad catch-all
 ]
 
-# Title containing any of these is excluded (AND NOT logic).
-# Case-insensitive matching using contains() — a job is REMOVED
-# if its title contains ANY of these as a SUBSTRING. This means
-# "account" matches "accountant", "account executive", etc.
+# Title containing any of these is removed (substring, case-insensitive).
 # Exclusion runs BEFORE inclusion.
 #
-# ── EXCLUSION PHILOSOPHY ──
-# Every keyword here was validated against the full graded job database
-# (2,001 jobs across 434 companies). A keyword is ONLY added if it
-# appears in ZERO jobs graded B or above. This is a hard rule — we
-# accept a 100:1 F-to-good ratio before considering a keyword safe.
+# Every keyword here was validated against the full graded DB (2,001 jobs
+# across 434 companies). A keyword is added ONLY if it appears in ZERO B+
+# jobs — i.e. a 100:1 F-to-good ratio before considering it safe. Words
+# like "market" (kills QRT SS internship), "trader" (kills Old Mission A
+# quant role), "operations" (kills Jane Street B role) are deliberately
+# NOT excluded despite high F counts.
 #
-# The cost of a false negative (excluding a good job) is catastrophic
-# and irreversible. The cost of a false positive (grading a bad job)
-# is 30 seconds of AI time. We bias aggressively toward inclusion.
-#
-# Words like "market" (kills QRT SS-tier internship), "trader" (kills
-# Old Mission A-tier quant role), and "operations" (kills Jane Street
-# B-tier role) are deliberately NOT excluded despite high F counts
-# because they appear in at least one valuable job.
-#
-# Each keyword below has been verified against historical data:
-#   solutions: 117 F/C, 0 B+    |  sales: 71 F/C, 0 B+
-#   executive: 66 F/C, 0 B+     |  account: 54 F/C, 0 B+
-#   support: 38 F/C, 0 B+       |  marketing: 17 F/C, 0 B+
-
+# Validation data (top exclusions, F/C count vs B+ count):
+#   solutions 117/0  ·  sales 71/0  ·  executive 66/0  ·  account 54/0
+#   support 38/0  ·  marketing 17/0  ·  (full data in context/notes/grading-rubric.md)
 exclude_keywords = [
-    # Seniority (too experienced for entry-level candidate)
-    "Senior", "Sr.", "Sr ", "Principal", "Staff", "Distinguished",
-    "Director", "VP", "Vice President",
-    "Head of", "Chief", "CTO", "CIO",
-    "Lead",
-    # Management
-    "Manager", "Managing",
-    # Too junior (apprenticeships/placements are different from internships)
-    "Apprentice", "Placement",
-    # Sales and business development (0 hits in B+ across 2,001 jobs)
-    "Sales", "Account", "Executive", "BDR", "SDR",
+    "Senior", "Sr.", "Sr ", "Principal", "Staff", "Distinguished",        # seniority
+    "Director", "VP", "Vice President", "Head of", "Chief", "CTO", "CIO", "Lead",
+    "Manager", "Managing",                                                # management
+    "Apprentice", "Placement",                                            # too-junior (different from internships)
+    "Sales", "Account", "Executive", "BDR", "SDR",                        # sales / BD (0 B+ hits)
     "Business Development", "Commercial", "GTM",
-    # Customer-facing / support (0 hits in B+)
-    "Solutions", "Customer", "Support", "Consult",
-    # Non-engineering functions (0 hits in B+)
-    "Marketing", "Communications", "Content", "Social Media",
+    "Solutions", "Customer", "Support", "Consult",                        # customer-facing (0 B+ hits)
+    "Marketing", "Communications", "Content", "Social Media",             # non-engineering (0 B+ hits)
     "Brand", "Strategist", "Evangelist",
     "Legal", "Counsel", "Paralegal", "Compliance",
     "Finance", "Tax", "Payroll", "Controller",
@@ -133,135 +78,46 @@ exclude_keywords = [
     "Administrator", "Procurement", "Office",
 ]
 
-# ─────────────────────────────────────────────────────────────────
-# LOCATION FILTERS (per ATS provider)
-# ─────────────────────────────────────────────────────────────────
-# Each ATS provider formats location data differently. These patterns
-# are matched case-insensitively against the provider's location field.
-# A job is KEPT if its location contains ANY of the patterns below.
+# Shared location patterns, applied across every ATS provider. Was per-
+# provider (greenhouse / lever / ashby / workable / smartrecruiters /
+# workday) but every provider matched the same UK + remote vocabulary
+# case-insensitively — the per-provider split was 100% duplicated content.
+# Format differences (workable "GB" vs smartrecruiters "gb") are handled
+# by the shared lowercased contains() match in src/config.rs.
 #
-# If a job's location is NULL, empty, or missing entirely, it is KEPT
-# (false negative protection — the job might be in London but the
-# company just didn't fill in the field).
-#
-# Tier-shaped — the strategic source of truth is profile/career-goals.md
-# §Soft preferences (Location). Tiers 1/2/3 + generic UK markers are
-# all included here so search catches them; the grading agent applies
-# the tier-aware office-frequency rule downstream when reading the JD.
-#
-# A handful of these cities collide with US placenames (Cambridge MA,
-# Brighton MA, Bath OH, Derby KS, Reading PA). False positives are cheap
-# per the cardinal rule above; the grading agent filters them later.
-#
-# Greenhouse: location.name is freetext, often includes work policy
-#   (e.g. "Hybrid", "London, England"). Some companies use semicolons
-#   for multi-city: "Berlin; London; Munich".
-# Lever: categories.location is a string, typically "City, Country".
-# Ashby: location is freetext, often includes policy ("London Office - Hybrid").
-#   Also has structured address.postalAddress with addressLocality/Country.
-# Workable: separate city/country fields plus a locations array.
-#   Country codes are uppercase ISO alpha-2 ("GB").
-# SmartRecruiters: structured object with city, country (lowercase "gb"),
-#   plus fullLocation pre-formatted string. Has server-side country filter.
-
-[search_filters.locations.greenhouse]
+# Tier source of truth is profile/career-goals.md §Soft preferences.
+# A few cities collide with US placenames (Cambridge MA, Brighton MA,
+# Bath OH, Derby KS, Reading PA) — false positives are cheap per the
+# cardinal rule; the grading agent filters them downstream.
+[search_filters.locations]
 patterns = [
-    # Generic UK markers
-    "UK", "United Kingdom", "England", "Remote",
-    # Tier 1 — daily-commute
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    # Tier 2 — stretch hybrid
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    # Tier 3 — relocation candidates
-    "Edinburgh", "Glasgow",
-]
-
-[search_filters.locations.lever]
-patterns = [
-    "UK", "United Kingdom", "England", "Remote",
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    "Edinburgh", "Glasgow",
-]
-
-[search_filters.locations.ashby]
-patterns = [
-    "UK", "United Kingdom", "England", "Remote",
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    "Edinburgh", "Glasgow",
-]
-
-[search_filters.locations.workable]
-patterns = [
-    "GB", "United Kingdom", "Remote",
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    "Edinburgh", "Glasgow",
-]
-
-[search_filters.locations.smartrecruiters]
-patterns = [
-    "gb", "United Kingdom", "Remote",
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    "Edinburgh", "Glasgow",
-]
-
-[search_filters.locations.workday]
-patterns = [
-    "UK", "United Kingdom", "England", "Remote",
-    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes",
-    "Brighton", "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
-    "Bristol", "Bath", "Birmingham", "Coventry",
-    "Northampton", "Sheffield", "Nottingham", "Derby",
-    "Edinburgh", "Glasgow",
+    "UK", "GB", "United Kingdom", "England", "Remote",                                       # generic UK / remote markers
+    "London", "Reading", "Cambridge", "Oxford", "Milton Keynes", "Brighton",                 # ↓ Tier 1 — daily-commute
+    "Guildford", "Watford", "Stevenage", "Luton", "Newbury",
+    "Bristol", "Bath", "Birmingham", "Coventry", "Northampton", "Sheffield",                 # ↓ Tier 2 — stretch hybrid
+    "Nottingham", "Derby",
+    "Edinburgh", "Glasgow",                                                                  # ↓ Tier 3 — relocation candidates
 ]
 
 # ─────────────────────────────────────────────────────────────────
-# CLEANUP THRESHOLDS
+# CLEANUP THRESHOLDS — used by `cernio clean`
 # ─────────────────────────────────────────────────────────────────
-# Control what gets removed or archived when running `cernio clean`.
-# All thresholds are configurable so you can tune aggressiveness.
 
 [cleanup]
-# Job grades to remove during cleanup. Jobs with these grades are
-# deleted unless they have a user decision (watching/applied/rejected).
-#
-# Valid job grades: SS, S, A, B, C, F
-# SS — Apply immediately. Everything aligns.
-# S  — Strong application candidate. Most dimensions good.
-# A  — Worth applying to. Good with 1-2 notable weaknesses.
-# B  — Backup / worth watching. Decent but limited in some way.
-# C  — Only if nothing better. Limited ceiling or poor growth.
-# F  — Don't apply. Wrong seniority, dead-end, or dealbreaker.
+
+# Job grades to remove during cleanup. Jobs with these grades are deleted
+# unless they have a user decision (watching/applied/rejected).
+# Valid: SS / S / A / B / C / F.
 remove_job_grades = ["F", "C"]
 
-# Job age threshold in days. Jobs older than this with no user
-# decision are removed, regardless of grade — EXCEPT SS and S
-# graded jobs which are always kept as records of what companies
-# look for.
+# Job age threshold in days. Older jobs with no user decision are removed
+# regardless of grade — EXCEPT SS and S, which are always kept as records
+# of what companies look for.
 stale_days = 14
 
-# Company grades to archive during cleanup. Companies with these
-# grades are set to status='archived' — hidden from TUI and excluded
-# from job searches, but preserved in DB for deduplication so
-# discovery won't waste time re-discovering them.
-#
-# Empty list means cleanup does NOT auto-archive any companies by
-# grade. Companies can still be archived manually if needed.
-# C-tier companies are kept active because job grading handles
-# quality filtering — a C company might still have one good role.
-#
-# Valid company grades: S, A, B, C
+# Company grades to archive during cleanup. Empty = cleanup does NOT
+# auto-archive any companies by grade (still archivable manually).
+# C-tier kept active because job grading handles quality filtering —
+# a C company might still have one good role.
+# Valid: S / A / B / C.
 archive_company_grades = []

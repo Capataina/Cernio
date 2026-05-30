@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -26,12 +25,16 @@ pub struct SearchFilters {
     #[serde(default)]
     pub exclude_keywords: Vec<String>,
 
-    /// Location patterns per ATS provider.
+    /// Shared location patterns applied across every ATS provider.
+    /// The provider distinction was dropped — all six providers produce
+    /// freetext location strings that match the same UK+remote vocabulary
+    /// (case-insensitive `contains`), so per-provider lists were 100%
+    /// duplicated content.
     #[serde(default)]
-    pub locations: HashMap<String, LocationConfig>,
+    pub locations: LocationConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct LocationConfig {
     #[serde(default)]
     pub patterns: Vec<String>,
@@ -71,7 +74,7 @@ impl Default for SearchFilters {
             min_company_grade: default_min_grade(),
             include_keywords: Vec::new(),
             exclude_keywords: Vec::new(),
-            locations: HashMap::new(),
+            locations: LocationConfig::default(),
         }
     }
 }
@@ -145,28 +148,25 @@ impl SearchFilters {
             .any(|kw| lower.contains(&kw.to_lowercase()))
     }
 
-    /// Check if a job's locations pass the location filter for a given provider.
-    /// Returns true if ANY location string contains ANY pattern for this provider.
-    /// Also returns true if locations is empty (false negative protection).
-    pub fn passes_location(&self, provider: &str, locations: &[String]) -> bool {
+    /// Check if a job's locations pass the shared location filter.
+    /// Returns true if ANY location string contains ANY configured pattern,
+    /// also returns true if locations is empty (false negative protection)
+    /// or if no patterns are configured (pass-through default).
+    pub fn passes_location(&self, locations: &[String]) -> bool {
         // No location data → keep the job (false negative protection).
         if locations.is_empty() {
             return true;
         }
 
-        // No patterns configured for this provider → keep everything.
-        let Some(config) = self.locations.get(provider) else {
-            return true;
-        };
-
-        if config.patterns.is_empty() {
+        // No patterns configured → keep everything.
+        if self.locations.patterns.is_empty() {
             return true;
         }
 
         // Any location matching any pattern → keep.
         for loc in locations {
             let lower = loc.to_lowercase();
-            for pattern in &config.patterns {
+            for pattern in &self.locations.patterns {
                 if lower.contains(&pattern.to_lowercase()) {
                     return true;
                 }
@@ -204,7 +204,7 @@ mod tests {
             min_company_grade: "B".to_string(),
             include_keywords: include.into_iter().map(String::from).collect(),
             exclude_keywords: exclude.into_iter().map(String::from).collect(),
-            locations: HashMap::new(),
+            locations: LocationConfig::default(),
         }
     }
 
@@ -299,80 +299,65 @@ mod tests {
     // passes_location
     // ─────────────────────────────────────────────────────────────
 
-    fn with_locations(provider: &str, patterns: Vec<&str>) -> SearchFilters {
-        let mut f = SearchFilters::default();
-        f.locations.insert(
-            provider.to_string(),
-            LocationConfig {
+    fn with_patterns(patterns: Vec<&str>) -> SearchFilters {
+        SearchFilters {
+            locations: LocationConfig {
                 patterns: patterns.into_iter().map(String::from).collect(),
             },
-        );
-        f
+            ..SearchFilters::default()
+        }
     }
 
     #[test]
     fn location_empty_locations_is_kept() {
         // False-negative protection: no location data → keep the job.
-        let f = with_locations("greenhouse", vec!["London"]);
-        assert!(f.passes_location("greenhouse", &[]));
+        let f = with_patterns(vec!["London"]);
+        assert!(f.passes_location(&[]));
     }
 
     #[test]
-    fn location_unknown_provider_is_pass_through() {
-        // No config for this provider → no filtering.
+    fn location_no_patterns_configured_is_pass_through() {
         let f = SearchFilters::default();
-        assert!(f.passes_location("greenhouse", &["Mars".to_string()]));
+        assert!(f.passes_location(&["Mars".to_string()]));
     }
 
     #[test]
     fn location_empty_patterns_is_pass_through() {
-        let f = with_locations("greenhouse", vec![]);
-        assert!(f.passes_location("greenhouse", &["Mars".to_string()]));
+        let f = with_patterns(vec![]);
+        assert!(f.passes_location(&["Mars".to_string()]));
     }
 
     #[test]
     fn location_matches_any_pattern() {
-        let f = with_locations("greenhouse", vec!["London", "Cambridge"]);
-        assert!(f.passes_location("greenhouse", &["London, UK".to_string()]));
-        assert!(f.passes_location("greenhouse", &["Cambridge, UK".to_string()]));
-        assert!(!f.passes_location("greenhouse", &["Paris, FR".to_string()]));
+        let f = with_patterns(vec!["London", "Cambridge"]);
+        assert!(f.passes_location(&["London, UK".to_string()]));
+        assert!(f.passes_location(&["Cambridge, UK".to_string()]));
+        assert!(!f.passes_location(&["Paris, FR".to_string()]));
     }
 
     #[test]
     fn location_case_insensitive() {
-        let f = with_locations("greenhouse", vec!["LONDON"]);
-        assert!(f.passes_location("greenhouse", &["london, uk".to_string()]));
-        let f = with_locations("greenhouse", vec!["london"]);
-        assert!(f.passes_location("greenhouse", &["LONDON, UK".to_string()]));
+        let f = with_patterns(vec!["LONDON"]);
+        assert!(f.passes_location(&["london, uk".to_string()]));
+        let f = with_patterns(vec!["london"]);
+        assert!(f.passes_location(&["LONDON, UK".to_string()]));
     }
 
     #[test]
     fn location_multiple_locations_any_match() {
-        let f = with_locations("greenhouse", vec!["London"]);
+        let f = with_patterns(vec!["London"]);
         let locs = vec![
             "Berlin".to_string(),
             "Paris".to_string(),
             "London".to_string(),
         ];
-        assert!(f.passes_location("greenhouse", &locs));
+        assert!(f.passes_location(&locs));
     }
 
     #[test]
     fn location_country_code_match() {
-        let f = with_locations("workable", vec!["GB"]);
-        assert!(f.passes_location("workable", &["GB".to_string()]));
-    }
-
-    #[test]
-    fn location_per_provider_isolation() {
-        // Greenhouse has London; Workable doesn't → Workable jobs pass through.
-        let mut f = SearchFilters::default();
-        f.locations.insert(
-            "greenhouse".to_string(),
-            LocationConfig { patterns: vec!["London".to_string()] },
-        );
-        assert!(f.passes_location("workable", &["Paris".to_string()]));
-        assert!(!f.passes_location("greenhouse", &["Paris".to_string()]));
+        let f = with_patterns(vec!["GB"]);
+        assert!(f.passes_location(&["GB".to_string()]));
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -477,11 +462,8 @@ mod tests {
             include_keywords = ["Engineer"]
             exclude_keywords = ["Senior"]
 
-            [search_filters.locations.greenhouse]
-            patterns = ["London", "Cambridge"]
-
-            [search_filters.locations.lever]
-            patterns = ["UK"]
+            [search_filters.locations]
+            patterns = ["London", "Cambridge", "UK"]
 
             [cleanup]
             remove_job_grades = ["F"]
@@ -495,10 +477,10 @@ mod tests {
         assert_eq!(prefs.cleanup.remove_job_grades, vec!["F"]);
         assert!(prefs.cleanup.archive_company_grades.is_empty());
 
-        let gh = prefs.search_filters.locations.get("greenhouse").expect("gh present");
-        assert_eq!(gh.patterns, vec!["London", "Cambridge"]);
-        let lv = prefs.search_filters.locations.get("lever").expect("lever present");
-        assert_eq!(lv.patterns, vec!["UK"]);
+        assert_eq!(
+            prefs.search_filters.locations.patterns,
+            vec!["London", "Cambridge", "UK"]
+        );
     }
 
     // ─────────────────────────────────────────────────────────────

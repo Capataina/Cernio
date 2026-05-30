@@ -367,7 +367,7 @@ Today's session completed the profile-schema migration and added a build-time sa
 |----------|-------|
 | Profile | Synced from LifeOS via `populate-from-lifeos` (first end-to-end run completed 2026-04-26); per-project files in `profile/projects/` with status frontmatter (no tier system); `skills.md` derived from projects with six-table / four-band rubric; `portfolio-gaps.md` actively maintained by `check-integrity`; `sync-summary.md` is the per-run audit artefact |
 | SQLite schema | 5 tables, 6 migrations, 29 inline tests (was 11 at session 7) |
-| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet); preferences-integrity test enforces per-provider location-filter coverage |
+| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet); preferences-integrity test enforces a single shared `[search_filters.locations]` list (per-provider split retired May 2026 — was 100% duplicated content) |
 | Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug |
 | Testing | 346 tests (273 inline + 73 integration including 21 preferences-integrity), zero failing, runs under a second once compiled |
 | TUI | v5, 5 views, modular (26 source files), dashboard overhaul applied |

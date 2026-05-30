@@ -35,19 +35,6 @@ use std::path::PathBuf;
 
 const PREFERENCES_FILE: &str = "profile/preferences.toml";
 
-/// All ATS providers Cernio's pipeline supports. Must stay in sync with the
-/// modules in `src/ats/`. A new provider added without a matching location
-/// subtable in `preferences.toml` would silently bypass the location filter
-/// for that provider's jobs.
-const SUPPORTED_ATS_PROVIDERS: &[&str] = &[
-    "greenhouse",
-    "lever",
-    "ashby",
-    "workable",
-    "smartrecruiters",
-    "workday",
-];
-
 /// Valid `min_company_grade` values per `src/config.rs::included_grades`.
 const VALID_COMPANY_GRADES: &[&str] = &["S", "A", "B", "C"];
 
@@ -255,69 +242,67 @@ fn exclude_keywords_blocks_seniority_terms() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [search_filters.locations.<provider>] subtables — per-ATS coverage
+// [search_filters.locations] — single shared list
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// Was previously per-ATS-provider subtables (greenhouse, lever, ashby,
+// workable, smartrecruiters, workday). Collapsed to a single shared list
+// because every provider matched the same UK + remote vocabulary
+// case-insensitively and the per-provider split was 100% duplicated content.
 
 #[test]
-fn locations_subtable_exists() {
+fn locations_section_exists() {
     let root = parse_as_toml_value();
     let _ = dotted_get(&root, "search_filters.locations").unwrap_or_else(|| {
-        panic!("missing `[search_filters.locations]` parent table. Per-provider location filters are configured under this.")
+        panic!("missing `[search_filters.locations]`. src/config.rs reads this single shared list at every CLI invocation.")
     });
+    assert_array_at(&root, "search_filters.locations.patterns");
 }
 
 #[test]
-fn every_supported_ats_provider_has_a_location_subtable() {
-    // The most important integrity test: a new ATS provider added to
-    // `src/ats/` without a corresponding location subtable here would
-    // silently bypass the location filter for all of that provider's jobs
-    // (per src/config.rs::passes_location, unknown provider = pass-through).
+fn locations_patterns_is_non_empty() {
     let root = parse_as_toml_value();
-    for provider in SUPPORTED_ATS_PROVIDERS {
+    let arr = assert_array_at(&root, "search_filters.locations.patterns");
+    assert!(
+        !arr.is_empty(),
+        "`search_filters.locations.patterns` is empty. Per src/config.rs::passes_location, an empty patterns array degrades to pass-through (every location accepted). For a UK-focused tool this is almost certainly a mistake."
+    );
+}
+
+#[test]
+fn locations_patterns_includes_uk_markers() {
+    // Sanity: this is a UK-focused tool. The shared list must include at
+    // least one UK marker (London / UK / GB / United Kingdom / Remote).
+    let root = parse_as_toml_value();
+    let arr = assert_array_at(&root, "search_filters.locations.patterns");
+    let strings: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
+    let has_uk = strings.iter().any(|s| {
+        let lower = s.to_lowercase();
+        lower == "london"
+            || lower == "uk"
+            || lower == "gb"
+            || lower == "united kingdom"
+            || lower == "england"
+            || lower == "cambridge"
+            || lower.contains("remote")
+    });
+    assert!(
+        has_uk,
+        "`search_filters.locations.patterns` has no UK / Cambridge / Remote marker. Found: {strings:?}"
+    );
+}
+
+#[test]
+fn locations_patterns_no_per_provider_subtables() {
+    // Regression guard: the per-provider split was retired because it was
+    // 100% duplicated content. A re-introduction would reintroduce the
+    // maintenance burden it was deleted to solve.
+    let root = parse_as_toml_value();
+    for provider in &["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "workday"] {
         let path = format!("search_filters.locations.{provider}");
-        let _ = dotted_get(&root, &path).unwrap_or_else(|| {
-            panic!(
-                "missing `[search_filters.locations.{provider}]`. The provider exists in `src/ats/{provider}.rs` but has no location filter — every {provider} job would bypass the UK location filter and reach the AI grader unfiltered."
-            )
-        });
-    }
-}
-
-#[test]
-fn every_provider_subtable_has_a_patterns_array() {
-    let root = parse_as_toml_value();
-    for provider in SUPPORTED_ATS_PROVIDERS {
-        let path = format!("search_filters.locations.{provider}.patterns");
-        let arr = assert_array_at(&root, &path);
         assert!(
-            !arr.is_empty(),
-            "`{path}` is an empty array. Per src/config.rs::passes_location, an empty patterns array degrades to pass-through (every location accepted). If the intent is no filtering, that should be done by removing the subtable entirely; if filtering is wanted, add patterns."
-        );
-    }
-}
-
-#[test]
-fn every_provider_subtable_has_a_uk_pattern() {
-    // Sanity: this is a UK-focused tool. Each provider's location subtable
-    // must include at least one UK marker (London / UK / GB / United Kingdom).
-    let root = parse_as_toml_value();
-    for provider in SUPPORTED_ATS_PROVIDERS {
-        let path = format!("search_filters.locations.{provider}.patterns");
-        let arr = assert_array_at(&root, &path);
-        let strings: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
-        let has_uk = strings.iter().any(|s| {
-            let lower = s.to_lowercase();
-            lower == "london"
-                || lower == "uk"
-                || lower == "gb"
-                || lower == "united kingdom"
-                || lower == "england"
-                || lower == "cambridge"
-                || lower.contains("remote")
-        });
-        assert!(
-            has_uk,
-            "`{path}` has no UK / Cambridge / Remote pattern. Found: {strings:?}"
+            dotted_get(&root, &path).is_none(),
+            "`[search_filters.locations.{provider}]` has re-grown. The per-provider location split was retired in favour of a single shared `[search_filters.locations] patterns = [...]` list. See src/config.rs — passes_location takes only locations, no provider arg."
         );
     }
 }

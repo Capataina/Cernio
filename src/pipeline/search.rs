@@ -57,7 +57,7 @@ pub async fn run(conn: &Connection, filters: &SearchFilters, dry_run: bool) {
         let after_location: Vec<_> = result
             .jobs
             .iter()
-            .filter(|j| filters.passes_location(&result.target.provider, &j.all_locations))
+            .filter(|j| filters.passes_location(&j.all_locations))
             .collect();
         total_after_location += after_location.len() as u64;
 
@@ -166,7 +166,7 @@ pub async fn run_single(
 
         let filtered: Vec<_> = jobs
             .iter()
-            .filter(|j| filters.passes_location(&target.provider, &j.all_locations))
+            .filter(|j| filters.passes_location(&j.all_locations))
             .filter(|j| filters.passes_exclusion(&j.title))
             .filter(|j| filters.passes_inclusion(&j.title))
             .filter(|j| !job_exists(conn, &j.url))
@@ -228,7 +228,7 @@ pub async fn run_by_grade(
         let filtered: Vec<_> = result
             .jobs
             .iter()
-            .filter(|j| filters.passes_location(&result.target.provider, &j.all_locations))
+            .filter(|j| filters.passes_location(&j.all_locations))
             .filter(|j| filters.passes_exclusion(&j.title))
             .filter(|j| filters.passes_inclusion(&j.title))
             .filter(|j| !job_exists(conn, &j.url))
