@@ -515,6 +515,47 @@ pub fn action_queue(conn: &Connection) -> Vec<(String, i64, String)> {
     ]
 }
 
+/// All decisions, optionally filtered by kind ("applied" | "watching" |
+/// "interview" | "rejected" | "all"). Returns most-recent first.
+/// Returns (decided_at, decision, title, company, lanes_json, grade, url, job_id).
+pub fn decisions_filtered(conn: &Connection, kind: &str)
+    -> Vec<(String, String, String, String, Option<String>, Option<String>, String, i64)>
+{
+    let where_clause = match kind {
+        "all" | "" => String::new(),
+        k => format!(" WHERE ud.decision = '{}'", k.replace('\'', "''")),
+    };
+    let sql = format!(
+        "SELECT ud.decided_at, ud.decision, j.title, c.name, j.lanes, j.grade, j.url, j.id
+         FROM user_decisions ud
+         JOIN jobs j ON j.id = ud.job_id
+         JOIN companies c ON c.id = j.company_id
+         {where_clause}
+         ORDER BY ud.decided_at DESC");
+    conn.prepare(&sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| {
+                Ok((
+                    r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,
+                    r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?,
+                ))
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// Decision counts grouped by kind.
+pub fn decision_counts(conn: &Connection) -> std::collections::HashMap<String, i64> {
+    let sql = "SELECT decision, COUNT(DISTINCT job_id) FROM user_decisions GROUP BY decision";
+    conn.prepare(sql)
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
 /// Recent user decisions (last N), most recent first.
 /// Returns (decided_at, decision, title, company, lanes_json, grade, url, job_id).
 pub fn recent_decisions(conn: &Connection, n: i64)

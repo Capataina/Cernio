@@ -1,0 +1,133 @@
+/* decisions.css — /decisions tab specific layout.
+ * Shared decision-row + decision-kind primitives live in dashboard.css
+ * (recent-decisions feed). Decisions-only widgets: tabs strip + list view.
+ */
+
+.decisions-page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+}
+
+.decisions-page .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+@media (max-width: 1100px) {
+    .decisions-page .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+    .decisions-page .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpi-watching::before  { background: var(--warn) !important; }
+.kpi-applied::before   { background: var(--good) !important; }
+.kpi-interview::before { background: var(--grade-ss) !important; }
+.kpi-rejected::before  { background: var(--bad) !important; }
+
+/* ── Decision tabs (segmented) ───────────────────────────────────── */
+
+.decision-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+.decision-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 14px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    text-decoration: none;
+    border-radius: 3px;
+    transition: all var(--t-base) var(--easing);
+    cursor: pointer;
+}
+.decision-tab:hover {
+    background: var(--bg-3);
+    color: var(--text-0);
+}
+.decision-tab-active {
+    background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
+    color: var(--bg-0);
+    font-weight: 700;
+    box-shadow: 0 0 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.decision-tab[data-kind="watching"].decision-tab-active {
+    background: linear-gradient(180deg, var(--warn), color-mix(in srgb, var(--warn) 70%, black));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.decision-tab[data-kind="applied"].decision-tab-active {
+    background: linear-gradient(180deg, var(--good), color-mix(in srgb, var(--good) 70%, black));
+    box-shadow: 0 0 12px var(--good-glow);
+}
+.decision-tab[data-kind="interview"].decision-tab-active {
+    background: linear-gradient(180deg, var(--grade-ss), color-mix(in srgb, var(--grade-ss) 70%, black));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--grade-ss) 50%, transparent);
+}
+.decision-tab[data-kind="rejected"].decision-tab-active {
+    background: linear-gradient(180deg, var(--bad), color-mix(in srgb, var(--bad) 70%, black));
+    box-shadow: 0 0 12px var(--bad-glow);
+}
+
+.decision-tab-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.65;
+}
+.decision-tab-active .decision-tab-count { opacity: 1; }
+
+/* ── Full decisions list ──────────────────────────────────────────── */
+
+.decisions-list {
+    display: flex;
+    flex-direction: column;
+}
+.decision-list-row {
+    display: grid;
+    grid-template-columns: 60px 90px 64px 32px 1fr 30px;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--bg-3);
+    transition: background var(--t-fast) var(--easing);
+    cursor: pointer;
+}
+.decision-list-row:hover { background: var(--bg-2); }
+.decision-list-row:last-child { border-bottom: none; }
+
+.decision-list-row .decision-text { min-width: 0; }
+.decision-list-row .decision-title {
+    color: var(--text-0);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.decision-list-row .decision-co {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-top: 2px;
+}
+.decision-open {
+    color: var(--text-3);
+    text-decoration: none;
+    font-size: 16px;
+    text-align: center;
+    transition: all var(--t-fast) var(--easing);
+}
+.decision-open:hover {
+    color: var(--accent);
+    transform: translateX(2px);
+}

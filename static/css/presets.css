@@ -1,0 +1,164 @@
+/* presets.css — Saved-searches dropdown.
+ * Lives top-right next to the LOCALHOST status strip.
+ */
+
+.preset-menu {
+    position: relative;
+    margin-right: 12px;
+}
+
+.preset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all var(--t-fast) var(--easing);
+}
+.preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-0);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.preset-btn[data-open="1"] {
+    border-color: var(--accent);
+    color: var(--text-0);
+}
+
+.preset-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 280px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    border: 1px solid var(--border-strong);
+    border-left: 2px solid var(--accent);
+    border-radius: 2px;
+    padding: 8px;
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,0.6), 0 0 18px var(--accent-glow);
+    z-index: 200;
+    animation: preset-in var(--t-base) var(--easing);
+}
+.preset-panel.hidden { display: none; }
+
+@keyframes preset-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.preset-section-head {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 6px 8px;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 4px;
+}
+
+.preset-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    color: var(--text-1);
+    text-decoration: none;
+    font-size: 11px;
+    border-radius: 2px;
+    transition: background var(--t-fast) var(--easing);
+}
+.preset-item:hover {
+    background: var(--bg-3);
+    color: var(--text-0);
+}
+
+.preset-name {
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.preset-page-tag {
+    color: var(--text-4);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 2px 5px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+}
+.preset-del {
+    color: var(--text-4);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 2px;
+    background: transparent;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    transition: all var(--t-fast) var(--easing);
+}
+.preset-del:hover { color: var(--bad); background: rgba(255,92,92,0.08); }
+
+.preset-save-row {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+}
+.preset-save-row input {
+    flex: 1;
+    background: var(--bg-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text-0);
+    padding: 5px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color var(--t-base) var(--easing);
+}
+.preset-save-row input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+.preset-save-row button {
+    padding: 5px 10px;
+    background: var(--accent);
+    color: var(--bg-0);
+    border: 1px solid var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all var(--t-fast) var(--easing);
+}
+.preset-save-row button:hover {
+    background: var(--accent-2);
+    box-shadow: 0 0 10px var(--accent);
+}
+
+.preset-empty {
+    color: var(--text-4);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 14px 8px;
+    text-align: center;
+}

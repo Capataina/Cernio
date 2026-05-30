@@ -34,6 +34,8 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/debug.css";
                 link rel="stylesheet" href="/static/css/ops.css";
                 link rel="stylesheet" href="/static/css/drawer.css";
+                link rel="stylesheet" href="/static/css/cmdk.css";
+                link rel="stylesheet" href="/static/css/presets.css";
                 // Page-specific stylesheet (optional).
                 @if let Some(css) = assets.page_css {
                     link rel="stylesheet" href=(css);
@@ -47,6 +49,8 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 script src="/static/js/debug.js" defer {}
                 script src="/static/js/ops.js" defer {}
                 script src="/static/js/drawer.js" defer {}
+                script src="/static/js/cmdk.js" defer {}
+                script src="/static/js/presets.js" defer {}
                 // Page-specific JS (optional, deferred).
                 @if let Some(js) = assets.page_js {
                     script src=(js) defer {}
@@ -62,7 +66,14 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                         (tab("/", "Dashboard", active == "dashboard"))
                         (tab("/companies", "Companies", active == "companies"))
                         (tab("/jobs", "Jobs", active == "jobs"))
+                        (tab("/decisions", "Decisions", active == "decisions"))
                         (tab("/activity", "Activity", active == "activity"))
+                    }
+                    div.preset-menu {
+                        button #preset-btn class="preset-btn" type="button" title="Saved searches" {
+                            "★ presets"
+                        }
+                        div #preset-panel class="preset-panel hidden" {}
                     }
                     div.status-strip {
                         span.dot {}
@@ -93,6 +104,22 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                     }
                     div.drawer-body { "loading…" }
                 }
+                // Command palette (Cmd-K / Ctrl-K) — driven by /static/js/cmdk.js.
+                div #cmdk-backdrop class="cmdk-backdrop hidden" {}
+                div #cmdk-palette class="cmdk-palette hidden" role="dialog" aria-modal="true" {
+                    header.cmdk-head {
+                        input #cmdk-input type="text" class="cmdk-input"
+                            placeholder="Search companies, jobs, commands…"
+                            autocomplete="off" autocapitalize="off" spellcheck="false";
+                        span.cmdk-hint { "⌘K · Esc to close" }
+                    }
+                    div #cmdk-results class="cmdk-results" {}
+                    footer.cmdk-foot {
+                        span { "↑↓ navigate · ⏎ open · ⌘⏎ open in new tab" }
+                    }
+                }
+                // Shortcut leader-mode hint (top-right transient).
+                div #cmdk-leader class="cmdk-leader hidden" { "g _ — d j c a x" }
                 // Debug screenshot trigger — bottom-right floating button.
                 button #snap-all class="snap-btn" title="Capture all 4 tabs as PNGs into /tmp/cernio-debug/" {
                     span.snap-dot {}
