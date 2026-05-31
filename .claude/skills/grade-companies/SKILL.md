@@ -75,9 +75,46 @@ When delegating grading to parallel subagents, every subagent prompt embeds:
 - The **full content of both reference files**, verbatim (agents cannot read the skill's references)
 - The **full content of every file in `profile/`** (agents cannot read the profile)
 - The **calibration anchors** pulled from the database at the start of this grading session — 2–3 real examples per tier (S / A / B / C) with their `grade_reasoning` (agents cannot query the database)
-- **Explicit instruction** to output UPDATE statements in the exact SQL format below, not narrative summaries
+- **Explicit instruction** to WRITE UPDATE statements to an assigned scratch-path SQL file AND a parallel summary file (see §Subagent Output Contract below), not emit SQL inline in the chat reply
 
 Under-contextualising a subagent produces grades that pattern-match against the agent's pretraining rather than the Cernio rubric. Subagent prompts that summarise the profile or paraphrase the rubric produce tier-accurate grades with profile-unspecific reasoning, failing Inviolable Rule 1's citation requirement — verified in prior production runs.
+
+---
+
+## Subagent Output Contract — Scratch-Path Pattern
+
+Subagents do NOT emit SQL in their chat replies. The orchestrator does not transcribe SQL out of agent messages. Instead, every grading subagent writes two files to a shared scratch directory:
+
+```
+/tmp/grade-companies-<run-id>/
+├── <batch-id>.sql         ← single-line UPDATE statements, one per company in the batch
+└── <batch-id>.summary.md  ← grouped-by-tier human-readable summary for orchestrator review
+```
+
+Where:
+- `<run-id>` is a session-stable identifier (e.g. epoch timestamp at orchestrator start). The orchestrator picks it once and embeds the full scratch directory path in every subagent prompt.
+- `<batch-id>` is the agent's assigned slug (`aa`, `ab`, ...). One agent owns one batch-id and writes exactly two files for it.
+
+**Per-agent file contract:**
+
+`<batch-id>.sql` — pure SQL. Single-line UPDATE per company; semicolon-terminated. Exact column names per Rule 7. Single quotes escaped by doubling. Timestamps via `datetime('now')`. No markdown fences, no commentary lines, no SQL comments. The file is concatenable with every other agent's .sql via `cat`.
+
+`<batch-id>.summary.md` — orchestrator-facing verification artefact. Frontmatter line `companies: N` declares how many companies the agent graded; followed by one section per tier (S / A / B / C) with `**Name**` heading, the grade letter, and a one-line verdict. This is what the orchestrator reads to verify the agent did the work (row counts match the assigned batch size, tier distribution is plausible, no missing companies). NOT for human review — skills are autonomous; the orchestrator validates and applies.
+
+**Orchestrator flow:**
+
+1. Pick `run-id`, `mkdir -p /tmp/grade-companies-<run-id>/`, embed the path in every subagent prompt.
+2. Dispatch all subagents in parallel.
+3. As agents finish, verify per batch:
+   - Both `<batch>.sql` and `<batch>.summary.md` exist; missing = redispatch.
+   - Summary frontmatter `companies: N` equals the assigned batch size; mismatch = redispatch.
+   - SQL line count equals N; mismatch = redispatch.
+   - SQL parses: `sqlite3 :memory: ".read /tmp/grade-companies-<run-id>/<batch>.sql"` returns no errors against an empty schema, OR a dry-run on a temp copy succeeds.
+4. Apply SQL: `cat /tmp/grade-companies-<run-id>/*.sql | sqlite3 state/cernio.db`. No approval gate — the verification in step 3 is the safety net.
+5. Post-apply report: one line per tier with counts, plus any anomalies the orchestrator noticed (skewed distribution, repeated reasoning patterns) for the session-end summary.
+6. Scratch dir is ephemeral.
+
+This pattern keeps the orchestrator's context burn flat regardless of batch count, localises SQL escaping bugs to one file, and keeps the skill autonomous start-to-finish per the no-mid-run-pause-points contract.
 
 ---
 
@@ -143,9 +180,9 @@ C-tier companies remain in the active search pool. The cost of searching a few l
 
 Archival is a separate decision driven by hard exclusions (company is in an excluded sector from `preferences.toml`, company has dissolved, company has no engineering team at all) — not by a C grade. The SQL for C-tier writes is identical to S / A / B except for the `grade` value.
 
-### 6. Present grouped results for user review
+### 6. Verify scratch artefacts
 
-Group graded companies by tier. Show `what_they_do`, `grade`, and `why_relevant` inline. The user reviews and approves before anything is written to the database. The review gate catches miscalibrated grades, wrong-tier placements, and missing profile-element citations before they reach production.
+After every dispatched subagent has written its `<batch>.summary.md` and `<batch>.sql` to the scratch directory, the orchestrator runs the verification checks listed in the §Subagent Output Contract Orchestrator flow step 3: file presence, summary-frontmatter row count equals batch size, SQL line count matches, SQL parses cleanly. Any batch failing a check is redispatched with the same prompt — not silently dropped. This is mechanical verification, not user review; the skill remains autonomous.
 
 Example:
 
@@ -165,17 +202,17 @@ Example:
 - ...
 ```
 
-### 7. Write to the database (exact SQL format)
+### 7. Write to the database
 
-After approval, execute the updates. Column names and format are exact — do not rename, do not add fields, do not multi-line:
+After verification passes, the orchestrator applies the agent-written SQL files in one shot:
 
-```sql
-UPDATE companies SET what_they_do = 'description paragraph', location = 'London', sector_tags = 'tag1, tag2', grade = 'X', grade_reasoning = 'reasoning text', why_relevant = 'relevance text naming specific profile elements', relevance_updated_at = datetime('now'), graded_at = datetime('now') WHERE id = N;
+```bash
+cat /tmp/grade-companies-<run-id>/*.sql | sqlite3 state/cernio.db
 ```
 
-**Column name contract:** `what_they_do`, `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`, `relevance_updated_at`, `graded_at`. Not `reasoning`, not `description`, not `relevance`. Column-name drift produces silent DB-level mismatches that downstream queries miss.
+The orchestrator does NOT hand-write or re-emit SQL. The .sql files on disk are the source of truth; the orchestrator's only job here is concatenation + execution.
 
-**Escaping:** single quotes in text are doubled — `it''s` not `it's`. One statement per line; semicolon-terminated. Timestamps are `datetime('now')`, not hardcoded date strings.
+**Column-name and format contract (enforced inside every agent's .sql file):** columns are `what_they_do`, `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`, `relevance_updated_at`, `graded_at`. Not `reasoning`, not `description`, not `relevance`. Single quotes doubled (`it''s`). One UPDATE per line, semicolon-terminated. Timestamps via `datetime('now')`. Subagent prompts repeat this contract verbatim so the written .sql files conform.
 
 **Do not set `status = 'archived'` for any grade, including C.** Archival is a separate workflow with its own triggers.
 
@@ -215,9 +252,10 @@ Both files are read at invocation — not one or the other. The rubric without t
 3. **Grades are calibrated against DB anchors, not against the current batch.** A batch of ten excellent companies produces ten high grades. Within-batch distribution enforcement is a grading error.
 4. **C-tier companies stay active.** Setting `status = 'archived'` on a C-grade write is a rule violation. Archival has separate triggers.
 5. **`what_they_do` excludes stale content.** No headcounts, no funding amounts, no "recently launched" news, no employee counts. Only what the company fundamentally is and does.
-6. **No DB write without user approval of the grouped summary.** The user-review gate is the last correction opportunity before grades reach production.
+6. **The skill is autonomous start-to-finish.** No mid-run user-approval gate. Mechanical verification of scratch artefacts (file presence, row-count match, SQL parse) is the safety net before `sqlite3` applies the batch. The orchestrator surfaces anomalies in the post-run report; it does not pause mid-skill for approval.
 7. **Exact SQL column names.** `what_they_do`, `location`, `sector_tags`, `grade`, `grade_reasoning`, `why_relevant`, `relevance_updated_at`, `graded_at`. No variants.
 8. **Subagents receive full profile + full reference content verbatim in their prompt.** Subagents cannot read project files. Under-contextualising them produces ungrounded grades.
+9. **Subagents write SQL + summary to the assigned scratch path; orchestrator never transcribes SQL from chat.** Per the Subagent Output Contract section, every agent writes `<batch>.sql` and `<batch>.summary.md` to `/tmp/grade-companies-<run-id>/`. Agents that emit SQL inline in their chat reply have violated the contract; the orchestrator redispatches with the prompt re-emphasising the file-write instruction. The orchestrator applies SQL via `cat .../*.sql | sqlite3`, never by retyping or hand-aggregating.
 
 ---
 
@@ -233,7 +271,8 @@ Both files are read at invocation — not one or the other. The rubric without t
 - [ ] **Per company:** `why_relevant` names at least one specific flagship project or technology by name — generic "good alignment" phrases fail
 - [ ] **Per company:** uncertainty is acknowledged explicitly where evidence is thin; false confidence against weak evidence is flagged and rewritten
 - [ ] **No company has `status` set to `archived` by this skill.** C-tier stays active. Archival is a separate decision with separate triggers.
-- [ ] **SQL format:** exact column names, single-line UPDATE statements, single quotes escaped by doubling, `datetime('now')` for both timestamps
-- [ ] **Results presented grouped by tier** for user review before any DB write happened
-- [ ] **User approved** the grouped results before the UPDATE statements ran
+- [ ] **SQL format:** exact column names, single-line UPDATE statements, single quotes escaped by doubling, `datetime('now')` for both timestamps — enforced inside every agent-written `<batch>.sql` file
+- [ ] **Scratch-path file contract honoured:** every dispatched batch has BOTH `/tmp/grade-companies-<run-id>/<batch>.sql` AND `<batch>.summary.md` present on disk; missing files redispatched, not silently dropped
+- [ ] **Orchestrator did not hand-write or re-emit SQL:** the SQL applied to the DB is `cat /tmp/grade-companies-<run-id>/*.sql | sqlite3 state/cernio.db`; no Write or Edit calls produced .sql files during this run
+- [ ] **Mechanical verification ran before DB apply** — per-batch file-presence, summary `companies: N` vs assigned batch size, SQL line count, and SQL parse-check all passed; failing batches were redispatched, not silently applied
 - [ ] **Step 8 "What I did not do" declaration emitted** — names ungraded-with-reason companies, marginal-call tie-break citations, hard-exclusion recommendations, or explicitly states "every queued company graded cleanly"

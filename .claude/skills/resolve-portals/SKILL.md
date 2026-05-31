@@ -53,6 +53,36 @@ Without the reference, the agent cannot verify slugs correctly, misses the Smart
 
 ---
 
+## Subagent Output Contract — Scratch-Path Pattern
+
+Parallel resolution subagents do NOT return summary rows in chat for the orchestrator to transcribe. Each agent writes two files to a shared scratch directory:
+
+```
+/tmp/resolve-portals-<run-id>/
+├── <batch-id>.sql         ← INSERT into company_portals + UPDATE companies SET status statements
+└── <batch-id>.summary.md  ← summary-table rows (company / result / ATS / slug / evidence)
+```
+
+**Per-agent file contract:**
+
+`<batch-id>.sql` — pure SQL, one statement per line, semicolon-terminated. For each `resolved` company: one `INSERT INTO company_portals (...)` line plus one `UPDATE companies SET status = 'resolved' WHERE id = N`. For each `bespoke` company: one `UPDATE companies SET status = 'bespoke', careers_url = '...' WHERE id = N`. Dead companies emit no SQL — they go to summary only with `dead` result. Single quotes doubled. The orchestrator embeds each assigned company's `id` in the agent's prompt so the agent writes correct `WHERE id = N` clauses.
+
+`<batch-id>.summary.md` — orchestrator-facing verification artefact. Frontmatter line `companies: N, resolved: R, bespoke: B, dead: D` (R+B+D must equal N). Then markdown table rows (no header — orchestrator prepends one for the end-of-skill report) matching the §5 column format: `| Company | Result | ATS | Slug | Evidence |`. The Evidence column carries the verbatim ATS-signal quote / API response field / Companies House evidence per Rule 6.
+
+**Orchestrator flow:**
+
+1. Pick `run-id`, `mkdir -p /tmp/resolve-portals-<run-id>/`, embed the path + per-batch `{name → id}` map in each subagent prompt.
+2. Dispatch agents in parallel.
+3. Verify per batch:
+   - Both files exist; missing = redispatch.
+   - Summary frontmatter counts sum to assigned batch size (`resolved + bespoke + dead == N`); mismatch = redispatch.
+   - SQL line count matches `resolved` + `bespoke` row counts (dead emits no SQL).
+   - SQL parses cleanly; syntax error = redispatch.
+4. Apply SQL: `cat /tmp/resolve-portals-<run-id>/*.sql | sqlite3 state/cernio.db`. No approval gate.
+5. Dead-company rows are reported in the end-of-skill summary as informational; no SQL was run for them.
+
+---
+
 ## Context
 
 The companies reaching this skill fall into three buckets. Categorisation happens during inspection, not upfront:
@@ -167,7 +197,7 @@ Do not insert. Report to the user with specific evidence — Companies House sta
 
 Evidence column entries read like the rows above — specific URLs, quoted outbound-link domains, API response fields. Prose assertions ("found via careers page") are not accepted — they do not constitute evidence.
 
-Wait for user approval before executing any SQL. This is a review gate — the user catches misclassified providers, wrong slugs, or premature "dead" calls.
+The orchestrator runs the §Subagent Output Contract verification checks (file presence, frontmatter counts, SQL parses) and applies the SQL automatically — skills are autonomous start-to-finish, no mid-run approval gate. Misclassified providers / wrong slugs / premature "dead" calls are caught by the mechanical verification and by the post-apply report; if anomalies surface, the orchestrator notes them in the end-of-skill summary.
 
 ### 6. Declare what was skipped
 
@@ -192,9 +222,10 @@ These are failure modes observed in real resolution runs, not theoretical concer
 When dispatching parallel resolution work (one subagent per 3–5 unresolved companies), each subagent prompt embeds every item below. Subagents run in isolated contexts and cannot read the skill directory or query the database themselves; anything not embedded in the prompt is invisible to them.
 
 - The **full text of `references/ats-providers.md`** — verbatim, not summarised.
-- The **list of assigned companies** with their existing `website` and `careers_url` fields.
-- The step-2 per-company evidence obligation reproduced verbatim, so the subagent returns rows with query + page URL + ATS signal quote (not narrative).
-- The summary-table column format from step 5 reproduced verbatim (company / result / ATS / slug / evidence), so subagent output can be concatenated without reformatting.
+- The **list of assigned companies** with their `id`, `website`, and `careers_url` fields. The `id` is required so the agent's written SQL targets the correct row.
+- The **scratch-path file assignments** — `/tmp/resolve-portals-<run-id>/<batch>.sql` and `/tmp/resolve-portals-<run-id>/<batch>.summary.md` — that the agent must WRITE TO (not emit inline in chat).
+- The step-2 per-company evidence obligation reproduced verbatim, so the summary-file rows carry query + page URL + ATS signal quote (not narrative).
+- The summary-table column format from step 5 reproduced verbatim (company / result / ATS / slug / evidence), so the per-batch summary files are concatenable.
 - The SmartRecruiters `totalFound > 0` rule stated inline in the prompt, not only linked — tool-use obligations degrade when buried in references (F13).
 
 The failure mode this section defends against is subagent prompts that paraphrase the reference material rather than embed it. Paraphrased-input subagents drop the SmartRecruiters false-positive trap on real companies — this has been observed in practice, not a theoretical concern.
@@ -213,10 +244,11 @@ The failure mode this section defends against is subagent prompts that paraphras
 
 1. **Every resolved portal is verified against the provider's JSON API before DB write.** Raw careers-page evidence is necessary but not sufficient.
 2. **SmartRecruiters requires `totalFound > 0`.** A 200 with zero totalFound is ambiguous and defaults to bespoke when the careers page itself does not link to SmartRecruiters.
-3. **No DB write without user approval of the summary table.** The review gate catches mislabelled providers and wrong-slug assignments before they reach production.
+3. **The skill is autonomous start-to-finish.** Mechanical verification of scratch artefacts (file presence, frontmatter count sums, SQL parses) is the safety net before `sqlite3` applies the batch. No mid-run user-approval gate.
 4. **Bespoke entries point to a working job listings page.** Not a homepage. Downstream bespoke search depends on this.
 5. **Dead-company claims carry concrete evidence.** Companies House status, HTTP 404, redirect-to-parent. No unsubstantiated "seems dead" calls.
 6. **Every summary-table row cites specific artefacts.** URLs, quoted outbound-link domains, API response fields, Companies House numbers — not narrative. Prose evidence ("found via careers page") is rejected at step 3.
+7. **Subagents write SQL + summary to assigned scratch path; orchestrator never transcribes from chat.** Per the §Subagent Output Contract, each agent writes `<batch>.sql` and `<batch>.summary.md` to `/tmp/resolve-portals-<run-id>/`. The orchestrator applies SQL via `cat .../*.sql | sqlite3` only after user approval of the concatenated summary.
 
 ---
 
@@ -234,5 +266,7 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Dead rows cite a source** — Companies House URL + status text, HTTP error code, or redirect-target URL. Prose-only "seems dead" rows fail this item.
 - [ ] **Multi-portal cases have `is_primary` assignments justified in the Evidence column** — active = 1, residual = 0, with a sentence naming which portal is active and why.
 - [ ] **Duplicate `company_portals` rows avoided** — cite the pre-insert check (SELECT query or UNIQUE constraint reliance) that catches duplicates.
-- [ ] **Summary table presented and approved** — the table was emitted, the user explicitly approved, and the approval turn is identifiable in the transcript.
+- [ ] **Scratch-path file contract honoured** — every dispatched batch has `/tmp/resolve-portals-<run-id>/<batch>.sql` AND `<batch>.summary.md` on disk; missing files redispatched.
+- [ ] **Orchestrator did not hand-write SQL** — DB application was `cat /tmp/resolve-portals-<run-id>/*.sql | sqlite3 state/cernio.db`; no Write/Edit calls produced .sql files during this run.
+- [ ] **Mechanical verification ran before DB apply** — per-batch file presence, summary frontmatter counts (`resolved + bespoke + dead == N`), SQL line count, and SQL parse-check all passed; failing batches were redispatched, not silently applied.
 - [ ] **"What I did not do" declaration emitted** — at the end of the run, a section names every company left in `potential`, every SmartRecruiters ambiguity resolved against confirmation, every careers-page that failed to load. If nothing was skipped, the section says so explicitly; it is not absent.

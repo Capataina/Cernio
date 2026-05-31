@@ -82,6 +82,43 @@ The profile is not cached in this skill or in any reference file. Every invocati
 
 ---
 
+## Subagent Output Contract — Scratch-Path Pattern
+
+Subagents do NOT emit SQL in their chat replies. The orchestrator does not transcribe SQL out of agent messages. Every grading subagent writes two files to a shared scratch directory:
+
+```
+/tmp/grade-jobs-<run-id>/
+├── <batch-id>.sql         ← single-line UPDATE statements (one per job in the batch)
+└── <batch-id>.summary.md  ← grouped-by-grade human-readable summary for orchestrator review
+```
+
+- `<run-id>` is a session-stable identifier (epoch timestamp at orchestrator start). The orchestrator picks it once and embeds the full scratch directory path in every subagent prompt.
+- `<batch-id>` is the agent's assigned slug. One agent owns one batch-id and writes exactly two files.
+
+**Per-agent file contract:**
+
+`<batch-id>.sql` — pure SQL. Single-line UPDATE per job; semicolon-terminated. Exact column names per Rule 10 (`grade`, `fit_assessment`, `evaluation_status`, `evidence_basis`). Single quotes escaped by doubling. No `fit_score` column. No markdown fences, no SQL comments. Concatenable across batches via `cat`.
+
+`<batch-id>.summary.md` — orchestrator-facing verification artefact. Frontmatter line `jobs: N`, `evidence_basis: {jd: X, semantic: Y, insufficient: Z}`. Then one section per grade tier (SS/S/A/B/C/F) with `**Company — Title** (id=NNN)` and a one-line verdict-extract. This is what the orchestrator reads to verify the agent did the work (counts match assigned batch, evidence_basis totals sum to N, no rows missing). NOT for human review — skills are autonomous; the orchestrator validates and applies.
+
+**Orchestrator flow:**
+
+1. Pick `run-id`, `mkdir -p /tmp/grade-jobs-<run-id>/`, embed the path in every subagent prompt.
+2. Dispatch agents in parallel.
+3. Verify per batch:
+   - Both `<batch>.sql` and `<batch>.summary.md` exist; missing = redispatch.
+   - `jobs: N` in summary frontmatter equals assigned batch size; mismatch = redispatch.
+   - SQL line count equals N; mismatch = redispatch.
+   - SQL parses against an empty-schema `:memory:` DB or a temp copy; syntax error = redispatch.
+4. Apply SQL: `cat /tmp/grade-jobs-<run-id>/*.sql | sqlite3 state/cernio.db`. No approval gate — verification in step 3 is the safety net.
+5. Relativity Pass (§11) operates on already-applied rows — runs after step 4. Adjustment UPDATEs from the Relativity Pass are written to `/tmp/grade-jobs-<run-id>/relativity.sql` by the same agents and applied the same way (verify file presence, then `cat | sqlite3`).
+6. Post-apply session report: §12 batch results — orchestrator-assembled from summary files; this is end-of-skill output for the user, not a mid-run approval gate.
+7. Scratch dir is ephemeral.
+
+This keeps the orchestrator's context burn flat, localises SQL bugs per batch, preserves the rubric/relativity discipline, and keeps the skill autonomous start-to-finish per the no-mid-run-pause-points contract.
+
+---
+
 ## Workflow
 
 ### 0. Run `cernio format` before any grading starts
@@ -329,7 +366,7 @@ Grading is parallelised. Split the pending queue into batches by company cluster
 - The full content of every file in `profile/`
 - The calibration anchors pulled in step 2
 - The list of assigned jobs with company name, company grade, title, location, and description excerpt from the DB
-- Explicit instruction to output SQL UPDATE statements directly — not narrative summaries
+- Explicit instruction to WRITE SQL UPDATE statements to `/tmp/grade-jobs-<run-id>/<batch>.sql` AND a parallel `<batch>.summary.md`, per the §Subagent Output Contract above — not to emit SQL in the chat reply
 
 Subagents that do not receive these files produce shallow, generic assessments. Under-contextualising is the single largest parallel-grading quality failure — verified by prior production runs where summarised-profile subagents produced grade-level-correct but profile-unspecific assessments that failed the citation rule.
 
@@ -344,7 +381,7 @@ SET grade = 'X',
 WHERE id = NNN;
 ```
 
-Do NOT include `fit_score` — the column has been dropped from the schema; any UPDATE containing `fit_score = ...` will fail. `evidence_basis` is always set: 'jd' when the JD was used, 'semantic' when company+title reasoning was used, 'insufficient' when neither (in which case `grade` is NULL and `evaluation_status` stays 'pending'). The orchestrator collects SQL from all agents and executes in one batch.
+Do NOT include `fit_score` — the column has been dropped from the schema; any UPDATE containing `fit_score = ...` will fail. `evidence_basis` is always set: 'jd' when the JD was used, 'semantic' when company+title reasoning was used, 'insufficient' when neither (in which case `grade` is NULL and `evaluation_status` stays 'pending'). The UPDATE lines above are the format each subagent writes into `<batch>.sql` on disk — the orchestrator then applies all batches' SQL files via `cat /tmp/grade-jobs-<run-id>/*.sql | sqlite3 state/cernio.db`. The orchestrator does not retype, hand-aggregate, or re-emit SQL from chat output.
 
 ### 9. Batch discipline
 
@@ -500,7 +537,7 @@ All three are read at invocation. The rubric alone without profile-context produ
 6. **Profile is read fresh every invocation.** No caching, no embedded snapshots.
 7. **Grades are calibrated against DB anchors, not the current batch.** A batch of genuinely excellent jobs produces excellent grades — no distribution flattening. The Relativity Pass (step 11) is the structural defence: after grading, each agent compares its rows against 3 random DB-sampled jobs per tier and adjusts inconsistencies.
 8. **`profile/portfolio-gaps.md` is updated after every batch.** Even a null update ("no new patterns this batch") is written — silent skipping breaks the career-coaching loop.
-9. **Subagents receive full profile + full reference content verbatim, AND the Relativity Pass query verbatim.** Under-contextualised subagents produce shallow assessments; subagents without the Relativity Pass query cannot run step 11.
+9. **Subagents receive full profile + full reference content verbatim, AND the Relativity Pass query verbatim, AND the assigned scratch-path file paths.** Under-contextualised subagents produce shallow assessments; subagents without the Relativity Pass query cannot run step 11; subagents without scratch-path assignment fall back to inline-SQL emission and burn the orchestrator's context. The prompt names the exact files the agent must write: `/tmp/grade-jobs-<run-id>/<batch>.sql` and `/tmp/grade-jobs-<run-id>/<batch>.summary.md`. Agents that emit SQL in chat instead of writing to disk have violated the contract — orchestrator redispatches.
 10. **Exact SQL column names.** `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis`. The `fit_score` column was dropped from the schema — UPDATE statements that reference it will fail at execution. `evaluation_status` maps to the six-tier table in step 6; `evidence_basis` is always set ('jd' / 'semantic' / 'insufficient').
 11. **No mechanical company-to-grade or role-type-to-grade rules.** Grading is AI reasoning, not classification. The rubric does NOT contain rules like "company X = grade Y", "frontend role = max C", "junior + top brand = SS", or any threshold mapping from a single attribute to a grade. Every grade emerges from prose Q-slot reasoning plus the Verdict. If a rubric edit ever introduces such a rule, it is an inviolable-rule violation and must be reverted.
 12. **Banned strings inside Q-slot prose** (this is the enumerated list of verdict-enum labels and arrow-shorthand patterns that must NOT appear anywhere inside Q1, Q2, Q3a, Q3b, Q4, Q5, or Verdict prose): `cleared-decisively`, `cleared-with-friction`, `real-headwind`, `hard-fail`, `Q1 cleared`, `Q2 strong`, `Q2 moderate`, `Q2 weak`, `Q3 moderate`, `Q3 strong`, `Q3 weak`, `Q5 ✓`, `Q4 ✓`, `→ A`, `→ B`, `→ C`, `→ S`, `→ SS`, `→ F`, `-> A`, `-> B`, `-> C`, `-> S`, `-> SS`, `-> F`. Each is a label or shortcut that bypasses prose reasoning. The agent expresses the same content in prose without using these strings. The list is extended whenever a new shortcut pattern is observed.
@@ -533,6 +570,8 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Verdict slot reads as a budget-of-30 answer** — the Verdict prose names the strongest pull AND strongest pushback, classifies the role-type (career-launch / axis-bet / credibility-builder / stretch / deadweight in prose, not by label), and answers whether the role makes the budget cut. The grade letter follows the Verdict.
 - [ ] **C / F assessments cite the specific dealbreaker** — named quoted JD text (seniority gap, technology mismatch, role-type exclusion) or the company-context dealbreaker on the semantic path. "Bad fit" without citation fails.
 - [ ] **Column mapping correct** — UPDATE statements set `grade`, `fit_assessment`, `evaluation_status`, `evidence_basis` exactly. `evaluation_status` maps SS/S → `strong_fit`, A/B → `weak_fit`, C/F → `no_fit`. `evidence_basis` is one of 'jd' / 'semantic' / 'insufficient'. No UPDATE includes `fit_score = ...` — the column has been dropped and including it fails the statement.
+- [ ] **Scratch-path file contract honoured** — every dispatched batch has BOTH `/tmp/grade-jobs-<run-id>/<batch>.sql` AND `<batch>.summary.md` on disk; missing files were redispatched, not silently dropped.
+- [ ] **Orchestrator did not hand-write or re-emit SQL** — DB application was `cat /tmp/grade-jobs-<run-id>/*.sql | sqlite3 state/cernio.db`; no Write/Edit produced .sql files during this run.
 - [ ] **Relativity Pass ran and the delta summary was emitted** — step 11's section is present in the batch output. The DB-sampled reference rows query was run; adjustments are listed by job_id with reason, or `Adjustments: 0 grades changed` is stated explicitly with a one-line confirmation that the comparison was run.
 - [ ] **`profile/portfolio-gaps.md` updated** — the diff to `portfolio-gaps.md` is cited (new patterns with counts + role names + companies, or a dated null-result note). Silent omission fails Inviolable Rule 8.
 - [ ] **Batch report includes evidence_basis breakdown** — counts of `jd` / `semantic` / `insufficient` rows in this batch, plus the standard tier breakdown and SS / S highlights.

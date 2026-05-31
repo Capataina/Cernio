@@ -179,9 +179,9 @@ Per-company workflow:
 
 Companies that are confirmed on the register but only via non-Skilled-Worker routes (Global Business Mobility: Senior or Specialist Worker, Graduate Trainee, Charity Worker, etc.) DO NOT qualify — those routes don't permit direct UK hire from outside the company. Such companies should be flagged for archival in step 6, not inserted.
 
-### 6. Present results for user review
+### 6. Assemble end-of-skill summary
 
-Before any DB write, produce a summary table:
+After mechanical verification (Subagent Context Requirements §Scratch-path contract) passes and SQL has been applied, the orchestrator concatenates agent-written summary rows under this header for the end-of-skill report. No mid-run approval gate; the skill is autonomous.
 
 ```
 | Company        | Result   | ATS        | Slug                     | Sponsor Entity                       | Source                                |
@@ -192,7 +192,7 @@ Before any DB write, produce a summary table:
 | Vypercore      | removed  | —          | —                        | n/a                                  | Companies House: in liquidation       |
 ```
 
-Wait for user approval. This is a review gate — the user can correct mistakes, skip entries, or request re-research. Writing to the DB only after confirmation.
+The orchestrator does not wait for approval — verification of scratch artefacts (file presence, frontmatter row counts, SQL parses) is the safety net. Anomalies surface in the post-apply summary for the user to act on if needed.
 
 ### 7. Commit and clean up
 
@@ -211,8 +211,19 @@ When delegating fallback work to parallel subagents (one per 3–5 unresolved co
 - The **full content of `references/ats-providers.md`** — verbatim, not summarised.
 - The **full content of every file in `profile/`** — needed for the relevance judgment in step 2.
 - The list of assigned companies with their discovery-source metadata (name, website, `why_relevant` from `potential.md`).
-- The per-company evidence obligation from step 5 reproduced verbatim, so the subagent returns rows with query + page URL + ATS signal quote + API response fields (not a narrative summary).
-- The summary-table column format from step 6, again verbatim, so subagent output can be concatenated without reformatting.
+- The **scratch-path file assignments** — `/tmp/populate-db-<run-id>/<batch>.summary.md` (and `<batch>.sql` for any SQL the agent generates, e.g. UPDATE for AI-fallback resolved slugs) — that the agent must WRITE TO (not emit inline in chat).
+- The per-company evidence obligation from step 5 reproduced verbatim, so the summary-file rows carry query + page URL + ATS signal quote + API response fields (not a narrative summary).
+- The summary-table column format from step 6, again verbatim, so per-batch summary files are concatenable.
+
+**Scratch-path contract.** Each fallback subagent writes:
+
+```
+/tmp/populate-db-<run-id>/
+├── <batch-id>.summary.md  ← markdown table rows (Company / Result / ATS / Slug / Sponsor Entity / Source) per Rule §6 format
+└── <batch-id>.sql         ← any SQL the agent produces (e.g. UPDATE companies SET uk_sponsor_entity_name = '...' for AI-fallback matches)
+```
+
+For bucket-1 slugs the canonical persistence path remains `cernio resolve --company "Name"` after the agent surfaces the slug — the agent's `<batch>.sql` is for sponsor-entity backfill and bespoke-status updates, NOT for INSERTing portal rows (the script writes richer metadata). The orchestrator concatenates the summary files for the §6 user-review block and applies the SQL via `cat .../*.sql | sqlite3 state/cernio.db` after approval.
 
 The failure mode this section defends against is subagent prompts that embed a summary of the reference material rather than the full text. Under-contextualised subagents produce generic output that mislabels providers — verified cause of prior F12-class silent misclassifications on this skill.
 
@@ -228,7 +239,7 @@ The failure mode this section defends against is subagent prompts that embed a s
 
 ## Inviolable Rules
 
-1. **No DB write without user approval of the summary table.** Writes are reversible but noisy; the review gate catches mislabelled providers and mis-slugged companies before they reach the DB.
+1. **The skill is autonomous start-to-finish.** Mechanical verification of scratch artefacts (file presence, frontmatter row counts, SQL parses, dedup query) is the safety net before `sqlite3` applies the batch. No mid-run user-approval gate. Anomalies surface in the post-apply summary, not as pause-points.
 2. **Each resolution must be verified against the provider's JSON API** (except bespoke). For SmartRecruiters, verification means `totalFound > 0` — 200 alone is not evidence.
 3. **Bespoke companies carry a working careers URL**, not a homepage. The bespoke-search workflow downstream needs a page that actually shows jobs.
 4. **Do not grade during this skill.** Grading is `grade-companies`. Mixing the two contaminates both passes.
@@ -236,6 +247,7 @@ The failure mode this section defends against is subagent prompts that embed a s
 6. **Every AI-fallback decision is cited.** Bucket 1 cites the careers URL and the API response fields proving the slug; bucket 2 cites the careers URL and the unsupported-ATS signal; bucket 3 cites a specific status source (Companies House URL, HTTP response, redirect target). A fallback row without a citable source is not a decision, it is a guess — surface it under "What I did not do" instead.
 7. **The cernio resolve step cannot be substituted.** For companies whose careers pages are on supported ATS providers, `cernio resolve` is the only path into the database. Manual INSERT statements for an in-coverage company are a failure, not a shortcut.
 8. **Every company processed must have `uk_sponsor_entity_name` populated.** The column is set to the exact register entity name (Skilled Worker route only — non-SW routes do not qualify) or to the literal string `unknown` if no match is found under any plausible variant. Inserting a row with `uk_sponsor_entity_name` left as NULL is a failure of step 5.5.
+9. **Fallback subagents write summary + SQL to assigned scratch path; orchestrator never transcribes per-company rows from chat.** Per the Subagent Context Requirements section, each agent writes `<batch>.summary.md` and (where SQL is produced) `<batch>.sql` to `/tmp/populate-db-<run-id>/`. The §6 review table is assembled by concatenating summary files. Bucket-1 slug surfaces still re-run `cernio resolve --company "Name"` as the canonical persistence path — agent-written SQL handles sponsor-entity backfill and bespoke-status updates, not portal INSERTs.
 
 ---
 
@@ -253,7 +265,9 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Each bucket-1 AI-fallback row cites query + page URL + ATS signal quote + API response fields** — per the step 5 per-company evidence obligation.
 - [ ] **Each bucket-2 bespoke row cites careers URL + unsupported-ATS signal** — the specific domain or script source that placed the provider in the unsupported list.
 - [ ] **Each bucket-3 dead-company row cites a source** — Companies House URL with status text, HTTP error code, or redirect-target URL. Prose assertion of deadness without a source belongs under "What I did not do."
-- [ ] **Summary table presented and approved** — the table from step 6 was emitted, the user explicitly approved, and the approval turn is identifiable in the transcript.
+- [ ] **Scratch-path file contract honoured** — every dispatched fallback batch has `/tmp/populate-db-<run-id>/<batch>.summary.md` on disk (plus `<batch>.sql` where applicable); missing files redispatched, not silently dropped.
+- [ ] **Orchestrator did not hand-write per-company rows or SQL** — the §6 table is assembled from agent-written summary files; any DB writes that bypassed `cernio resolve` were applied via `cat /tmp/populate-db-<run-id>/*.sql | sqlite3 state/cernio.db`.
+- [ ] **Mechanical verification ran before DB apply** — per-batch file presence, summary frontmatter counts, SQL line count, and SQL parse-check all passed; failing batches were redispatched, not silently applied.
 - [ ] **`uk_sponsor_entity_name` populated for every inserted/resolved company** — cite the per-company source: exact register entity name (with the register row quoted) or the literal string `unknown` with the reason no match was found. NULLs in this column post-insert are a step-5.5 failure.
 - [ ] **`companies/potential.md` cleaned after successful insert** — the file's content after the run contains only companies that were neither resolved nor bespoke (or is empty). Diff or after-state reference cited.
 - [ ] **"What I did not do" declaration emitted** — at the end of the run, a section names every company that was skipped, deferred, left in `potential.md` for human review, or partially processed, with the reason. If nothing was skipped, the section says so explicitly; it is not absent.

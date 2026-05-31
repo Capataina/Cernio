@@ -65,6 +65,39 @@ The profile is not cached. Every invocation reads `profile/` fresh.
 
 ---
 
+## Subagent Output Contract — Scratch-Path Pattern
+
+Bespoke-search subagents do NOT return roles as chat findings for the orchestrator to transcribe into INSERT statements. Each agent writes two files to a shared scratch directory:
+
+```
+/tmp/search-jobs-<run-id>/
+├── <batch-id>.sql         ← INSERT OR IGNORE statements (one per role found)
+└── <batch-id>.summary.md  ← per-company role counts + role titles for orchestrator report
+```
+
+**Per-agent file contract:**
+
+`<batch-id>.sql` — pure SQL. Single-line `INSERT OR IGNORE INTO jobs (company_id, title, url, location, evaluation_status, discovered_at) VALUES (...)` per role; semicolon-terminated. The orchestrator embeds the `{company-name → company_id}` map for every assigned company in the agent's prompt, so the agent fills in the correct `company_id`. Single quotes doubled. No fences, no comments. Concatenable via `cat`.
+
+`<batch-id>.summary.md` — orchestrator-facing verification artefact. Frontmatter line `companies: N, roles_found: M`. Then `## <Company Name> (id=NNN)` headings, each with role-count + title list (or `no-roles-found` / `page-load-failed`). One company per heading. Orchestrator reads this to verify the agent covered every assigned company and to assemble the §5 end-of-skill handoff report. NOT for human approval — skills are autonomous.
+
+**Orchestrator flow:**
+
+1. Pick `run-id`, `mkdir -p /tmp/search-jobs-<run-id>/`, embed the path + per-batch `{name → company_id}` map in each subagent prompt.
+2. Dispatch agents in parallel by tier (S first, then A, then B).
+3. Verify per batch:
+   - Both `<batch>.sql` and `<batch>.summary.md` exist; missing = redispatch.
+   - Summary `companies: N` equals assigned batch size; mismatch = redispatch.
+   - SQL line count equals summary `roles_found: M`; mismatch = redispatch.
+   - SQL parses cleanly; syntax error = redispatch.
+4. Apply SQL: `cat /tmp/search-jobs-<run-id>/*.sql | sqlite3 state/cernio.db`. `INSERT OR IGNORE` on the `url` unique constraint dedups automatically. No approval gate.
+5. Assemble §5 handoff report from summary files.
+6. Scratch dir is ephemeral.
+
+The orchestrator-constructed-INSERTs pattern in earlier versions of this skill burned context proportional to bespoke-company count and produced the documented session-7 failure mode where chat-reported roles were lost in transcription. Writing SQL to disk eliminates both problems and keeps the skill autonomous start-to-finish.
+
+---
+
 ## Workflow
 
 ### 1. Run `cernio search` for the resolved-ATS half
@@ -112,27 +145,27 @@ Dispatch parallel subagents — one per batch of 3–5 bespoke companies. Each s
 - The **relevant profile slice** — target role types, technologies, location preferences, visa status, plus the full text of `profile/lifestyle-preferences.md` (informational area awareness, not a filter — subagents do not skip roles for area reasons; `grade-jobs` performs the formal lifestyle assessment) — all pulled from `profile/` by the orchestrator
 - The **list of assigned companies** (name + careers_url + grade)
 - **Explicit instruction** to use `WebFetch` on the careers URL first, fall through to `WebSearch` on aggregators (LinkedIn, Indeed, Glassdoor, BuiltIn) per the playbook's priority order
-- **Output-format obligation** — per-company structured findings (title, URL, location for each match), not narrative summaries
-- **Explicit rule** — results are to be *returned* to the orchestrator as structured findings; the orchestrator inserts into the DB. Subagents do not write SQL.
+- **Output-format obligation** — agent WRITES `/tmp/search-jobs-<run-id>/<batch>.sql` (INSERT OR IGNORE per role) AND `<batch>.summary.md` (per-company role list) per the §Subagent Output Contract above. The prompt embeds the `{company-name → company_id}` map for every assigned company so the agent fills in the correct IDs.
+- **Explicit rule** — agent writes SQL files to scratch path; agent does NOT emit SQL inline in chat. Orchestrator applies the SQL via `cat .../*.sql | sqlite3` after all agents have finished.
 
 S-tier bespoke companies go first (highest expected yield per minute). A-tier companies next. B-tier if time permits.
 
-### 4. Insert bespoke results into the DB
+### 4. Apply scratch SQL to the DB
 
-After subagent results arrive, the orchestrator:
+After all subagents have written their `<batch>.sql` files to `/tmp/search-jobs-<run-id>/`, the orchestrator:
 
-1. Maps each returned company name to its `company_id` via `SELECT id, name FROM companies WHERE status = 'bespoke';`. Flag any name that does not resolve.
-2. Produces `INSERT OR IGNORE INTO jobs` statements for each returned role:
+1. Verifies every dispatched batch has its SQL file on disk (`ls /tmp/search-jobs-<run-id>/*.sql`); missing files = failed batches = redispatch with the same prompt.
+2. Applies all SQL in one shot:
 
-   ```sql
-   INSERT OR IGNORE INTO jobs (company_id, title, url, location, evaluation_status, discovered_at)
-   VALUES (?, ?, ?, ?, 'pending', datetime('now'));
+   ```bash
+   cat /tmp/search-jobs-<run-id>/*.sql | sqlite3 state/cernio.db
    ```
 
-3. Executes the inserts. The `OR IGNORE` clause relies on the `url` unique constraint — re-runs do not duplicate.
-4. Reports: companies searched, roles found, roles inserted (vs roles that were already in the DB as duplicates).
+   The `INSERT OR IGNORE` clause on the `url` unique constraint dedups automatically.
+3. Counts rows inserted vs ignored via `SELECT changes()` or by diffing `SELECT COUNT(*) FROM jobs` before/after.
+4. Reads the agent-written `<batch>.summary.md` files to produce the per-company report: companies searched, roles found, roles inserted vs already-present.
 
-**This step is load-bearing.** The session-7 failure mode was that subagent-found roles were reported conversationally and never inserted — they remained invisible to the TUI, the grading pipeline, and the application tracker. Insert, then report.
+**This step is load-bearing.** The session-7 failure mode was that subagent-found roles were reported conversationally and never inserted — they remained invisible to the TUI, the grading pipeline, and the application tracker. The scratch-path contract removes the chat-transcription step where that failure happened. Write, apply, report.
 
 ### 5. Confirm the pending queue
 
@@ -171,7 +204,7 @@ Close the run with a "What I did not do" section covering: resolved-ATS companie
 3. **Bespoke search is part of every full search pass** — not an optional tail step. Running `cernio search` alone covers 287 of the 408 companies. The other 121 include the highest-signal employers in the universe; silently skipping them is a partial job search mislabelled as complete.
 4. **Profile is read fresh every invocation.** No cached profile data in this skill or any subagent prompt.
 5. **Subagents receive the full bespoke-search-playbook + the relevant profile slice embedded verbatim** in their prompts. Agents cannot read the skill's references.
-6. **Subagents return structured findings, not SQL.** The orchestrator maps names to `company_id` and constructs the insert statements.
+6. **Subagents write INSERT SQL + per-company summary to assigned scratch path; orchestrator never transcribes findings from chat into SQL.** Per the §Subagent Output Contract, each agent writes `<batch>.sql` and `<batch>.summary.md` to `/tmp/search-jobs-<run-id>/`. The orchestrator embeds the `{name → company_id}` map in each agent's prompt so the agent emits correct IDs. The orchestrator applies SQL via `cat .../*.sql | sqlite3`, never by retyping or hand-constructing INSERTs.
 7. **The URL unique constraint drives dedup** — `INSERT OR IGNORE` is the insert form. Hand-coded "check if exists first" queries are unnecessary and error-prone.
 
 ---
@@ -187,8 +220,9 @@ Each item is an obligation with a concrete evidence slot, not a subjective self-
 - [ ] **Bespoke SQL query run and row count reported** — the `SELECT ... WHERE status = 'bespoke' AND grade IN ('S','A','B')` result is identifiable in the transcript.
 - [ ] **Bespoke pass ran in priority order** — S-tier first, A-tier second, B-tier third; per-tier subagent dispatch counts cited.
 - [ ] **Every subagent prompt embedded the full playbook + profile slice** — verified by inspecting the prompt contents in the transcript.
-- [ ] **Subagent returns are structured per-company findings** — titles, URLs, locations in the per-company blocks; no narrative-only returns accepted.
-- [ ] **Every returned role was inserted via `INSERT OR IGNORE INTO jobs`** — cite the generated SQL batch; every returned role appears in the SQL. A role reported but not inserted is the session-7 failure and fails this item.
+- [ ] **Every dispatched batch has `<batch>.sql` AND `<batch>.summary.md` on disk** under `/tmp/search-jobs-<run-id>/`. Missing files were redispatched, not silently dropped.
+- [ ] **Subagent-written summary files are structured per-company** — `## <Company>` headings with title + URL lists or explicit zero-result records.
+- [ ] **All scratch SQL applied via `cat .../*.sql | sqlite3 state/cernio.db`** — orchestrator did not hand-write INSERTs or retype roles from chat. A role reported but not inserted is the session-7 failure and fails this item.
 - [ ] **Unresolved company-name flags surfaced** — any subagent-returned name that did not map to a `company_id` is named in step 7's declaration (not silently dropped).
 - [ ] **Per-source insert vs already-duplicate counts cited** — the count of jobs the OR IGNORE silently skipped is reported alongside the new-insert count.
 - [ ] **Pending queue count after insert cited** — `SELECT COUNT(*) FROM jobs WHERE evaluation_status = 'pending'` result appears in the handoff.
