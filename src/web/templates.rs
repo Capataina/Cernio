@@ -29,6 +29,10 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/base.css";
                 link rel="stylesheet" href="/static/css/motion.css";
                 link rel="stylesheet" href="/static/css/components.css";
+                link rel="stylesheet" href="/static/css/chips.css";
+                link rel="stylesheet" href="/static/css/buttons.css";
+                link rel="stylesheet" href="/static/css/rows.css";
+                link rel="stylesheet" href="/static/css/tables.css";
                 link rel="stylesheet" href="/static/css/chrome.css";
                 link rel="stylesheet" href="/static/css/filters.css";
                 link rel="stylesheet" href="/static/css/debug.css";

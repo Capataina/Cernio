@@ -1,0 +1,79 @@
+/* tables.css — shared data tables (.job-table, .company-table), col widths,
+ * job-title, in-table link styles.
+ * Split out from components.css 2026-05-31. No behaviour change.
+ */
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+
+table.job-table,
+table.company-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px; table-layout: auto;
+}
+table.job-table thead th,
+table.company-table thead th {
+    text-align: left;
+    color: var(--text-3);
+    font-weight: 500; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-strong);
+    background: var(--bg-2);
+    position: sticky; top: 46px;
+    z-index: 2;
+}
+table.job-table tbody td,
+table.company-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--bg-3);
+    color: var(--text-1);
+    vertical-align: middle;
+    transition: background var(--t-fast) var(--easing);
+}
+table.job-table tbody tr,
+table.company-table tbody tr {
+    position: relative;
+    transition: background var(--t-fast) var(--easing);
+}
+table.job-table tbody tr:hover,
+table.company-table tbody tr:hover {
+    background: var(--bg-2);
+}
+table.job-table tbody tr:hover td:first-child::before,
+table.company-table tbody tr:hover td:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+}
+.col-grade  { width: 56px; }
+.col-lane   { width: 78px; }
+.col-co     { width: 220px; color: var(--text-2); }
+.col-status { width: 90px; }
+.col-jobs   { width: 70px; font-family: var(--font-mono); }
+.col-ats    { width: 120px; color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
+.col-loc    { width: 160px; color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
+.col-actions { width: 280px; text-align: right; }
+.job-title { color: var(--text-0); font-weight: 500; }
+
+/* Links inside data tables — match the theme instead of the browser default
+ * underlined royal-blue that screams 'unstyled'. */
+table.job-table td a,
+table.company-table td a {
+    color: var(--text-0);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color var(--t-fast) var(--easing),
+                border-color var(--t-fast) var(--easing);
+}
+table.job-table td a:hover,
+table.company-table td a:hover {
+    color: var(--accent-2);
+    border-bottom-color: var(--accent);
+}
+table.job-table td a:visited,
+table.company-table td a:visited {
+    color: var(--text-1);
+}

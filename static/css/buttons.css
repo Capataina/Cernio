@@ -1,0 +1,113 @@
+/* buttons.css — btn, role-apply, decision-state variants, ripple, decision-buttons.
+ * Split out from components.css 2026-05-31. No behaviour change.
+ */
+
+/* ── Buttons (lift + ripple) ────────────────────────────────────── */
+
+.btn, .role-apply {
+    position: relative;
+    display: inline-flex; align-items: center;
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-3);
+    color: var(--text-1);
+    font-size: 10px; font-family: var(--font-mono);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    text-decoration: none; cursor: pointer;
+    overflow: hidden;
+    transition: all var(--t-fast) var(--easing);
+}
+.btn:hover, .role-apply:hover {
+    background: var(--bg-4);
+    color: var(--text-0);
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    transform: translateY(-1px);
+}
+.btn:active, .role-apply:active { transform: translateY(0); }
+
+.btn-apply, .role-apply {
+    background: var(--accent);
+    color: var(--bg-0);
+    border-color: var(--accent);
+    font-weight: 700;
+    box-shadow: 0 0 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-apply:hover, .role-apply:hover {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
+    box-shadow: 0 0 20px var(--accent), inset 0 1px 0 rgba(255,255,255,0.3);
+    color: var(--bg-0);
+}
+.btn-active {
+    background: var(--grade-s);
+    color: var(--bg-0);
+    border-color: var(--grade-s);
+    /* Glow clamped from 12px → 4px outer; inset adds inner punch instead. */
+    box-shadow: inset 0 0 6px color-mix(in srgb, var(--grade-s) 50%, transparent),
+                0 0 4px var(--good-glow);
+}
+
+.btn::after, .role-apply::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%),
+                                rgba(255,255,255,0.4) 0%, transparent 50%);
+    opacity: 0;
+    pointer-events: none;
+}
+.btn.rippling::after, .role-apply.rippling::after {
+    animation: ripple var(--t-flash) ease-out;
+}
+
+.decision-buttons { display: inline-flex; gap: 6px; align-items: center; }
+/* Active-state variants. Each replaces the default outline state with a
+ * coloured-fill that matches the decision's semantic colour. Glow is inset
+ * so it doesn't bleed into adjacent table rows (was a known issue with the
+ * old btn-active outer 12px shadow). */
+.btn-applied {
+    background: var(--good);
+    color: var(--bg-0);
+    border-color: var(--good);
+    font-weight: 700;
+    box-shadow: inset 0 0 8px color-mix(in srgb, var(--good) 60%, transparent),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                0 0 4px var(--good-glow);
+}
+.btn-applied:hover {
+    background: color-mix(in srgb, var(--good) 110%, white);
+    border-color: color-mix(in srgb, var(--good) 110%, white);
+    box-shadow: inset 0 0 12px color-mix(in srgb, var(--good) 70%, transparent),
+                inset 0 1px 0 rgba(255,255,255,0.3),
+                0 0 8px var(--good-glow);
+    color: var(--bg-0);
+}
+.btn-watching {
+    background: var(--warn);
+    color: var(--bg-0);
+    border-color: var(--warn);
+    font-weight: 700;
+    box-shadow: inset 0 0 8px color-mix(in srgb, var(--warn) 60%, transparent),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                0 0 4px color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.btn-watching:hover {
+    background: color-mix(in srgb, var(--warn) 110%, white);
+    border-color: color-mix(in srgb, var(--warn) 110%, white);
+    color: var(--bg-0);
+}
+.btn-rejected {
+    background: var(--bad);
+    color: var(--bg-0);
+    border-color: var(--bad);
+    font-weight: 700;
+    box-shadow: inset 0 0 8px color-mix(in srgb, var(--bad) 60%, transparent),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                0 0 4px var(--bad-glow);
+}
+.btn-rejected:hover {
+    background: color-mix(in srgb, var(--bad) 110%, white);
+    border-color: color-mix(in srgb, var(--bad) 110%, white);
+    color: var(--bg-0);
+}
