@@ -78,10 +78,15 @@
 
 /* ── Lane legend topbar popover ──────────────────────────────────── */
 
-.lane-legend-topbar {
+.topbar-right {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.lane-legend-topbar {
     position: relative;
-    margin-right: 12px;
 }
 .lane-legend-trigger {
     display: inline-flex;
@@ -122,7 +127,7 @@
     width: 320px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--t-base) var(--easity), transform var(--t-base) var(--easing);
+    transition: opacity var(--t-base) var(--easing), transform var(--t-base) var(--easing);
     transform: translateY(-4px);
 }
 .lane-legend-topbar:hover .lane-legend-pop {

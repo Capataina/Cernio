@@ -826,38 +826,50 @@ pub async fn decision(
 }
 
 fn decision_buttons(id: i64, current: Option<&str>, url: &str) -> Markup {
-    let active = |kind: &str| {
-        if current == Some(kind) {
-            "btn btn-active"
-        } else {
-            "btn"
-        }
+    // Each button: if it represents the current decision, render in its "active"
+    // tone — green (Applied), amber (Watching), red (Rejected) — with past-tense
+    // label. Otherwise render in the dormant tone with imperative label.
+    // The state IS the button colour + label; no trailing "current" text needed.
+    let apply_class = if current == Some("applied") {
+        "btn btn-applied"
+    } else {
+        "btn btn-apply"
     };
+    let apply_label = if current == Some("applied") { "Applied" } else { "Apply" };
+    let watch_class = if current == Some("watching") {
+        "btn btn-watching"
+    } else {
+        "btn"
+    };
+    let watch_label = if current == Some("watching") { "Watching" } else { "Watch" };
+    let reject_class = if current == Some("rejected") {
+        "btn btn-rejected"
+    } else {
+        "btn"
+    };
+    let reject_label = if current == Some("rejected") { "Rejected" } else { "Reject" };
     html! {
         div.decision-buttons {
-            a.btn.btn-apply href=(url) target="_blank"
+            a class=(apply_class) href=(url) target="_blank"
                 hx-post=(format!("/jobs/{id}/decision"))
                 hx-vals=(r#"{"decision":"applied"}"#)
                 hx-swap="outerHTML"
                 hx-target="closest .decision-buttons" {
-                "Apply"
+                (apply_label)
             }
-            button.(active("watching"))
+            button class=(watch_class)
                 hx-post=(format!("/jobs/{id}/decision"))
                 hx-vals=(r#"{"decision":"watching"}"#)
                 hx-swap="outerHTML"
                 hx-target="closest .decision-buttons" {
-                "Watch"
+                (watch_label)
             }
-            button.(active("rejected"))
+            button class=(reject_class)
                 hx-post=(format!("/jobs/{id}/decision"))
                 hx-vals=(r#"{"decision":"rejected"}"#)
                 hx-swap="outerHTML"
                 hx-target="closest .decision-buttons" {
-                "Reject"
-            }
-            @if let Some(d) = current {
-                span.decision-current { (d) }
+                (reject_label)
             }
         }
     }

@@ -111,56 +111,6 @@
   min-height: 0;
   overflow-y: auto;
 }
-.decision-row {
-  display: grid;
-  grid-template-columns: 48px 78px 64px 32px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  text-decoration: none;
-  border-bottom: 1px solid var(--bg-3);
-  transition: background var(--t-fast) var(--easing), transform var(--t-base) var(--easing);
-  color: var(--text-1);
-}
-.decision-row:hover {
-  background: var(--bg-2);
-  transform: translateX(2px);
-}
-.decision-row:last-child { border-bottom: none; }
-
-.decision-when {
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  font-variant-numeric: tabular-nums;
-}
-.decision-kind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 16px;
-  padding: 0 6px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  border: 1px solid currentColor;
-  border-radius: 2px;
-}
-.decision-kind[data-kind="applied"]   { color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
-.decision-kind[data-kind="watching"]  { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
-.decision-kind[data-kind="rejected"]  { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
-.decision-kind[data-kind="interview"] { color: var(--grade-ss); background: color-mix(in srgb, var(--grade-ss) 10%, transparent); }
-.decision-title {
-  color: var(--text-0);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.decision-co {
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
+/* decision-row + decision-kind + decision-title + decision-co primitives moved
+ * to components.css so /decisions (which loads decisions.css, not dashboard.css)
+ * gets them via the shared components bundle. */

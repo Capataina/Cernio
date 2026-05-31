@@ -69,38 +69,39 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                         (tab("/decisions", "Decisions", active == "decisions"))
                         (tab("/activity", "Activity", active == "activity"))
                     }
-                    div.lane-legend-topbar {
-                        span.lane-legend-trigger { "lanes" }
-                        div.lane-legend-pop {
-                            (lane_legend_inline(active))
+                    div.topbar-right {
+                        div.lane-legend-topbar {
+                            span.lane-legend-trigger { "lanes" }
+                            div.lane-legend-pop {
+                                (lane_legend_inline(active))
+                            }
                         }
-                    }
-                    div.preset-menu {
-                        button #preset-btn class="preset-btn" type="button" title="Saved searches" {
-                            "★ presets"
+                        div #ops-menu {
+                            button #ops-btn class="ops-btn" type="button" title="Pipeline operations" {
+                                span.ops-gear { "⚙" }
+                                span.ops-label { "ops" }
+                            }
+                            div #ops-panel class="ops-panel hidden" {
+                                header.ops-panel-head { "Pipeline operations" }
+                                div.ops-list {
+                                    (ops_item("clean", "Clean DB", "Archive stale jobs by tier (SS=28d → F=3d) and low-grade companies; prune expired archived rows."))
+                                    (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per click."))
+                                }
+                            }
                         }
-                        div #preset-panel class="preset-panel hidden" {}
-                    }
-                    div.status-strip {
-                        span.dot {}
-                        span.status-label { "localhost" }
+                        div.preset-menu {
+                            button #preset-btn class="preset-btn" type="button" title="Saved searches" {
+                                "★ presets"
+                            }
+                            div #preset-panel class="preset-panel hidden" {}
+                        }
+                        div.status-strip {
+                            span.dot {}
+                            span.status-label { "localhost" }
+                        }
                     }
                 }
                 main { (body) }
-                // Ops menu — floating top-right; opens a panel of pipeline operations.
-                div #ops-menu {
-                    button #ops-btn class="ops-btn" type="button" title="Pipeline operations" {
-                        span.ops-gear { "⚙" }
-                        span.ops-label { "ops" }
-                    }
-                    div #ops-panel class="ops-panel hidden" {
-                        header.ops-panel-head { "Pipeline operations" }
-                        div.ops-list {
-                            (ops_item("clean", "Clean DB", "Archive stale jobs by tier (SS=28d → F=3d) and low-grade companies; prune expired archived rows."))
-                            (ops_item("format", "Format text", "Normalise HTML descriptions and whitespace in fit assessments. Capped at 50 rows per click."))
-                        }
-                    }
-                }
                 // Side drawer — populated by /static/js/drawer.js via fetch.
                 div #detail-drawer-backdrop class="hidden" {}
                 aside #detail-drawer class="detail-drawer hidden" {

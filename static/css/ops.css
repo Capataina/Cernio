@@ -4,12 +4,10 @@
  */
 
 #ops-menu {
-    position: fixed;
-    /* Sit further right of the LOCALHOST status strip and lower so the topbar
-     * tabs / strip don't overlap the button. */
-    top: 9px;
-    right: 220px;
-    z-index: 200;
+    /* Sits inside .topbar-right (a flexbox child) — natural spacing, no
+     * magic-number right offsets. Was previously position:fixed top:9px
+     * right:220px which fought with the lane-legend trigger added later. */
+    position: relative;
     font-family: var(--font-mono);
 }
 
