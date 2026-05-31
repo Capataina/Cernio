@@ -78,3 +78,35 @@ pub fn all_lanes(lanes_json: Option<&str>) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .collect()
 }
+
+/// Build the CSS `background` value used by `.row-lane-accent` to encode a
+/// row's lane(s) as a left-edge colour stripe. Returns `None` when there are
+/// no lanes (caller skips rendering the accent element entirely).
+///
+/// The horizontal fade-out is applied via `mask-image` in CSS — this helper
+/// only emits the vertical-band colour structure:
+///
+/// - 1 lane  → solid colour
+/// - 2 lanes → two vertical bands at 0–50% / 50–100%
+/// - 3+      → equal bands across the height (clamped to first 4 for
+///   visual sanity; lane #5+ is hidden but the row's lane chip column still
+///   shows the full set).
+pub fn lane_accent_gradient(lanes_json: Option<&str>) -> Option<String> {
+    let lanes = all_lanes(lanes_json);
+    if lanes.is_empty() {
+        return None;
+    }
+    let take: Vec<&str> = lanes.iter().take(4).map(|s| s.as_str()).collect();
+    if take.len() == 1 {
+        // Solid colour — the horizontal fade is CSS-side via mask-image.
+        return Some(lane_hex(take[0]).to_string());
+    }
+    let n = take.len() as f32;
+    let mut stops: Vec<String> = Vec::with_capacity(take.len());
+    for (i, key) in take.iter().enumerate() {
+        let start = (i as f32 / n * 100.0).round() as i32;
+        let end = ((i as f32 + 1.0) / n * 100.0).round() as i32;
+        stops.push(format!("{} {start}% {end}%", lane_hex(key)));
+    }
+    Some(format!("linear-gradient(to bottom, {})", stops.join(", ")))
+}

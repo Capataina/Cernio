@@ -1,7 +1,12 @@
 //! Filtered-jobs table + per-row decision buttons.
+//!
+//! Markup is div+role-based (not `<table>`) so each row is a CSS-grid
+//! container that can host an absolutely-positioned lane accent stripe behind
+//! the cells. ARIA roles preserve table semantics for assistive tech.
 
 use maud::{html, Markup};
 
+use crate::data::lane::lane_accent_gradient;
 use crate::data::models::JobRow;
 use crate::web::templates::{grade_pill, lane_chip_for};
 
@@ -12,29 +17,29 @@ pub(super) fn render_table(jobs: &[JobRow]) -> Markup {
                 h2 { "Filtered jobs" }
                 span.panel-sub { (jobs.len()) " matching · sorted by grade" }
             }
-            table.job-table {
-                thead {
-                    tr {
-                        th.col-grade { "Grade" }
-                        th.col-lane  { "Lane" }
-                        th.col-title { "Title" }
-                        th.col-co    { "Company" }
-                        th.col-loc   { "Location" }
-                        th.col-actions { "" }
-                    }
+            div.row-grid.row-grid-jobs role="table" {
+                div.row-header role="row" {
+                    div.row-grade role="columnheader" { "Grade" }
+                    div.row-lane role="columnheader" { "Lane" }
+                    div.row-title role="columnheader" { "Title" }
+                    div.row-company role="columnheader" { "Company" }
+                    div.row-location role="columnheader" { "Location" }
+                    div.row-actions role="columnheader" { "" }
                 }
-                tbody {
-                    @for j in jobs {
-                        tr.job-row.row-clickable id=(format!("job-{}", j.id))
-                            data-detail=(format!("job-{}", j.id)) {
-                            td.col-grade { (grade_pill(j.grade.as_deref())) }
-                            td.col-lane  { (lane_chip_for(j.lanes.as_deref())) }
-                            td.col-title { div.job-title data-marquee="" { (j.title) } }
-                            td.col-co    { (j.company_name) }
-                            td.col-loc   { (j.location.as_deref().unwrap_or("—")) }
-                            td.col-actions {
-                                (decision_buttons(j.id, j.decision.as_deref(), &j.url))
-                            }
+                @for j in jobs {
+                    div.job-row.row-clickable role="row"
+                        id=(format!("job-{}", j.id))
+                        data-detail=(format!("job-{}", j.id)) {
+                        @if let Some(bg) = lane_accent_gradient(j.lanes.as_deref()) {
+                            div.row-lane-accent style=(format!("background: {bg};")) {}
+                        }
+                        div.row-grade    role="cell" { (grade_pill(j.grade.as_deref())) }
+                        div.row-lane     role="cell" { (lane_chip_for(j.lanes.as_deref())) }
+                        div.row-title    role="cell" { span.row-title-text data-marquee="" { (j.title) } }
+                        div.row-company  role="cell" { (j.company_name) }
+                        div.row-location role="cell" { (j.location.as_deref().unwrap_or("—")) }
+                        div.row-actions  role="cell" {
+                            (decision_buttons(j.id, j.decision.as_deref(), &j.url))
                         }
                     }
                 }

@@ -215,6 +215,24 @@ fn urlencode(s: &str) -> String {
 
 pub(super) fn render_axis(q: &JobsQuery, axis: &AxisDef) -> Markup {
     let active = axis_set(q, axis);
+
+    // Lane axis renders as the radial pie rather than a chip row.
+    if axis.key == "lane" {
+        let q_for_href = q;
+        let axis_copy = *axis;
+        let pie = crate::web::templates::lane_pie(
+            &active,
+            |k| toggle_href(q_for_href, &axis_copy, k),
+            "/jobs",
+        );
+        return html! {
+            div.filter-axis.filter-axis-lane {
+                span.filter-axis-label { (axis.label) }
+                (pie)
+            }
+        };
+    }
+
     match axis.kind {
         ChipKind::Segmented => {
             // Render as a segmented control rather than a flexbox of chips.

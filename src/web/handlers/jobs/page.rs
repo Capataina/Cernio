@@ -153,21 +153,58 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
         div.jobs-page {
             (lane_legend("jobs"))
 
-            // ── Chip strip filter ─────────────────────────────────────────
-            div.filter-strip {
-                @for axis in AXES.iter() {
-                    (render_axis(q, axis))
+            // ── Chip strip filter (collapsible) ───────────────────────────
+            @let summary_pairs: Vec<(&str, String)> = {
+                let mut out: Vec<(&str, String)> = Vec::new();
+                for axis in AXES.iter() {
+                    let s = axis_set(q, axis);
+                    // Skip default archive={active} from the summary.
+                    if axis.key == "archive" && s.len() == 1 && s.contains("active") { continue; }
+                    if s.is_empty() { continue; }
+                    let mut vs: Vec<&str> = s.iter().map(|x| x.as_str()).collect();
+                    vs.sort();
+                    out.push((axis.key, vs.join("+")));
                 }
-                div.filter-summary-row {
-                    div.filter-summary {
-                        span.filter-count { (kpi_total) }
-                        span.filter-count-total { " of " (total_universe) }
-                        span.filter-count-label {
-                            @if any_active { " filtered jobs" } @else { " jobs" }
+                if let Some(c) = q.company.as_deref() {
+                    if !c.trim().is_empty() { out.push(("company", c.trim().to_string())); }
+                }
+                out
+            };
+            div.filter-strip data-page="jobs" {
+                div.filter-strip-head {
+                    div.filter-strip-summary {
+                        @if summary_pairs.is_empty() {
+                            span.fss-axis { "all filters · " }
+                            span.fss-vals { "no axis active" }
                         }
+                        @for (k, v) in &summary_pairs {
+                            span.fss-axis { (k) ": " }
+                            span.fss-vals { (v) }
+                        }
+                        span.fss-sep { "·" }
+                        span.fss-count { (kpi_total) " of " (total_universe) " jobs" }
                     }
-                    @if any_active {
-                        a.filter-reset href="/jobs" { "reset all" }
+                    button.filter-strip-toggle type="button" aria-expanded="false" title="Toggle filters (f)" {
+                        span.filter-strip-chevron { "▼" }
+                        span { "filters" }
+                        span.filter-strip-toggle-key { "f" }
+                    }
+                }
+                div.filter-strip-body {
+                    @for axis in AXES.iter() {
+                        (render_axis(q, axis))
+                    }
+                    div.filter-summary-row {
+                        div.filter-summary {
+                            span.filter-count { (kpi_total) }
+                            span.filter-count-total { " of " (total_universe) }
+                            span.filter-count-label {
+                                @if any_active { " filtered jobs" } @else { " jobs" }
+                            }
+                        }
+                        @if any_active {
+                            a.filter-reset href="/jobs" { "reset all" }
+                        }
                     }
                 }
             }

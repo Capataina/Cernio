@@ -90,7 +90,7 @@ h3 { font-size: 12px; color: var(--text-2); }
 
 /* Tabular numbers across all data surfaces */
 .stat-value, .panel-sub, .role-company, .activity-time,
-.col-jobs, .col-ats, .col-loc, .col-grade, .col-lane,
+.row-jobs, .row-ats, .row-location, .row-grade, .row-lane,
 .grade-pill, .lane-chip, .hit-rate-pct, .hit-rate-total,
 .metric, .funnel-num, .funnel-pct, .ticker, .kpi-value,
 .bar-list-num, .top-list-num {

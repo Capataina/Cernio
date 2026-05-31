@@ -39,6 +39,93 @@
     opacity: 0.5;
 }
 
+/* ── Collapsible strip ───────────────────────────────────────────── */
+
+.filter-strip-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 26px;
+}
+.filter-strip-summary {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+}
+.filter-strip-summary .fss-axis {
+    color: var(--text-4);
+}
+.filter-strip-summary .fss-vals {
+    color: var(--text-1);
+    margin-right: 10px;
+}
+.filter-strip-summary .fss-sep {
+    color: var(--text-5);
+    margin: 0 6px;
+}
+.filter-strip-summary .fss-count {
+    color: var(--text-0);
+    font-weight: 600;
+    margin-left: auto;
+}
+.filter-strip-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    border-radius: 5px;
+    padding: 3px 9px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--t-fast) var(--easing);
+    flex: 0 0 auto;
+}
+.filter-strip-toggle:hover {
+    color: var(--text-0);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+.filter-strip-toggle-key {
+    color: var(--text-4);
+    font-size: 9px;
+    padding: 1px 4px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.filter-strip-body {
+    overflow: hidden;
+    /* Smooth-ish expand. Setting max-height because grid-rows transitions
+     * aren't broadly supported; this is generous enough for either page. */
+    max-height: 2400px;
+    transition: max-height var(--t-med) var(--easing),
+                opacity var(--t-fast) var(--easing),
+                margin var(--t-fast) var(--easing);
+    opacity: 1;
+    margin-top: 10px;
+}
+.filter-strip-collapsed .filter-strip-body {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    pointer-events: none;
+}
+.filter-strip-collapsed {
+    padding-bottom: 8px;
+}
+.filter-strip-collapsed .filter-strip-head {
+    min-height: 22px;
+}
+
 .filter-axis {
     display: grid;
     grid-template-columns: 80px 1fr;

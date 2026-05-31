@@ -1,0 +1,188 @@
+/* filters-pie.css — radial pie/petal lane filter
+ *
+ * Replaces the horizontal lane chip row inside the filter strip.
+ * Eight wedges (45° each), each its own clickable <a> with a clip-path
+ * cut out of a square. A circular centre disc sits on top as the master
+ * toggle (all on / all off). Wedge labels are 3-letter lane badges
+ * rendered radially so they read outward.
+ */
+
+.lane-pie-wrap {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.lane-pie {
+    position: relative;
+    width: 168px;
+    height: 168px;
+    flex: 0 0 auto;
+    /* subtle ambient ring so the pie sits in the strip rather than floating */
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
+}
+
+/* Each wedge is an <a> that fills the box; clip-path carves it into a slice.
+ * --wedge-color comes from inline style (lane hex).
+ * The clip-path polygon is server-emitted per wedge. */
+.lane-wedge {
+    position: absolute;
+    inset: 0;
+    text-decoration: none;
+    color: var(--text-0);
+    background: var(--wedge-color, var(--bg-3));
+    clip-path: var(--wedge-clip);
+    -webkit-clip-path: var(--wedge-clip);
+    opacity: 0.22;
+    filter: saturate(0.55) brightness(0.7);
+    transition: opacity var(--t-fast) var(--easing),
+                filter var(--t-fast) var(--easing),
+                transform var(--t-med) var(--easing);
+    transform-origin: 50% 50%;
+    /* Hairline gap between wedges for definition. */
+    box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,0.35);
+    will-change: transform, opacity;
+}
+
+.lane-wedge:hover {
+    opacity: 0.55;
+    filter: saturate(0.9) brightness(0.95);
+    transform: scale(1.04);
+    z-index: 2;
+}
+
+.lane-wedge[data-active="true"] {
+    opacity: 1;
+    filter: saturate(1.15) brightness(1.05);
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.18),
+        0 0 16px color-mix(in srgb, var(--wedge-color) 50%, transparent);
+}
+
+.lane-wedge[data-active="true"]:hover {
+    transform: scale(1.06);
+    filter: saturate(1.25) brightness(1.12);
+}
+
+/* Radial label — rendered as a separate span centred at the midpoint of
+ * the wedge. Positioned absolutely with --label-x / --label-y / --label-rot
+ * inline-set from server render. */
+.lane-wedge-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform:
+        translate(-50%, -50%)
+        translate(var(--label-x, 0), var(--label-y, 0))
+        rotate(var(--label-rot, 0deg));
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: rgba(255,255,255,0.92);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+    pointer-events: none;
+    user-select: none;
+    /* Labels sit above wedges. */
+    z-index: 3;
+}
+
+/* Hide labels on inactive wedges slightly to reduce noise. */
+.lane-wedge:not([data-active="true"]) .lane-wedge-label {
+    color: rgba(255,255,255,0.55);
+}
+
+/* ── Centre master toggle ──────────────────────────────────────── */
+
+.lane-pie-centre {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 52px;
+    height: 52px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    border: 1px solid var(--border-strong);
+    color: var(--text-1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    z-index: 4;
+    transition: all var(--t-fast) var(--easing);
+    text-decoration: none;
+    box-shadow:
+        0 4px 16px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.lane-pie-centre:hover {
+    color: var(--text-0);
+    border-color: var(--accent);
+    box-shadow:
+        0 4px 18px rgba(0,0,0,0.6),
+        0 0 12px var(--accent-glow),
+        inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.lane-pie-centre[data-state="all"]  { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, var(--border-strong)); }
+.lane-pie-centre[data-state="some"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong)); }
+.lane-pie-centre[data-state="none"] { color: var(--text-3); }
+
+/* ── Side legend column — compact list of active lanes ─────────── */
+
+.lane-pie-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-3);
+    line-height: 1.4;
+    max-width: 220px;
+}
+.lane-pie-legend-title {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-4);
+    margin-bottom: 2px;
+}
+.lane-pie-legend-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-2);
+}
+.lane-pie-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lane-color);
+    box-shadow: 0 0 6px var(--lane-color);
+    flex: 0 0 auto;
+}
+.lane-pie-legend-hint {
+    color: var(--text-4);
+    font-size: 9px;
+    margin-top: 4px;
+    letter-spacing: 0.06em;
+}
+
+/* When the Lane axis renders a pie, the row layout should let the pie
+ * breathe rather than being shoehorned into the narrow chip column. */
+.filter-axis.filter-axis-lane {
+    grid-template-columns: 80px 1fr;
+    align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lane-wedge { transition: none; }
+    .lane-wedge:hover { transform: none; }
+}

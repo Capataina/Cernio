@@ -1,79 +1,128 @@
-/* tables.css — shared data tables (.job-table, .company-table), col widths,
- * job-title, in-table link styles.
- * Split out from components.css 2026-05-31. No behaviour change.
+/* tables.css — shared row-grid primitives for the jobs + companies tables.
+ *
+ * Original `<table>` markup was replaced with `<div role="table">` + grid rows
+ * on 2026-05-31 so that each row can host a left-edge lane-colour accent
+ * stripe behind the cells. Column widths + typography live here; row-specific
+ * styling lives in rows.css.
+ *
+ * The grid templates below MUST stay in sync with the cell order emitted by:
+ *   - src/web/handlers/jobs/table.rs       (.row-grid-jobs)
+ *   - src/web/handlers/companies/table.rs  (.row-grid-companies)
  */
 
-/* ── Tables ─────────────────────────────────────────────────────── */
+/* ── Grid container ─────────────────────────────────────────────── */
 
-table.job-table,
-table.company-table {
-    width: 100%; border-collapse: collapse;
-    font-size: 12px; table-layout: auto;
+.row-grid {
+    width: 100%;
+    font-size: 12px;
 }
-table.job-table thead th,
-table.company-table thead th {
-    text-align: left;
+
+/* Jobs: grade(56) lane(78) title(1fr) company(220) location(160) actions(280) */
+.row-grid-jobs .row-header,
+.row-grid-jobs .job-row {
+    display: grid;
+    grid-template-columns: 56px 78px 1fr 220px 160px 280px;
+    align-items: center;
+    column-gap: 12px;
+}
+
+/* Companies: grade(56) lanes(90) name(1fr) status(90) jobs(70) ats(120) */
+.row-grid-companies .row-header,
+.row-grid-companies .company-row {
+    display: grid;
+    grid-template-columns: 56px 90px 1fr 90px 70px 120px;
+    align-items: center;
+    column-gap: 12px;
+}
+
+/* ── Header row ─────────────────────────────────────────────────── */
+
+.row-header {
     color: var(--text-3);
-    font-weight: 500; font-size: 10px;
-    text-transform: uppercase; letter-spacing: 0.12em;
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
     padding: 10px 12px;
     border-bottom: 1px solid var(--border-strong);
     background: var(--bg-2);
-    position: sticky; top: 46px;
+    position: sticky;
+    top: 46px;
     z-index: 2;
 }
-table.job-table tbody td,
-table.company-table tbody td {
-    padding: 9px 12px;
-    border-bottom: 1px solid var(--bg-3);
-    color: var(--text-1);
-    vertical-align: middle;
-    transition: background var(--t-fast) var(--easing);
+.row-header > * {
+    /* columnheader cells inherit the strip's typography. */
+    color: inherit;
 }
-table.job-table tbody tr,
-table.company-table tbody tr {
-    position: relative;
-    transition: background var(--t-fast) var(--easing);
-}
-table.job-table tbody tr:hover,
-table.company-table tbody tr:hover {
-    background: var(--bg-2);
-}
-table.job-table tbody tr:hover td:first-child::before,
-table.company-table tbody tr:hover td:first-child::before {
-    content: "";
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-}
-.col-grade  { width: 56px; }
-.col-lane   { width: 78px; }
-.col-co     { width: 220px; color: var(--text-2); }
-.col-status { width: 90px; }
-.col-jobs   { width: 70px; font-family: var(--font-mono); }
-.col-ats    { width: 120px; color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
-.col-loc    { width: 160px; color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
-.col-actions { width: 280px; text-align: right; }
-.job-title { color: var(--text-0); font-weight: 500; }
 
-/* Links inside data tables — match the theme instead of the browser default
- * underlined royal-blue that screams 'unstyled'. */
-table.job-table td a,
-table.company-table td a {
+/* ── Per-cell typography ────────────────────────────────────────── */
+
+.row-grade { font-variant-numeric: tabular-nums; }
+.row-lane  { font-variant-numeric: tabular-nums; }
+
+.row-title-text {
     color: var(--text-0);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    min-width: 0;
+}
+
+.row-company,
+.row-location {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.row-status { font-size: 11px; }
+
+.row-jobs {
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.row-ats {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.row-ats-empty { color: var(--text-4); }
+
+.row-actions {
+    text-align: right;
+    /* Lock width so Apply/Watch/Reject buttons don't reshuffle when their
+     * labels switch to past-tense ("Apply" → "Applied"). The three buttons
+     * are sized inside .decision-buttons; this column reserves their box. */
+    justify-self: end;
+}
+
+/* Links inside row cells — match the theme, not the browser default blue. */
+.row-title a,
+.row-company a {
+    color: inherit;
     text-decoration: none;
     border-bottom: 1px solid transparent;
     transition: color var(--t-fast) var(--easing),
                 border-color var(--t-fast) var(--easing);
 }
-table.job-table td a:hover,
-table.company-table td a:hover {
+.row-title a:hover,
+.row-company a:hover {
     color: var(--accent-2);
     border-bottom-color: var(--accent);
 }
-table.job-table td a:visited,
-table.company-table td a:visited {
-    color: var(--text-1);
+.row-title a:visited,
+.row-company a:visited {
+    color: var(--text-0);
 }

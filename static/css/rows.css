@@ -261,6 +261,62 @@
     font-size: 11px; text-align: right;
 }
 
+/* ── Jobs + Companies data rows (replaces old <table> markup) ────
+ *
+ * Grid layout is declared in tables.css (.row-grid-jobs / -companies). This
+ * block defines the visuals shared by every data row: hover lift, divider
+ * line, and the absolutely-positioned lane accent stripe.
+ *
+ * The accent is a wide (~150px) absolutely-positioned div whose background
+ * is set inline (solid colour or vertical band gradient from
+ * lane_accent_gradient()). The horizontal fade-out is applied here via
+ * mask-image so the accent fades into the row content area instead of
+ * crowding it. position:relative on the row anchors the accent.
+ */
+
+.job-row,
+.company-row {
+    position: relative;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--bg-3);
+    color: var(--text-1);
+    transition: background var(--t-fast) var(--easing),
+                transform var(--t-base) var(--easing);
+}
+.job-row:hover,
+.company-row:hover {
+    background: var(--bg-2);
+    transform: translateX(2px);
+}
+.job-row > *,
+.company-row > * {
+    /* Sit cells above the accent stripe. */
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+/* Left-edge lane stripe — width 150px so the colour cue extends across more
+ * than a hairline on the gutter, but masked with a left→right alpha fade so
+ * it dissolves before reaching the title column. */
+.row-lane-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 150px;
+    pointer-events: none;
+    opacity: 0.55;
+    z-index: 0;
+    -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 100%);
+            mask-image: linear-gradient(to right, #000 0%, transparent 100%);
+    transition: opacity var(--t-fast) var(--easing);
+}
+.job-row:hover .row-lane-accent,
+.company-row:hover .row-lane-accent {
+    opacity: 0.75;
+}
+
 /* ── Click-to-filter affordances ─────────────────────────────────────────
  * Row/cell wrappers that became <a> tags for cross-filter navigation:
  *   .row-clickable      — top-list rows, funnel rows

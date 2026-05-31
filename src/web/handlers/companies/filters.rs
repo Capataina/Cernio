@@ -280,6 +280,7 @@ pub(super) fn filter_companies(all: &[CompanyRow], q: &CompaniesQuery) -> Vec<Co
 
 #[derive(Clone, Copy)]
 pub(super) enum ChipKind {
+    #[allow(dead_code)] // retained for symmetry with jobs/filters.rs; lane axis now renders as pie
     Lane,
     Grade,
     Plain,
@@ -354,8 +355,6 @@ pub(super) fn render_axis(
 }
 
 pub(super) fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) -> Markup {
-    use crate::data::lane::{lane_label, LANE_KEYS};
-
     let any_active = !parse_csv(&q.lane).is_empty()
         || !parse_csv(&q.grade).is_empty()
         || !parse_csv(&q.status).is_empty()
@@ -364,31 +363,82 @@ pub(super) fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) ->
         || !parse_csv(&q.location).is_empty()
         || !parse_csv(&q.has_jobs).is_empty();
 
+    // Lane axis renders as the radial pie (companies version reuses the
+    // shared templates::lane_pie helper, with per-axis toggle URL builder).
+    let lane_active = parse_csv(&q.lane);
+    let q_for_pie = q.clone();
+    let lane_pie_markup = crate::web::templates::lane_pie(
+        &lane_active,
+        |k| toggle_qs(&q_for_pie, "lane", k),
+        "/companies",
+    );
+
+    // Compact one-line summary of active filters for the collapsed head bar.
+    let summary_pairs: Vec<(&str, Vec<String>)> = vec![
+        ("lane", parse_csv(&q.lane).into_iter().collect()),
+        ("grade", parse_csv(&q.grade).into_iter().collect()),
+        ("status", parse_csv(&q.status).into_iter().collect()),
+        ("ats", parse_csv(&q.ats).into_iter().collect()),
+        ("sponsor", parse_csv(&q.sponsor).into_iter().collect()),
+        ("location", parse_csv(&q.location).into_iter().collect()),
+        ("has_jobs", parse_csv(&q.has_jobs).into_iter().collect()),
+    ];
+    let mut summary_parts: Vec<(String, String)> = Vec::new();
+    for (k, mut vs) in summary_pairs {
+        if vs.is_empty() { continue; }
+        vs.sort();
+        summary_parts.push((k.to_string(), vs.join("+")));
+    }
+
     html! {
-        div.filter-strip {
-            (render_axis(q, "Lane", "lane", &LANE_KEYS, ChipKind::Lane, |v| lane_label(v).to_string()))
-            (render_axis(q, "Grade", "grade", &GRADE_CHIPS, ChipKind::Grade, |v| v.to_string()))
-            (render_axis(q, "Status", "status", &STATUS_CHIPS, ChipKind::Plain, |v| v.to_string()))
-            (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, ChipKind::Plain, |v| v.to_string()))
-            (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, ChipKind::SegmentedGood, |v| v.to_string()))
-            (render_axis(q, "Location", "location", &LOCATION_CHIPS, ChipKind::Plain, |v| {
-                match v {
-                    "london" => "London".into(),
-                    "uk_ex_london" => "UK ex-London".into(),
-                    "remote" => "Remote".into(),
-                    "intl" => "Intl".into(),
-                    _ => "Unknown".into(),
+        div.filter-strip data-page="companies" {
+            div.filter-strip-head {
+                div.filter-strip-summary {
+                    @if summary_parts.is_empty() {
+                        span.fss-axis { "all filters · " }
+                        span.fss-vals { "no axis active" }
+                    }
+                    @for (k, v) in &summary_parts {
+                        span.fss-axis { (k) ": " }
+                        span.fss-vals { (v) }
+                    }
+                    span.fss-sep { "·" }
+                    span.fss-count { (shown) " of " (total) " companies" }
                 }
-            }))
-            (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, ChipKind::Segmented, |v| v.to_string()))
-            div.filter-summary-row {
-                div.filter-summary {
-                    span.filter-count { (shown) }
-                    span.filter-count-total { " of " (total) }
-                    span.filter-count-label { @if any_active { " filtered companies" } @else { " companies" } }
+                button.filter-strip-toggle type="button" aria-expanded="false" title="Toggle filters (f)" {
+                    span.filter-strip-chevron { "▼" }
+                    span { "filters" }
+                    span.filter-strip-toggle-key { "f" }
                 }
-                @if any_active {
-                    a.filter-reset href="/companies" { "reset all" }
+            }
+            div.filter-strip-body {
+                div.filter-axis.filter-axis-lane {
+                    span.filter-axis-label { "Lane" }
+                    (lane_pie_markup)
+                }
+                (render_axis(q, "Grade", "grade", &GRADE_CHIPS, ChipKind::Grade, |v| v.to_string()))
+                (render_axis(q, "Status", "status", &STATUS_CHIPS, ChipKind::Plain, |v| v.to_string()))
+                (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, ChipKind::Plain, |v| v.to_string()))
+                (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, ChipKind::SegmentedGood, |v| v.to_string()))
+                (render_axis(q, "Location", "location", &LOCATION_CHIPS, ChipKind::Plain, |v| {
+                    match v {
+                        "london" => "London".into(),
+                        "uk_ex_london" => "UK ex-London".into(),
+                        "remote" => "Remote".into(),
+                        "intl" => "Intl".into(),
+                        _ => "Unknown".into(),
+                    }
+                }))
+                (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, ChipKind::Segmented, |v| v.to_string()))
+                div.filter-summary-row {
+                    div.filter-summary {
+                        span.filter-count { (shown) }
+                        span.filter-count-total { " of " (total) }
+                        span.filter-count-label { @if any_active { " filtered companies" } @else { " companies" } }
+                    }
+                    @if any_active {
+                        a.filter-reset href="/companies" { "reset all" }
+                    }
                 }
             }
         }

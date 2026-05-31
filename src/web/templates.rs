@@ -35,6 +35,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/tables.css";
                 link rel="stylesheet" href="/static/css/chrome.css";
                 link rel="stylesheet" href="/static/css/filters.css";
+                link rel="stylesheet" href="/static/css/filters-pie.css";
                 link rel="stylesheet" href="/static/css/debug.css";
                 link rel="stylesheet" href="/static/css/ops.css";
                 link rel="stylesheet" href="/static/css/drawer.css";
@@ -55,6 +56,8 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 script src="/static/js/drawer.js" defer {}
                 script src="/static/js/cmdk.js" defer {}
                 script src="/static/js/presets.js" defer {}
+                script src="/static/js/filters-toggle.js" defer {}
+                script src="/static/js/filters-pie.js" defer {}
                 // Page-specific JS (optional, deferred).
                 @if let Some(js) = assets.page_js {
                     script src=(js) defer {}
@@ -221,6 +224,100 @@ fn ops_item(op: &str, title: &str, desc: &str) -> Markup {
             div.ops-detail data-op-detail=(op) {}
             div.ops-actions {
                 button.ops-run type="button" data-op-run=(op) { "Run" }
+            }
+        }
+    }
+}
+
+/// Render the radial lane filter pie. The caller supplies:
+///   - `active`: the set of currently-active lane keys (use `is_active` from
+///     the page's filter module so URL semantics match the chip variant).
+///   - `toggle_href`: closure mapping `lane_key → URL` that toggles that lane.
+///
+/// The pie is server-rendered; JS only enhances (shift-click for "only this",
+/// centre-button for master toggle). Without JS the pie still works as eight
+/// independent toggle links plus a centre button that follows a static href.
+pub fn lane_pie(
+    active: &std::collections::HashSet<String>,
+    toggle_href: impl Fn(&str) -> String,
+    base_path: &str,
+) -> Markup {
+    use std::f64::consts::PI;
+
+    // Build polygon points for each wedge. The pie box is treated as a unit
+    // square (we use percentages for clip-path), centre = (50%, 50%), radius
+    // along the diagonal so wedges meet the bounding box rather than being
+    // clipped at a small inset circle.
+    let n = LANE_KEYS.len(); // 8
+    let step = 2.0 * PI / n as f64;
+    // Start at -PI/2 so the first wedge points "up".
+    let start_angle = -PI / 2.0;
+
+    fn polar_to_xy(angle: f64) -> (f64, f64) {
+        // Project from centre out far enough that the wedge fills the bounding
+        // box (radius √2/2 ≈ 0.707). We extend further (1.0) and rely on the
+        // bounding box to clip — produces clean edge meets between wedges.
+        let r = 1.0_f64;
+        let x = 50.0 + 50.0 * r * angle.cos();
+        let y = 50.0 + 50.0 * r * angle.sin();
+        // Clamp to [0,100] — outside values still clip cleanly but linting
+        // friendlier numbers help when debugging in DevTools.
+        (x.clamp(-10.0, 110.0), y.clamp(-10.0, 110.0))
+    }
+
+    html! {
+        div.lane-pie-wrap {
+            div.lane-pie {
+                @for (i, key) in LANE_KEYS.iter().enumerate() {
+                    @let a0 = start_angle + step * i as f64;
+                    @let a1 = start_angle + step * (i + 1) as f64;
+                    @let amid = (a0 + a1) / 2.0;
+
+                    // Polygon: centre + a0 endpoint + a few interpolated points + a1 endpoint.
+                    // 4 interior samples gives a clean arc-ish edge for 45° wedges.
+                    @let (x0, y0) = polar_to_xy(a0);
+                    @let (xa, ya) = polar_to_xy(a0 + (a1 - a0) * 0.33);
+                    @let (xb, yb) = polar_to_xy(a0 + (a1 - a0) * 0.66);
+                    @let (x1, y1) = polar_to_xy(a1);
+                    @let clip = format!(
+                        "polygon(50% 50%, {x0:.2}% {y0:.2}%, {xa:.2}% {ya:.2}%, {xb:.2}% {yb:.2}%, {x1:.2}% {y1:.2}%)"
+                    );
+
+                    // Label position: midpoint along the wedge bisector at ~62% radius.
+                    @let lx = 50.0 * 0.62 * amid.cos();
+                    @let ly = 50.0 * 0.62 * amid.sin();
+                    // Rotation: read outward from centre. amid is in radians where
+                    // 0 = right, PI/2 = down. Convert to degrees and add 90° so text
+                    // baseline points outward. Flip when on the left half so text
+                    // doesn't read upside-down.
+                    @let deg = amid.to_degrees();
+                    @let rot = if deg > 90.0 || deg < -90.0 { deg + 180.0 } else { deg };
+
+                    @let is_on = active.is_empty() || active.contains(*key);
+                    @let href = toggle_href(key);
+                    @let style = format!(
+                        "--wedge-color: {hex}; --wedge-clip: {clip}; --label-x: {lx:.2}px; --label-y: {ly:.2}px; --label-rot: {rot:.2}deg",
+                        hex = lane_hex(key),
+                    );
+
+                    a class="lane-wedge"
+                      href=(href)
+                      title=(lane_label(key))
+                      data-lane=(*key)
+                      data-active=(is_on)
+                      style=(style) {
+                        span.lane-wedge-label { (lane_badge(key)) }
+                    }
+                }
+
+                // Centre master toggle. Default href clears the lane filter
+                // (no-JS fallback = "show all lanes"). JS upgrades to toggle.
+                a class="lane-pie-centre"
+                  href=(base_path)
+                  data-state="all"
+                  title="Toggle all lanes (click) — server: clears lane filter" {
+                    span.lane-pie-centre-glyph { "○" }
+                }
             }
         }
     }
