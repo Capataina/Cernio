@@ -124,7 +124,7 @@
     });
     return {
       backgroundColor: theme.bg,
-      grid: { left: 110, right: 24, top: 32, bottom: 28, containLabel: false },
+      grid: { left: 8, right: 24, top: 32, bottom: 28, containLabel: true },
       tooltip: {
         ...theme.tooltip,
         trigger: 'axis',

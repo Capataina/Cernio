@@ -149,6 +149,8 @@ pub(super) fn axis_set(q: &JobsQuery, axis: &AxisDef) -> HashSet<String> {
 }
 
 /// Build the URL produced by toggling `value` in `axis` against the current query.
+/// Preserves the current `?view=...` (table/lanes toggle) and `?company=...`
+/// scope so clicking a filter chip doesn't silently revert either.
 fn toggle_href(q: &JobsQuery, axis: &AxisDef, value: &str) -> String {
     // Re-emit every axis; replace the one being toggled with the new CSV.
     let mut parts: Vec<(&str, String)> = Vec::new();
@@ -173,6 +175,19 @@ fn toggle_href(q: &JobsQuery, axis: &AxisDef, value: &str) -> String {
             let mut vals: Vec<&str> = new_set.iter().map(|s| s.as_str()).collect();
             vals.sort();
             parts.push((a.key, vals.join(",")));
+        }
+    }
+    // Preserve scoped-search company filter (not part of AXES).
+    if let Some(c) = q.company.as_deref() {
+        let t = c.trim();
+        if !t.is_empty() {
+            parts.push(("company", t.to_string()));
+        }
+    }
+    // Preserve view mode (table/lanes toggle) — table is default so skipped.
+    if let Some(v) = q.view.as_deref() {
+        if v == "lanes" {
+            parts.push(("view", v.to_string()));
         }
     }
     if parts.is_empty() {

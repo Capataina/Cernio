@@ -296,31 +296,36 @@
     min-width: 0;
 }
 
-/* Left-edge lane stripe — width 150px so the colour cue extends across more
- * than a hairline on the gutter, but masked with a left→right alpha fade so
- * it dissolves before reaching the title column. */
+/* Left-edge lane stripe — a wide, soft background wash that hints at the
+ * lane colour across the row's leftmost ~300px and dissolves before the
+ * title column. Sized + faded to read as a BACKGROUND tint, not as a halo
+ * around the leftmost badges (the earlier 150px / 0.55 opacity made the
+ * badges sit inside a saturated zone, making it look like the colour
+ * emitted from the grade pill rather than the row itself). */
 .row-lane-accent {
     position: absolute;
     /* Span the whole grid so this absolutely-positioned child does NOT
-     * consume an auto-placed grid track (which shifts the real row cells
-     * right by one column). Universal fix for grid-parented rows
-     * (.decision-list-row, .next-action-row, .job-row, .company-row).
-     * Position:absolute keeps the visual offset (left:0; width:150px). */
+     * consume an auto-placed grid track (which would shift the real row
+     * cells right by one column). Universal across grid-parented rows. */
     grid-area: 1 / 1 / -1 / -1;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 150px;
+    width: 320px;
     pointer-events: none;
-    opacity: 0.55;
+    /* Low opacity — this is a background wash. The mask-image fade also
+     * tapers the colour toward zero before reaching the title column. */
+    opacity: 0.28;
     z-index: 0;
-    -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 100%);
-            mask-image: linear-gradient(to right, #000 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%);
+            mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%);
     transition: opacity var(--t-fast) var(--easing);
 }
 .job-row:hover .row-lane-accent,
-.company-row:hover .row-lane-accent {
-    opacity: 0.75;
+.company-row:hover .row-lane-accent,
+.decision-list-row:hover .row-lane-accent,
+.next-action-row:hover .row-lane-accent {
+    opacity: 0.42;
 }
 
 /* ── Click-to-filter affordances ─────────────────────────────────────────
