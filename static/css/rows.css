@@ -298,31 +298,17 @@
     transform: none;
 }
 
-/* Thin accent strip at the very LEFT BORDER edge of the row on hover.
- * left: -12px (or -16px for decision rows) cancels the row's horizontal
- * padding so the strip reaches the actual row boundary, not the grade
- * pill's inside edge. */
+/* Thin accent strip on hover, spanning the FULL row height (top:0 bottom:0
+ * with no grid-area — abs children of grid containers default to the
+ * padding-box as containing block per spec, so top/bottom/left = the row's
+ * actual padding-box edges, including the 9px top/bottom padding). */
 .job-row::before,
-.company-row::before {
-    content: "";
-    position: absolute;
-    grid-area: 1 / 1 / -1 / -1;
-    left: -12px;
-    top: 0;
-    bottom: 0;
-    width: 0;
-    background: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
-    transition: width var(--t-fast) var(--easing);
-    pointer-events: none;
-    z-index: 3;
-}
+.company-row::before,
 .decision-list-row::before,
 .next-action-row::before {
     content: "";
     position: absolute;
-    grid-area: 1 / 1 / -1 / -1;
-    left: -16px;
+    left: 0;
     top: 0;
     bottom: 0;
     width: 0;
@@ -352,34 +338,20 @@
  * around the leftmost badges (the earlier 150px / 0.55 opacity made the
  * badges sit inside a saturated zone, making it look like the colour
  * emitted from the grade pill rather than the row itself). */
-/* Ambient lane glow — soft LED-style accent positioned at the row's
- * actual left BORDER edge (not the inside-padding edge). Heavy blur for
- * diffuse falloff so it reads as ambient light, not as a stripe.
- * grid-area span prevents grid-track consumption; left:-12 / -16
- * cancels each row's horizontal padding to reach the true left edge. */
-.job-row > .row-lane-accent,
-.company-row > .row-lane-accent {
+/* Ambient lane glow — soft LED-style accent at the row's left BORDER edge.
+ * Fixed height (28px ellipse, vertically centered) so jobs + companies +
+ * decisions all render the same-shaped halo regardless of row height
+ * differences (jobs has the Apply/Watch/Reject button column making rows
+ * taller than companies). No grid-area — abs children of grid containers
+ * default to padding-box containing block per spec, so left:0 = the row's
+ * actual border-left edge. */
+.row-lane-accent {
     position: absolute;
-    grid-area: 1 / 1 / -1 / -1;
-    left: -12px;
-    top: 4px;
-    bottom: 4px;
+    left: 0;
+    top: 50%;
     width: 140px;
-    pointer-events: none;
-    opacity: 0.32;
-    filter: blur(28px);
-    border-radius: 50%;
-    z-index: 0;
-    transition: opacity var(--t-fast) var(--easing);
-}
-.decision-list-row > .row-lane-accent,
-.next-action-row > .row-lane-accent {
-    position: absolute;
-    grid-area: 1 / 1 / -1 / -1;
-    left: -16px;
-    top: 4px;
-    bottom: 4px;
-    width: 140px;
+    height: 28px;
+    transform: translateY(-50%);
     pointer-events: none;
     opacity: 0.32;
     filter: blur(28px);
