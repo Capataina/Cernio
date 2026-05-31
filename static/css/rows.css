@@ -305,27 +305,31 @@
 .row-lane-accent {
     position: absolute;
     /* Span the whole grid so this absolutely-positioned child does NOT
-     * consume an auto-placed grid track (which would shift the real row
-     * cells right by one column). Universal across grid-parented rows. */
+     * consume an auto-placed grid track. Universal across grid-parented rows. */
     grid-area: 1 / 1 / -1 / -1;
+    /* FULL row width (left:0 right:0, width:auto) — not a 320px left strip.
+     * Previous 320px width clustered the colour around the leftmost badges,
+     * making it look like the lane colour "emitted from the grade pill"
+     * rather than tinting the whole row entry. Now it's a uniform row-wide
+     * background wash that fades only in the last ~20% of width. */
     left: 0;
+    right: 0;
     top: 0;
     bottom: 0;
-    width: 320px;
+    width: auto;
     pointer-events: none;
-    /* Low opacity — this is a background wash. The mask-image fade also
-     * tapers the colour toward zero before reaching the title column. */
-    opacity: 0.28;
+    /* Lower opacity since it now covers more area. */
+    opacity: 0.14;
     z-index: 0;
-    -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%);
-            mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.45) 82%, transparent 100%);
+            mask-image: linear-gradient(to right, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.45) 82%, transparent 100%);
     transition: opacity var(--t-fast) var(--easing);
 }
 .job-row:hover .row-lane-accent,
 .company-row:hover .row-lane-accent,
 .decision-list-row:hover .row-lane-accent,
 .next-action-row:hover .row-lane-accent {
-    opacity: 0.42;
+    opacity: 0.22;
 }
 
 /* ── Click-to-filter affordances ─────────────────────────────────────────

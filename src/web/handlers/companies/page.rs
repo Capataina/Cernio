@@ -10,6 +10,7 @@ use crate::web::AppState;
 
 use super::charts;
 use super::filters::{filter_companies, grade_color, render_filter_strip};
+use super::lanes_view::render_lanes_view;
 use super::table::render_table;
 
 pub use super::filters::CompaniesQuery;
@@ -242,8 +243,14 @@ async fn render(state: &AppState, q: &CompaniesQuery) -> Markup {
                 }
             }
 
-            // Filterable companies table
-            (render_table(&companies, total_unfiltered))
+            // Filterable companies list.
+            // ?view=lanes swaps the table for an 8-column lane-grouped grid;
+            // any other value (or absent) renders the default table.
+            @if matches!(q.view.as_deref(), Some("lanes")) {
+                (render_lanes_view(&companies))
+            } @else {
+                (render_table(&companies, total_unfiltered))
+            }
         }
     }
 }

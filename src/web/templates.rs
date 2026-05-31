@@ -34,6 +34,7 @@ pub fn page_with(title: &str, active: &str, assets: PageAssets, body: Markup) ->
                 link rel="stylesheet" href="/static/css/rows.css";
                 link rel="stylesheet" href="/static/css/tables.css";
                 link rel="stylesheet" href="/static/css/jobs-lanes.css";
+                link rel="stylesheet" href="/static/css/companies-lanes.css";
                 link rel="stylesheet" href="/static/css/chrome.css";
                 link rel="stylesheet" href="/static/css/filters.css";
                 link rel="stylesheet" href="/static/css/filters-pie.css";

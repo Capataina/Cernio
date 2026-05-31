@@ -89,6 +89,12 @@ pub struct CompaniesQuery {
     pub location: Option<String>,
     /// "yes" or "no"
     pub has_jobs: Option<String>,
+    /// Presentation mode for the filtered companies list. `Some("lanes")`
+    /// swaps the table for the 8-column lane-grouped grid; any other value
+    /// (including `None` / `Some("table")`) renders the default table. Not
+    /// part of the filter axes — it only controls rendering, not which
+    /// companies are included.
+    pub view: Option<String>,
     /// Back-compat; ignored.
     #[serde(default)]
     #[allow(dead_code)]
@@ -178,6 +184,44 @@ pub(super) fn toggle_qs(q: &CompaniesQuery, axis: &str, value: &str) -> String {
         let mut v: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
         v.sort();
         parts.push(format!("{}={}", name, v.join(",")));
+    }
+    // Preserve view mode (table/lanes toggle) — table is default so skipped.
+    if let Some(v) = q.view.as_deref() {
+        if v == "lanes" {
+            parts.push("view=lanes".to_string());
+        }
+    }
+    if parts.is_empty() {
+        "/companies".to_string()
+    } else {
+        format!("/companies?{}", parts.join("&"))
+    }
+}
+
+/// Build a URL that preserves the current filter state and only sets
+/// `view=<mode>`. Used by the table/lanes view toggle. `mode == "table"` is
+/// the default and is stripped from the URL to keep links clean.
+pub(super) fn view_href(q: &CompaniesQuery, mode: &str) -> String {
+    let axes: Vec<(&str, HashSet<String>)> = vec![
+        ("lane", parse_csv(&q.lane)),
+        ("grade", parse_csv(&q.grade)),
+        ("status", parse_csv(&q.status)),
+        ("ats", parse_csv(&q.ats)),
+        ("sponsor", parse_csv(&q.sponsor)),
+        ("location", parse_csv(&q.location)),
+        ("has_jobs", parse_csv(&q.has_jobs)),
+    ];
+    let mut parts: Vec<String> = Vec::new();
+    for (name, set) in &axes {
+        if set.is_empty() {
+            continue;
+        }
+        let mut v: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
+        v.sort();
+        parts.push(format!("{}={}", name, v.join(",")));
+    }
+    if mode != "table" {
+        parts.push(format!("view={mode}"));
     }
     if parts.is_empty() {
         "/companies".to_string()
@@ -415,9 +459,19 @@ pub(super) fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) ->
         summary_parts.push((k.to_string(), vs.join("+")));
     }
 
+    let is_lanes_view = matches!(q.view.as_deref(), Some("lanes"));
+
     html! {
         div.filter-strip data-page="companies" {
             div.filter-strip-head {
+                div.view-toggle.seg-group title="Switch between table and lane-column layout" {
+                    a class="seg" href=(view_href(q, "table")) data-active=(!is_lanes_view) {
+                        span.view-toggle-glyph { "⊞" } " Table"
+                    }
+                    a class="seg" href=(view_href(q, "lanes")) data-active=(is_lanes_view) {
+                        span.view-toggle-glyph { "▦" } " Lanes"
+                    }
+                }
                 div.filter-strip-summary {
                     @if summary_parts.is_empty() {
                         span.fss-axis { "all filters · " }

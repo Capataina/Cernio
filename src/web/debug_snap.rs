@@ -43,6 +43,7 @@ const PAGES: &[(&str, &str)] = &[
     ("jobs-filtered", "/jobs?lane=hft"),
     ("companies-filtered", "/companies?lane=hft"),
     ("jobs-lanes", "/jobs?view=lanes"),
+    ("companies-lanes", "/companies?view=lanes"),
     ("decisions", "/decisions"),
     ("activity", "/activity"),
 ];

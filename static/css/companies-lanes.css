@@ -1,0 +1,62 @@
+/* Companies lane-columned view (/companies?view=lanes).
+ *
+ * Reuses the column grid, card chrome, and view-toggle styling from
+ * jobs-lanes.css — those rules are generic enough to cover both surfaces.
+ * This file only adds the company-specific bits: the status pill (resolved /
+ * bespoke / potential) and a small meta layout that pairs the jobs count
+ * with the ATS provider monospace tag.
+ */
+
+.lane-card-jobs {
+    color: var(--text-2);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+.lane-card-ats {
+    color: var(--text-3);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Status pill ──────────────────────────────────────────────────────────
+ * Compact three-state indicator on the card head row. Uses the same visual
+ * weight as the grade pill so they sit side-by-side cleanly.
+ */
+.co-status-pill {
+    flex: 0 0 auto;
+    font-size: 9px;
+    line-height: 1.4;
+    padding: 1px 5px;
+    border-radius: 2px;
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--text-3);
+}
+
+.co-status-pill.co-status-resolved {
+    border-color: color-mix(in srgb, #4ade80 60%, transparent);
+    background: color-mix(in srgb, #4ade80 14%, transparent);
+    color: #4ade80;
+}
+
+.co-status-pill.co-status-bespoke {
+    border-color: color-mix(in srgb, #ffc94a 60%, transparent);
+    background: color-mix(in srgb, #ffc94a 14%, transparent);
+    color: #ffc94a;
+}
+
+.co-status-pill.co-status-potential {
+    border-color: color-mix(in srgb, #aab3bf 60%, transparent);
+    background: color-mix(in srgb, #aab3bf 14%, transparent);
+    color: var(--text-2);
+}
