@@ -282,6 +282,7 @@ pub(super) fn filter_companies(all: &[CompanyRow], q: &CompaniesQuery) -> Vec<Co
 pub(super) enum ChipKind {
     #[allow(dead_code)] // retained for symmetry with jobs/filters.rs; lane axis now renders as pie
     Lane,
+    #[allow(dead_code)] // grade axis now renders as the tier ladder, not a chip row
     Grade,
     Plain,
     Segmented,
@@ -307,6 +308,30 @@ pub(super) fn chip_classes_style(kind: ChipKind, val: &str, active: bool) -> (St
         }
         ChipKind::Plain => (format!("{base} chip-plain"), String::new()),
         ChipKind::Segmented | ChipKind::SegmentedGood => (base.to_string(), String::new()),
+    }
+}
+
+/// Render the GRADE axis for companies as a tier-band ladder. Companies has
+/// no SS/F tiers — just S/A/B/C and ungraded ('?').
+pub(super) fn render_grade_ladder(q: &CompaniesQuery) -> Markup {
+    html! {
+        div.filter-axis {
+            span.filter-axis-label { "Grade" }
+            div.grade-ladder {
+                @for v in GRADE_CHIPS.iter() {
+                    @let active = is_active(q, "grade", v);
+                    @let href = toggle_qs(q, "grade", v);
+                    @let (cell_class, disp): (&str, &str) = match *v {
+                        "S" => ("grade-ladder-cell grade-ladder-s", "S"),
+                        "A" => ("grade-ladder-cell grade-ladder-a", "A"),
+                        "B" => ("grade-ladder-cell grade-ladder-b", "B"),
+                        "C" => ("grade-ladder-cell grade-ladder-c", "C"),
+                        _   => ("grade-ladder-cell grade-ladder-ungraded", "ungraded"),
+                    };
+                    a class=(cell_class) href=(href) data-active=(active) { (disp) }
+                }
+            }
+        }
     }
 }
 
@@ -412,32 +437,38 @@ pub(super) fn render_filter_strip(q: &CompaniesQuery, shown: i64, total: i64) ->
                 }
             }
             div.filter-strip-body {
-                div.filter-axis.filter-axis-lane {
-                    span.filter-axis-label { "Lane" }
-                    (lane_pie_markup)
-                }
-                (render_axis(q, "Grade", "grade", &GRADE_CHIPS, ChipKind::Grade, |v| v.to_string()))
-                (render_axis(q, "Status", "status", &STATUS_CHIPS, ChipKind::Plain, |v| v.to_string()))
-                (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, ChipKind::Plain, |v| v.to_string()))
-                (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, ChipKind::SegmentedGood, |v| v.to_string()))
-                (render_axis(q, "Location", "location", &LOCATION_CHIPS, ChipKind::Plain, |v| {
-                    match v {
-                        "london" => "London".into(),
-                        "uk_ex_london" => "UK ex-London".into(),
-                        "remote" => "Remote".into(),
-                        "intl" => "Intl".into(),
-                        _ => "Unknown".into(),
+                div.filter-body-grid {
+                    // Left column — the lane pie (hero filter).
+                    div.filter-pie-col {
+                        (lane_pie_markup)
                     }
-                }))
-                (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, ChipKind::Segmented, |v| v.to_string()))
-                div.filter-summary-row {
-                    div.filter-summary {
-                        span.filter-count { (shown) }
-                        span.filter-count-total { " of " (total) }
-                        span.filter-count-label { @if any_active { " filtered companies" } @else { " companies" } }
-                    }
-                    @if any_active {
-                        a.filter-reset href="/companies" { "reset all" }
+                    // Right column — every other axis stacked, with the
+                    // summary/reset row pinned to the bottom.
+                    div.filter-axes-col {
+                        (render_grade_ladder(q))
+                        (render_axis(q, "Status", "status", &STATUS_CHIPS, ChipKind::Plain, |v| v.to_string()))
+                        (render_axis(q, "ATS", "ats", &ATS_FILTER_CHIPS, ChipKind::Plain, |v| v.to_string()))
+                        (render_axis(q, "Sponsor", "sponsor", &SPONSOR_CHIPS, ChipKind::SegmentedGood, |v| v.to_string()))
+                        (render_axis(q, "Location", "location", &LOCATION_CHIPS, ChipKind::Plain, |v| {
+                            match v {
+                                "london" => "London".into(),
+                                "uk_ex_london" => "UK ex-London".into(),
+                                "remote" => "Remote".into(),
+                                "intl" => "Intl".into(),
+                                _ => "Unknown".into(),
+                            }
+                        }))
+                        (render_axis(q, "Has jobs", "has_jobs", &HAS_JOBS_CHIPS, ChipKind::Segmented, |v| v.to_string()))
+                        div.filter-summary-row {
+                            div.filter-summary {
+                                span.filter-count { (shown) }
+                                span.filter-count-total { " of " (total) }
+                                span.filter-count-label { @if any_active { " filtered companies" } @else { " companies" } }
+                            }
+                            @if any_active {
+                                a.filter-reset href="/companies" { "reset all" }
+                            }
+                        }
                     }
                 }
             }

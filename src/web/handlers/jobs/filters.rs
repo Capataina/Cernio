@@ -263,6 +263,19 @@ fn urlencode(s: &str) -> String {
         .collect()
 }
 
+/// Render the lane pie standalone (without the row-wrapper). Used by the
+/// two-column filter-strip layout where the pie sits in its own left column.
+pub(super) fn render_lane_pie(q: &JobsQuery) -> Markup {
+    let axis = &AXES[0]; // lane is the first axis
+    let active = axis_set(q, axis);
+    let axis_copy = *axis;
+    crate::web::templates::lane_pie(
+        &active,
+        |k| toggle_href(q, &axis_copy, k),
+        "/jobs",
+    )
+}
+
 pub(super) fn render_axis(q: &JobsQuery, axis: &AxisDef) -> Markup {
     let active = axis_set(q, axis);
 
@@ -279,6 +292,52 @@ pub(super) fn render_axis(q: &JobsQuery, axis: &AxisDef) -> Markup {
             div.filter-axis.filter-axis-lane {
                 span.filter-axis-label { (axis.label) }
                 (pie)
+            }
+        };
+    }
+
+    // Grade axis renders as a tier-band ladder.
+    if axis.key == "grade" {
+        return html! {
+            div.filter-axis {
+                span.filter-axis-label { (axis.label) }
+                div.grade-ladder {
+                    @for (val, disp) in axis.chips.iter() {
+                        @let is_active = active.contains(*val);
+                        @let href = toggle_href(q, axis, val);
+                        @let cell_class = match *val {
+                            "SS" => "grade-ladder-cell grade-ladder-ss",
+                            "S"  => "grade-ladder-cell grade-ladder-s",
+                            "A"  => "grade-ladder-cell grade-ladder-a",
+                            "B"  => "grade-ladder-cell grade-ladder-b",
+                            "C"  => "grade-ladder-cell grade-ladder-c",
+                            "F"  => "grade-ladder-cell grade-ladder-f",
+                            _    => "grade-ladder-cell grade-ladder-ungraded",
+                        };
+                        a class=(cell_class) href=(href) data-active=(is_active) {
+                            (disp)
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    // Posted axis renders as a fresher→older timeline strip.
+    if axis.key == "posted" {
+        return html! {
+            div.filter-axis {
+                span.filter-axis-label { (axis.label) }
+                div.posted-strip {
+                    @for (val, disp) in axis.chips.iter() {
+                        @let is_active = active.contains(*val);
+                        @let href = toggle_href(q, axis, val);
+                        @let cell_class = format!("posted-strip-cell posted-strip-{val}");
+                        a class=(cell_class) href=(href) data-active=(is_active) {
+                            (disp)
+                        }
+                    }
+                }
             }
         };
     }

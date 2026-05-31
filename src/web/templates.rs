@@ -230,14 +230,22 @@ fn ops_item(op: &str, title: &str, desc: &str) -> Markup {
     }
 }
 
-/// Render the radial lane filter pie. The caller supplies:
-///   - `active`: the set of currently-active lane keys (use `is_active` from
-///     the page's filter module so URL semantics match the chip variant).
+/// Render the radial lane filter pie as SVG. The caller supplies:
+///   - `active`: the set of currently-active lane keys.
 ///   - `toggle_href`: closure mapping `lane_key → URL` that toggles that lane.
+///   - `base_path`: page base URL the centre master-toggle navigates to when
+///     clearing the lane filter without JS.
 ///
-/// The pie is server-rendered; JS only enhances (shift-click for "only this",
-/// centre-button for master toggle). Without JS the pie still works as eight
-/// independent toggle links plus a centre button that follows a static href.
+/// The pie is server-rendered as eight `<path>` wedges around a circular
+/// outline, with a small angular gap between wedges (~2px visual) achieved by
+/// shrinking each wedge's sweep by `GAP_RAD` radians on each side. The wedge
+/// outer perimeter is a true arc (SVG `A` command), so the silhouette is a
+/// proper circle rather than a polygon. Wedge fill, hover lift, and label
+/// rotation are driven by CSS using inline-set custom properties.
+///
+/// JS enhances: shift-click on a wedge = "only this lane"; centre = master
+/// toggle. Without JS the pie still works (each wedge is an anchor, centre
+/// clears the filter).
 pub fn lane_pie(
     active: &std::collections::HashSet<String>,
     toggle_href: impl Fn(&str) -> String,
@@ -245,74 +253,113 @@ pub fn lane_pie(
 ) -> Markup {
     use std::f64::consts::PI;
 
-    // Build polygon points for each wedge. The pie box is treated as a unit
-    // square (we use percentages for clip-path), centre = (50%, 50%), radius
-    // along the diagonal so wedges meet the bounding box rather than being
-    // clipped at a small inset circle.
+    // SVG viewBox is 0 0 240 240 — gives a logical 240px coord system that
+    // CSS can scale freely without losing arc fidelity.
+    const VB: f64 = 240.0;
+    const CX: f64 = VB / 2.0;
+    const CY: f64 = VB / 2.0;
+    // Outer radius leaves a hair of room for the hover-lift transform so the
+    // expanded wedge doesn't clip the viewBox.
+    const R_OUTER: f64 = 110.0;
+    // Inner radius cuts a hole for the centre master-toggle button (rendered
+    // as a separate HTML element absolutely positioned over the SVG).
+    const R_INNER: f64 = 34.0;
+    // Angular gap between wedges, in radians. ~0.018 rad ≈ 1° ≈ 2px at r=110.
+    const GAP_RAD: f64 = 0.022;
+    // Label sits at 70% of the way from inner to outer radius.
+    const R_LABEL_FRAC: f64 = 0.62;
+
     let n = LANE_KEYS.len(); // 8
     let step = 2.0 * PI / n as f64;
     // Start at -PI/2 so the first wedge points "up".
     let start_angle = -PI / 2.0;
 
-    fn polar_to_xy(angle: f64) -> (f64, f64) {
-        // Project from centre out far enough that the wedge fills the bounding
-        // box (radius √2/2 ≈ 0.707). We extend further (1.0) and rely on the
-        // bounding box to clip — produces clean edge meets between wedges.
-        let r = 1.0_f64;
-        let x = 50.0 + 50.0 * r * angle.cos();
-        let y = 50.0 + 50.0 * r * angle.sin();
-        // Clamp to [0,100] — outside values still clip cleanly but linting
-        // friendlier numbers help when debugging in DevTools.
-        (x.clamp(-10.0, 110.0), y.clamp(-10.0, 110.0))
+    /// Build an SVG path string for a donut-segment wedge between angles
+    /// `a0`..`a1`, with inner radius `ri` and outer radius `ro`. Renders
+    /// outer edge as a true arc.
+    fn wedge_path(a0: f64, a1: f64, ri: f64, ro: f64) -> String {
+        let (sin0, cos0) = (a0.sin(), a0.cos());
+        let (sin1, cos1) = (a1.sin(), a1.cos());
+        let p0_x = CX + ro * cos0;
+        let p0_y = CY + ro * sin0;
+        let p1_x = CX + ro * cos1;
+        let p1_y = CY + ro * sin1;
+        let p2_x = CX + ri * cos1;
+        let p2_y = CY + ri * sin1;
+        let p3_x = CX + ri * cos0;
+        let p3_y = CY + ri * sin0;
+        let large_arc = if (a1 - a0) > PI { 1 } else { 0 };
+        format!(
+            "M {p0_x:.3} {p0_y:.3} \
+             A {ro:.3} {ro:.3} 0 {large_arc} 1 {p1_x:.3} {p1_y:.3} \
+             L {p2_x:.3} {p2_y:.3} \
+             A {ri:.3} {ri:.3} 0 {large_arc} 0 {p3_x:.3} {p3_y:.3} \
+             Z"
+        )
     }
+
+    let vb = format!("0 0 {VB} {VB}");
 
     html! {
         div.lane-pie-wrap {
             div.lane-pie {
-                @for (i, key) in LANE_KEYS.iter().enumerate() {
-                    @let a0 = start_angle + step * i as f64;
-                    @let a1 = start_angle + step * (i + 1) as f64;
-                    @let amid = (a0 + a1) / 2.0;
+                svg.lane-pie-svg viewBox=(vb) preserveAspectRatio="xMidYMid meet"
+                    role="img" aria-label="Lane filter" {
+                    @for (i, key) in LANE_KEYS.iter().enumerate() {
+                        @let a0_raw = start_angle + step * i as f64;
+                        @let a1_raw = start_angle + step * (i + 1) as f64;
+                        // Shrink the sweep by GAP_RAD/2 on each side to draw
+                        // a clean gap between wedges. The gap is the strip
+                        // background showing through, not a stroke.
+                        @let a0 = a0_raw + GAP_RAD / 2.0;
+                        @let a1 = a1_raw - GAP_RAD / 2.0;
+                        @let amid = (a0_raw + a1_raw) / 2.0;
+                        @let d = wedge_path(a0, a1, R_INNER, R_OUTER);
 
-                    // Polygon: centre + a0 endpoint + a few interpolated points + a1 endpoint.
-                    // 4 interior samples gives a clean arc-ish edge for 45° wedges.
-                    @let (x0, y0) = polar_to_xy(a0);
-                    @let (xa, ya) = polar_to_xy(a0 + (a1 - a0) * 0.33);
-                    @let (xb, yb) = polar_to_xy(a0 + (a1 - a0) * 0.66);
-                    @let (x1, y1) = polar_to_xy(a1);
-                    @let clip = format!(
-                        "polygon(50% 50%, {x0:.2}% {y0:.2}%, {xa:.2}% {ya:.2}%, {xb:.2}% {yb:.2}%, {x1:.2}% {y1:.2}%)"
-                    );
+                        // Label position — polar centre of the wedge at
+                        // R_LABEL_FRAC between inner and outer.
+                        @let r_label = R_INNER + (R_OUTER - R_INNER) * R_LABEL_FRAC;
+                        @let lx = CX + r_label * amid.cos();
+                        @let ly = CY + r_label * amid.sin();
+                        // Outward-reading rotation, auto-flipped on the left
+                        // half so the badge never reads upside-down.
+                        @let deg = amid.to_degrees();
+                        @let rot = if deg > 90.0 || deg < -90.0 { deg + 180.0 } else { deg };
 
-                    // Label position: midpoint along the wedge bisector at ~62% radius.
-                    @let lx = 50.0 * 0.62 * amid.cos();
-                    @let ly = 50.0 * 0.62 * amid.sin();
-                    // Rotation: read outward from centre. amid is in radians where
-                    // 0 = right, PI/2 = down. Convert to degrees and add 90° so text
-                    // baseline points outward. Flip when on the left half so text
-                    // doesn't read upside-down.
-                    @let deg = amid.to_degrees();
-                    @let rot = if deg > 90.0 || deg < -90.0 { deg + 180.0 } else { deg };
+                        // Hover-lift unit vector (in viewBox units). Wedges
+                        // translate ~4 units outward on hover — animated by CSS.
+                        @let dx = amid.cos();
+                        @let dy = amid.sin();
 
-                    @let is_on = active.is_empty() || active.contains(*key);
-                    @let href = toggle_href(key);
-                    @let style = format!(
-                        "--wedge-color: {hex}; --wedge-clip: {clip}; --label-x: {lx:.2}px; --label-y: {ly:.2}px; --label-rot: {rot:.2}deg",
-                        hex = lane_hex(key),
-                    );
+                        @let is_on = active.is_empty() || active.contains(*key);
+                        @let href = toggle_href(key);
+                        @let group_style = format!(
+                            "--wedge-color: {hex}; --lift-dx: {dx:.4}; --lift-dy: {dy:.4};",
+                            hex = lane_hex(key),
+                        );
 
-                    a class="lane-wedge"
-                      href=(href)
-                      title=(lane_label(key))
-                      data-lane=(*key)
-                      data-active=(is_on)
-                      style=(style) {
-                        span.lane-wedge-label { (lane_badge(key)) }
+                        a class="lane-wedge"
+                          href=(href)
+                          data-lane=(*key)
+                          data-active=(is_on)
+                          style=(group_style) {
+                            // <title> gives a native SVG tooltip with the
+                            // full human-readable lane name.
+                            title { (lane_label(key)) }
+                            path.lane-wedge-fill d=(d) {}
+                            text.lane-wedge-label
+                                x=(format!("{lx:.2}"))
+                                y=(format!("{ly:.2}"))
+                                text-anchor="middle"
+                                dominant-baseline="central"
+                                transform=(format!("rotate({rot:.2} {lx:.2} {ly:.2})")) {
+                                (lane_badge(key))
+                            }
+                        }
                     }
                 }
 
-                // Centre master toggle. Default href clears the lane filter
-                // (no-JS fallback = "show all lanes"). JS upgrades to toggle.
+                // Centre master toggle — sits on top of the SVG hole.
                 a class="lane-pie-centre"
                   href=(base_path)
                   data-state="all"

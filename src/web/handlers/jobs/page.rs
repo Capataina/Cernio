@@ -17,7 +17,7 @@ use super::charts::{
     decision_funnel_from, freshness_from, freshness_median_bucket, heatmap_cell_link,
     heatmap_from, lookup_funnel, top_companies_from, top_titles_from,
 };
-use super::filters::{axis_set, render_axis, set_href, view_href, AXES};
+use super::filters::{axis_set, render_axis, render_lane_pie, set_href, view_href, AXES};
 use super::lanes_view::render_lanes_view;
 use super::table::{decision_buttons, render_table};
 
@@ -206,19 +206,29 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                     }
                 }
                 div.filter-strip-body {
-                    @for axis in AXES.iter() {
-                        (render_axis(q, axis))
-                    }
-                    div.filter-summary-row {
-                        div.filter-summary {
-                            span.filter-count { (kpi_total) }
-                            span.filter-count-total { " of " (total_universe) }
-                            span.filter-count-label {
-                                @if any_active { " filtered jobs" } @else { " jobs" }
-                            }
+                    div.filter-body-grid {
+                        // Left column — the lane pie (hero filter).
+                        div.filter-pie-col {
+                            (render_lane_pie(q))
                         }
-                        @if any_active {
-                            a.filter-reset href="/jobs" { "reset all" }
+                        // Right column — every non-lane axis stacked, with
+                        // the summary/reset row pinned to the bottom.
+                        div.filter-axes-col {
+                            @for axis in AXES.iter().filter(|a| a.key != "lane") {
+                                (render_axis(q, axis))
+                            }
+                            div.filter-summary-row {
+                                div.filter-summary {
+                                    span.filter-count { (kpi_total) }
+                                    span.filter-count-total { " of " (total_universe) }
+                                    span.filter-count-label {
+                                        @if any_active { " filtered jobs" } @else { " jobs" }
+                                    }
+                                }
+                                @if any_active {
+                                    a.filter-reset href="/jobs" { "reset all" }
+                                }
+                            }
                         }
                     }
                 }

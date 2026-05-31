@@ -137,6 +137,163 @@
 .filter-axis:last-of-type {
     border-bottom: none;
 }
+
+/* ── Two-column body layout (pie left, other axes right) ─────────── */
+
+.filter-body-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 300px) 1fr;
+    gap: 18px;
+    align-items: stretch;
+}
+.filter-body-grid > .filter-pie-col {
+    grid-column: 1;
+}
+.filter-axes-col {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+/* When axes are nested inside the right column, drop the dashed separator
+ * on the last axis to avoid a stray underline above the summary row. */
+.filter-axes-col .filter-axis:last-of-type {
+    border-bottom: none;
+}
+.filter-axes-col .filter-summary-row {
+    margin-top: auto;
+}
+
+/* On narrow viewports collapse to a single column with the pie on top. */
+@media (max-width: 900px) {
+    .filter-body-grid {
+        grid-template-columns: 1fr;
+    }
+    .filter-pie-col {
+        border-right: none;
+        border-bottom: 1px dashed var(--bg-3);
+    }
+}
+
+/* ── Grade ladder — tier-band encoding for the GRADE axis ─────────── */
+
+.grade-ladder {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 4px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 3px;
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.grade-ladder-cell {
+    --cell-color: var(--text-3);
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: color-mix(in srgb, var(--cell-color) 60%, var(--text-3));
+    background: color-mix(in srgb, var(--cell-color) 8%, var(--bg-3));
+    border: 1px solid color-mix(in srgb, var(--cell-color) 30%, transparent);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.45;
+    transition: all var(--t-fast) var(--easing);
+}
+.grade-ladder-cell:hover {
+    opacity: 0.85;
+    color: var(--text-0);
+    transform: translateY(-1px);
+    background: color-mix(in srgb, var(--cell-color) 18%, var(--bg-3));
+}
+.grade-ladder-cell[data-active="true"] {
+    opacity: 1;
+    background: color-mix(in srgb, var(--cell-color) 28%, var(--bg-3));
+    color: var(--cell-color);
+    border-color: color-mix(in srgb, var(--cell-color) 70%, transparent);
+    box-shadow:
+        0 0 10px color-mix(in srgb, var(--cell-color) 40%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--cell-color) 25%, transparent);
+}
+.grade-ladder-cell.grade-ladder-ss { --cell-color: var(--grade-ss); }
+.grade-ladder-cell.grade-ladder-s  { --cell-color: var(--grade-s); }
+.grade-ladder-cell.grade-ladder-a  { --cell-color: var(--grade-a); }
+.grade-ladder-cell.grade-ladder-b  { --cell-color: var(--grade-b); }
+.grade-ladder-cell.grade-ladder-c  { --cell-color: var(--grade-c); }
+.grade-ladder-cell.grade-ladder-f  { --cell-color: var(--grade-f); }
+.grade-ladder-cell.grade-ladder-ungraded {
+    --cell-color: var(--text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+}
+
+/* ── Posted strip — fresher→older timeline encoding ──────────────── */
+
+.posted-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: 1fr 1.2fr 1.6fr 1.4fr 0.8fr;
+    gap: 3px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 3px;
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.posted-strip-cell {
+    --cell-color: var(--text-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-3);
+    background: color-mix(in srgb, var(--cell-color) 8%, var(--bg-3));
+    border: 1px solid color-mix(in srgb, var(--cell-color) 25%, transparent);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    transition: all var(--t-fast) var(--easing);
+    white-space: nowrap;
+}
+.posted-strip-cell:hover {
+    opacity: 0.9;
+    color: var(--text-0);
+    transform: translateY(-1px);
+}
+.posted-strip-cell[data-active="true"] {
+    opacity: 1;
+    background: color-mix(in srgb, var(--cell-color) 26%, var(--bg-3));
+    color: var(--cell-color);
+    border-color: color-mix(in srgb, var(--cell-color) 65%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--cell-color) 35%, transparent);
+}
+.posted-strip-cell.posted-strip-7d      { --cell-color: #4ade80; }
+.posted-strip-cell.posted-strip-30d     { --cell-color: #7ea8ff; }
+.posted-strip-cell.posted-strip-90d     { --cell-color: #ffc94a; }
+.posted-strip-cell.posted-strip-old     { --cell-color: #ff8a5c; }
+.posted-strip-cell.posted-strip-unknown { --cell-color: var(--text-4); }
+
+@media (prefers-reduced-motion: reduce) {
+    .grade-ladder-cell,
+    .grade-ladder-cell:hover,
+    .posted-strip-cell,
+    .posted-strip-cell:hover {
+        transform: none;
+        transition: none;
+    }
+}
 .filter-axis-label {
     color: var(--text-3);
     font-family: var(--font-mono);
