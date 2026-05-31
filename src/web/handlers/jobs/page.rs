@@ -17,7 +17,8 @@ use super::charts::{
     decision_funnel_from, freshness_from, freshness_median_bucket, heatmap_cell_link,
     heatmap_from, lookup_funnel, top_companies_from, top_titles_from,
 };
-use super::filters::{axis_set, render_axis, set_href, AXES};
+use super::filters::{axis_set, render_axis, set_href, view_href, AXES};
+use super::lanes_view::render_lanes_view;
 use super::table::{decision_buttons, render_table};
 
 /// Multi-value chip query — every axis is a comma-separated list, empty/missing
@@ -35,6 +36,11 @@ pub struct JobsQuery {
     /// Driven by click-to-filter from Top-companies rows; not part of the
     /// chip-strip axes, so it does not appear in `AXES`.
     pub company: Option<String>,
+    /// Presentation mode for the filtered jobs list. `Some("lanes")` swaps the
+    /// table for the 8-column lane-grouped grid; any other value (including
+    /// `None` / `Some("table")`) renders the default table. Not part of `AXES`
+    /// since it only controls rendering, not which jobs are included.
+    pub view: Option<String>,
 }
 
 pub async fn page(
@@ -170,8 +176,17 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                 }
                 out
             };
+            @let is_lanes_view = matches!(q.view.as_deref(), Some("lanes"));
             div.filter-strip data-page="jobs" {
                 div.filter-strip-head {
+                    div.view-toggle.seg-group title="Switch between table and lane-column layout" {
+                        a class="seg" href=(view_href(q, "table")) data-active=(!is_lanes_view) {
+                            span.view-toggle-glyph { "⊞" } " Table"
+                        }
+                        a class="seg" href=(view_href(q, "lanes")) data-active=(is_lanes_view) {
+                            span.view-toggle-glyph { "▦" } " Lanes"
+                        }
+                    }
                     div.filter-strip-summary {
                         @if summary_pairs.is_empty() {
                             span.fss-axis { "all filters · " }
@@ -363,8 +378,14 @@ async fn render(state: &AppState, q: &JobsQuery) -> Markup {
                 }
             }
 
-            // ── Filtered jobs table ───────────────────────────────────────
-            (render_table(&jobs))
+            // ── Filtered jobs list ────────────────────────────────────────
+            // ?view=lanes swaps the table for an 8-column lane-grouped grid;
+            // any other value (or absent) renders the default table.
+            @if is_lanes_view {
+                (render_lanes_view(&jobs))
+            } @else {
+                (render_table(&jobs))
+            }
         }
     }
 }

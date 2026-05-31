@@ -187,6 +187,41 @@ fn toggle_href(q: &JobsQuery, axis: &AxisDef, value: &str) -> String {
     }
 }
 
+/// Build a URL that preserves the current filter state and only sets
+/// `view=<mode>`. Used by the table/lanes view toggle. `mode == "table"` is
+/// the default and is stripped from the URL to keep links clean.
+pub(super) fn view_href(q: &JobsQuery, mode: &str) -> String {
+    let mut parts: Vec<(&str, String)> = Vec::new();
+    for a in AXES {
+        let set = axis_set(q, a);
+        let is_default = a.key == "archive" && set.len() == 1 && set.contains("active");
+        if !set.is_empty() && !is_default {
+            let mut vals: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
+            vals.sort();
+            parts.push((a.key, vals.join(",")));
+        }
+    }
+    if let Some(c) = q.company.as_deref() {
+        let t = c.trim();
+        if !t.is_empty() {
+            parts.push(("company", t.to_string()));
+        }
+    }
+    if mode != "table" {
+        parts.push(("view", mode.to_string()));
+    }
+    if parts.is_empty() {
+        "/jobs".to_string()
+    } else {
+        let qs = parts
+            .iter()
+            .map(|(k, v)| format!("{k}={}", urlencode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
+        format!("/jobs?{qs}")
+    }
+}
+
 /// Build a click-navigation URL that *sets* a fixed set of axes (rather than
 /// toggling). Used by heatmap cells / funnel rows / top-list rows.
 pub(super) fn set_href(pairs: &[(&str, &str)]) -> String {

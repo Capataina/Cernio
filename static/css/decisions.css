@@ -1,110 +1,345 @@
-/* decisions.css — /decisions tab specific layout.
- * Shared decision-row + decision-kind primitives live in dashboard.css
- * (recent-decisions feed). Decisions-only widgets: tabs strip + list view.
+/* decisions.css — /decisions tab layout.
+ *
+ * Three components live here (everything else is shared):
+ *   1. .decision-funnel-nav  — top-of-page horizontal flow bar
+ *                              (replaces the old kpi-strip + .decision-tabs)
+ *   2. .next-actions-panel   — watching-list-as-prompt pane
+ *   3. .decisions-list / .decision-list-row — flat decisions list with
+ *      day-headers and lane-accent stripes
+ *
+ * Shared primitives we depend on (do not redefine here):
+ *   .decision-row, .decision-kind, .decision-title, .decision-co, .decision-when
+ *       → static/css/rows.css + static/css/chips.css
+ *   .day-header                         → static/css/rows.css
+ *   .row-lane-accent                    → static/css/rows.css
+ *   .panel / .panel-head / .panel-sub   → static/css/components.css
+ *   .grade-pill / .lane-chip            → static/css/chips.css
  */
 
 .decisions-page {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     padding: 12px;
 }
 
-.decisions-page .kpi-strip {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
-}
-@media (max-width: 1100px) {
-    .decisions-page .kpi-strip { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 640px) {
-    .decisions-page .kpi-strip { grid-template-columns: repeat(2, 1fr); }
-}
-
-.kpi-watching::before  { background: var(--warn) !important; }
-.kpi-applied::before   { background: var(--good) !important; }
-.kpi-interview::before { background: var(--grade-ss) !important; }
-.kpi-rejected::before  { background: var(--bad) !important; }
-
-/* ── Decision tabs (segmented) ───────────────────────────────────── */
-
-.decision-tabs {
+/* ── Decision funnel nav ─────────────────────────────────────────
+ *
+ * One horizontal bar that replaces both the old 5-card KPI strip and
+ * the segmented tab row. Each stage is simultaneously:
+ *   - a stat card (count up-tickers)
+ *   - a filter anchor (clicking sets ?kind=)
+ *   - a flow node (connector arrows hint pipeline direction)
+ *
+ * Flex grow is set inline by the handler so stage width is proportional
+ * to count, with a 0.6 floor so empty stages stay visibly clickable.
+ *
+ * Active state: full saturation + scale + glow ring. Inactive: muted
+ * to ~45% opacity so the active stage carries the visual hierarchy.
+ */
+.decision-funnel-nav {
     display: flex;
-    gap: 4px;
-    padding: 4px;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px;
     background: var(--bg-2);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
 }
-.decision-tab {
-    flex: 1;
-    display: inline-flex;
-    align-items: center;
+
+.decision-funnel-stage {
+    flex: 1 1 0;
+    min-width: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: center;
-    gap: 8px;
-    padding: 9px 14px;
+    gap: 4px;
+    padding: 14px 18px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-2);
+    background: color-mix(in srgb, var(--bg-3) 60%, transparent);
+    border: 1px solid transparent;
+    opacity: 0.45;
+    transition: opacity var(--t-base) var(--easing),
+                transform var(--t-base) var(--easing),
+                background var(--t-base) var(--easing),
+                box-shadow var(--t-base) var(--easing);
+    position: relative;
+    overflow: hidden;
+}
+.decision-funnel-stage::before {
+    /* Subtle left-edge tag using the stage's colour token. Sits under
+     * the labels so the colour cue is present even when inactive. */
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--stage-color);
+    opacity: 0.55;
+    transition: opacity var(--t-base) var(--easing), width var(--t-base) var(--easing);
+}
+.decision-funnel-stage:hover {
+    opacity: 0.85;
+    color: var(--text-0);
+    background: color-mix(in srgb, var(--stage-color) 12%, var(--bg-3));
+}
+.decision-funnel-stage:hover::before { opacity: 1; width: 4px; }
+
+.decision-funnel-stage.is-active {
+    opacity: 1;
+    color: var(--bg-0);
+    background: linear-gradient(180deg,
+        var(--stage-color),
+        color-mix(in srgb, var(--stage-color) 70%, black));
+    box-shadow: 0 0 18px color-mix(in srgb, var(--stage-color) 45%, transparent),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px) scale(1.01);
+    border-color: color-mix(in srgb, var(--stage-color) 60%, transparent);
+}
+.decision-funnel-stage.is-active::before {
+    opacity: 0;
+    width: 0;
+}
+
+/* Stage colour mapping — keyed by data-kind so the same tokens drive
+ * the inactive accent line, the hover wash, and the active fill. */
+.decision-funnel-stage[data-kind="watching"]  { --stage-color: var(--warn); }
+.decision-funnel-stage[data-kind="applied"]   { --stage-color: var(--good); }
+.decision-funnel-stage[data-kind="interview"] { --stage-color: var(--grade-ss); }
+.decision-funnel-stage[data-kind="rejected"]  { --stage-color: var(--bad); }
+
+.decision-funnel-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    opacity: 0.85;
+}
+.decision-funnel-count {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: inherit;
+}
+.decision-funnel-stage.is-active .decision-funnel-count {
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Connector arrows — sit between stages, do not consume layout flex. */
+.decision-funnel-arrow {
+    flex: 0 0 auto;
+    align-self: center;
+    padding: 0 6px;
     color: var(--text-3);
     font-family: var(--font-mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
+    font-size: 14px;
+    opacity: 0.55;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* "All" trailing pill — visually separated from the flow so it reads
+ * as the no-filter fallback rather than a pipeline stage. */
+.decision-funnel-all {
+    flex: 0 0 auto;
+    margin-left: 8px;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 4px;
     text-decoration: none;
-    border-radius: 3px;
+    color: var(--text-2);
+    background: color-mix(in srgb, var(--bg-3) 60%, transparent);
+    border: 1px solid var(--border);
+    opacity: 0.7;
     transition: all var(--t-base) var(--easing);
-    cursor: pointer;
 }
-.decision-tab:hover {
-    background: var(--bg-3);
+.decision-funnel-all:hover {
+    opacity: 1;
     color: var(--text-0);
+    border-color: var(--accent);
 }
-.decision-tab-active {
-    background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
+.decision-funnel-all.is-active {
+    opacity: 1;
     color: var(--bg-0);
+    background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
+    border-color: var(--accent);
+    box-shadow: 0 0 14px var(--accent-glow);
+}
+.decision-funnel-all-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+.decision-funnel-all-count {
+    font-size: 18px;
     font-weight: 700;
-    box-shadow: 0 0 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2);
-}
-.decision-tab[data-kind="watching"].decision-tab-active {
-    background: linear-gradient(180deg, var(--warn), color-mix(in srgb, var(--warn) 70%, black));
-    box-shadow: 0 0 12px color-mix(in srgb, var(--warn) 50%, transparent);
-}
-.decision-tab[data-kind="applied"].decision-tab-active {
-    background: linear-gradient(180deg, var(--good), color-mix(in srgb, var(--good) 70%, black));
-    box-shadow: 0 0 12px var(--good-glow);
-}
-.decision-tab[data-kind="interview"].decision-tab-active {
-    background: linear-gradient(180deg, var(--grade-ss), color-mix(in srgb, var(--grade-ss) 70%, black));
-    box-shadow: 0 0 12px color-mix(in srgb, var(--grade-ss) 50%, transparent);
-}
-.decision-tab[data-kind="rejected"].decision-tab-active {
-    background: linear-gradient(180deg, var(--bad), color-mix(in srgb, var(--bad) 70%, black));
-    box-shadow: 0 0 12px var(--bad-glow);
-}
-
-.decision-tab-count {
     font-variant-numeric: tabular-nums;
-    opacity: 0.65;
+    line-height: 1;
 }
-.decision-tab-active .decision-tab-count { opacity: 1; }
 
-/* ── Full decisions list ──────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .decision-funnel-nav { flex-wrap: wrap; }
+    .decision-funnel-arrow { display: none; }
+    .decision-funnel-stage { min-width: 45%; flex-basis: 45%; }
+    .decision-funnel-all { width: 100%; align-items: flex-start; margin-left: 0; margin-top: 6px; }
+}
 
+/* ── Next actions pane ───────────────────────────────────────────
+ *
+ * Renders the `watching` list as actionable prompts ("3 days watching"
+ * → apply or let go). The age-based urgency class adds a left-edge
+ * border that intensifies as items linger.
+ */
+.next-actions-panel { /* uses .panel + .no-pad shared styles */ }
+
+.next-actions-list {
+    display: flex;
+    flex-direction: column;
+}
+.next-action-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 140px 1fr 100px 32px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--bg-3);
+    cursor: pointer;
+    transition: background var(--t-fast) var(--easing),
+                transform var(--t-base) var(--easing);
+}
+.next-action-row:last-child { border-bottom: none; }
+.next-action-row:hover { background: var(--bg-2); transform: translateX(2px); }
+.next-action-row > * {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+.next-action-row::after {
+    /* Urgency edge — sits on the right so it doesn't conflict with the
+     * left lane-accent stripe inherited from .row-lane-accent. */
+    content: "";
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--urgency-color, var(--text-3));
+    opacity: 0.4;
+    transition: opacity var(--t-fast) var(--easing);
+}
+.next-action-row:hover::after { opacity: 0.8; }
+
+.next-action-row.urgency-fresh { --urgency-color: var(--good); }
+.next-action-row.urgency-warm  { --urgency-color: var(--warn); }
+.next-action-row.urgency-stale { --urgency-color: var(--bad); }
+
+.next-action-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+.next-action-text { min-width: 0; }
+.next-action-title {
+    color: var(--text-0);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.next-action-co {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-top: 2px;
+}
+.next-action-since {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    font-family: var(--font-mono);
+    color: var(--urgency-color, var(--text-2));
+}
+.next-action-since-num {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.next-action-since-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+}
+.next-action-open {
+    color: var(--text-3);
+    text-decoration: none;
+    font-size: 16px;
+    text-align: center;
+    transition: all var(--t-fast) var(--easing);
+}
+.next-action-open:hover {
+    color: var(--accent);
+    transform: translateX(2px);
+}
+
+.next-actions-more {
+    display: block;
+    padding: 10px 16px;
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-decoration: none;
+    text-align: center;
+    border-top: 1px solid var(--bg-3);
+    transition: all var(--t-fast) var(--easing);
+}
+.next-actions-more:hover {
+    color: var(--accent);
+    background: var(--bg-2);
+}
+
+/* ── Full decisions list ──────────────────────────────────────────
+ *
+ * Day-grouped. Each row has a lane-accent stripe (same component as the
+ * jobs / companies tables) and a hover translate.
+ */
 .decisions-list {
     display: flex;
     flex-direction: column;
 }
 .decision-list-row {
+    position: relative;
     display: grid;
     grid-template-columns: 60px 90px 64px 32px 1fr 30px;
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--bg-3);
-    transition: background var(--t-fast) var(--easing);
+    transition: background var(--t-fast) var(--easing),
+                transform var(--t-base) var(--easing);
     cursor: pointer;
 }
-.decision-list-row:hover { background: var(--bg-2); }
+.decision-list-row:hover { background: var(--bg-2); transform: translateX(2px); }
 .decision-list-row:last-child { border-bottom: none; }
+.decision-list-row > * {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
 
 .decision-list-row .decision-text { min-width: 0; }
 .decision-list-row .decision-title {
@@ -130,4 +365,18 @@
 .decision-open:hover {
     color: var(--accent);
     transform: translateX(2px);
+}
+
+/* Honour reduced-motion: drop the hover translate + active scale. */
+@media (prefers-reduced-motion: reduce) {
+    .decision-funnel-stage,
+    .decision-funnel-stage.is-active,
+    .decision-list-row,
+    .next-action-row,
+    .decision-list-row:hover,
+    .next-action-row:hover,
+    .decision-open:hover,
+    .next-action-open:hover {
+        transform: none !important;
+    }
 }

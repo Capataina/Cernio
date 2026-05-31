@@ -5,6 +5,7 @@
 
 pub mod charts;
 pub mod filters;
+pub mod lanes_view;
 pub mod page;
 pub mod table;
 

@@ -1,30 +1,14 @@
-/* decisions.js — boots the Pipeline funnel on /decisions. */
+/* decisions.js — page-specific JS for /decisions.
+ *
+ * The 2026-05-31 redesign removed the ECharts funnel pane; the page is now
+ * entirely server-rendered. Count up-tickers on the funnel-nav stages are
+ * wired via the shared `data-ticker` attribute handled in core.js.
+ *
+ * This file is kept (and still referenced via PageAssets) as the canonical
+ * hook for future /decisions-only behaviour — e.g. inline decision flips,
+ * keyboard navigation between stages, drag-to-reorder watching items.
+ */
 (function () {
   'use strict';
-  if (!window.cernio || !window.cernio.bootEchart) return;
-  const boot = window.cernio.bootEchart;
-
-  boot('decisions-funnel', (data, theme) => ({
-    backgroundColor: theme.bg,
-    tooltip: { ...theme.tooltip, trigger: 'item', formatter: '{b}<br/>{c}' },
-    series: [{
-      type: 'funnel',
-      left: '8%', right: '8%', top: 18, bottom: 18,
-      width: '84%',
-      min: 0,
-      sort: 'descending',
-      gap: 2,
-      label: {
-        show: true, position: 'inside',
-        color: '#0a0e13',
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-        formatter: '{b}  {c}',
-      },
-      itemStyle: { borderColor: '#0a0e13', borderWidth: 1 },
-      emphasis: { label: { fontSize: 12 } },
-      data: data.items,
-      color: ['#7a838f', '#ffc94a', '#4ade80', '#c39df0'],
-    }],
-  }));
+  // Intentionally empty. Future page-specific behaviour lands here.
 })();
