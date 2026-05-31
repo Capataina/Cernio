@@ -90,6 +90,72 @@
     100% { background: linear-gradient(90deg, transparent 100%, var(--accent) 100%, transparent 100%); }
 }
 
+/* ── Row entry stagger ────────────────────────────────────────────
+ * Apply via the row-stagger animation; rows fade-in + slide-up as the
+ * page settles. First 20 rows are explicitly delayed (~16ms apart); past
+ * row 20, the animation skips so heavy lists don't take a noticeable
+ * cumulative time to settle.
+ * Used by: .job-row, .company-row, .lane-card, .decision-list-row,
+ *          .next-action-row, .role-row (dashboard top-actionable).
+ */
+@keyframes row-stagger-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.job-row,
+.company-row,
+.lane-card,
+.decision-list-row,
+.next-action-row,
+.role-row {
+    animation: row-stagger-in 320ms var(--easing) backwards;
+}
+/* Explicit staggered delays for the first ~20 rows. Past that, no delay
+ * (rows still animate via the base rule but all together — visible page
+ * is settled within ~340ms regardless of list length). */
+.job-row:nth-child(1),  .company-row:nth-child(1),  .lane-card:nth-child(1),
+.decision-list-row:nth-child(1), .next-action-row:nth-child(1), .role-row:nth-child(1) { animation-delay:  20ms; }
+.job-row:nth-child(2),  .company-row:nth-child(2),  .lane-card:nth-child(2),
+.decision-list-row:nth-child(2), .next-action-row:nth-child(2), .role-row:nth-child(2) { animation-delay:  36ms; }
+.job-row:nth-child(3),  .company-row:nth-child(3),  .lane-card:nth-child(3),
+.decision-list-row:nth-child(3), .next-action-row:nth-child(3), .role-row:nth-child(3) { animation-delay:  52ms; }
+.job-row:nth-child(4),  .company-row:nth-child(4),  .lane-card:nth-child(4),
+.decision-list-row:nth-child(4), .next-action-row:nth-child(4), .role-row:nth-child(4) { animation-delay:  68ms; }
+.job-row:nth-child(5),  .company-row:nth-child(5),  .lane-card:nth-child(5),
+.decision-list-row:nth-child(5), .next-action-row:nth-child(5), .role-row:nth-child(5) { animation-delay:  84ms; }
+.job-row:nth-child(6),  .company-row:nth-child(6),  .lane-card:nth-child(6),
+.decision-list-row:nth-child(6), .next-action-row:nth-child(6), .role-row:nth-child(6) { animation-delay: 100ms; }
+.job-row:nth-child(7),  .company-row:nth-child(7),  .lane-card:nth-child(7),
+.decision-list-row:nth-child(7), .next-action-row:nth-child(7), .role-row:nth-child(7) { animation-delay: 116ms; }
+.job-row:nth-child(8),  .company-row:nth-child(8),  .lane-card:nth-child(8),
+.decision-list-row:nth-child(8), .next-action-row:nth-child(8), .role-row:nth-child(8) { animation-delay: 132ms; }
+.job-row:nth-child(9),  .company-row:nth-child(9),  .lane-card:nth-child(9),
+.decision-list-row:nth-child(9), .next-action-row:nth-child(9), .role-row:nth-child(9) { animation-delay: 148ms; }
+.job-row:nth-child(10), .company-row:nth-child(10), .lane-card:nth-child(10),
+.decision-list-row:nth-child(10), .next-action-row:nth-child(10), .role-row:nth-child(10) { animation-delay: 164ms; }
+.job-row:nth-child(11), .company-row:nth-child(11), .lane-card:nth-child(11),
+.decision-list-row:nth-child(11), .next-action-row:nth-child(11), .role-row:nth-child(11) { animation-delay: 180ms; }
+.job-row:nth-child(12), .company-row:nth-child(12), .lane-card:nth-child(12),
+.decision-list-row:nth-child(12), .next-action-row:nth-child(12), .role-row:nth-child(12) { animation-delay: 196ms; }
+.job-row:nth-child(13), .company-row:nth-child(13), .lane-card:nth-child(13),
+.decision-list-row:nth-child(13), .next-action-row:nth-child(13), .role-row:nth-child(13) { animation-delay: 212ms; }
+.job-row:nth-child(14), .company-row:nth-child(14), .lane-card:nth-child(14),
+.decision-list-row:nth-child(14), .next-action-row:nth-child(14), .role-row:nth-child(14) { animation-delay: 228ms; }
+.job-row:nth-child(15), .company-row:nth-child(15), .lane-card:nth-child(15),
+.decision-list-row:nth-child(15), .next-action-row:nth-child(15), .role-row:nth-child(15) { animation-delay: 244ms; }
+.job-row:nth-child(16), .company-row:nth-child(16), .lane-card:nth-child(16),
+.decision-list-row:nth-child(16), .next-action-row:nth-child(16), .role-row:nth-child(16) { animation-delay: 260ms; }
+.job-row:nth-child(17), .company-row:nth-child(17), .lane-card:nth-child(17),
+.decision-list-row:nth-child(17), .next-action-row:nth-child(17), .role-row:nth-child(17) { animation-delay: 276ms; }
+.job-row:nth-child(18), .company-row:nth-child(18), .lane-card:nth-child(18),
+.decision-list-row:nth-child(18), .next-action-row:nth-child(18), .role-row:nth-child(18) { animation-delay: 292ms; }
+.job-row:nth-child(19), .company-row:nth-child(19), .lane-card:nth-child(19),
+.decision-list-row:nth-child(19), .next-action-row:nth-child(19), .role-row:nth-child(19) { animation-delay: 308ms; }
+.job-row:nth-child(20), .company-row:nth-child(20), .lane-card:nth-child(20),
+.decision-list-row:nth-child(20), .next-action-row:nth-child(20), .role-row:nth-child(20) { animation-delay: 324ms; }
+.job-row:nth-child(n+21), .company-row:nth-child(n+21), .lane-card:nth-child(n+21),
+.decision-list-row:nth-child(n+21), .next-action-row:nth-child(n+21), .role-row:nth-child(n+21) { animation-delay: 340ms; }
+
 /* ── Reduced motion override ─────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
