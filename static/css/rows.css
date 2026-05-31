@@ -301,6 +301,12 @@
  * it dissolves before reaching the title column. */
 .row-lane-accent {
     position: absolute;
+    /* Span the whole grid so this absolutely-positioned child does NOT
+     * consume an auto-placed grid track (which shifts the real row cells
+     * right by one column). Universal fix for grid-parented rows
+     * (.decision-list-row, .next-action-row, .job-row, .company-row).
+     * Position:absolute keeps the visual offset (left:0; width:150px). */
+    grid-area: 1 / 1 / -1 / -1;
     left: 0;
     top: 0;
     bottom: 0;

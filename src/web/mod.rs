@@ -8,11 +8,29 @@ pub mod debug_snap;
 mod handlers;
 mod templates;
 
+use axum::extract::Request;
+use axum::http::header::CACHE_CONTROL;
+use axum::http::HeaderValue;
+use axum::middleware::{self, Next};
+use axum::response::Response;
 use axum::routing::{get, post};
 use axum::Router;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
+
+/// Force browsers to re-fetch /static/* assets on every request so a stale
+/// cached CSS file never silently breaks the layout after a redesign. Cheap
+/// in dev (localhost). Production would want different headers; not relevant
+/// while cernio is single-user localhost.
+async fn no_cache_static(req: Request, next: Next) -> Response {
+    let mut response = next.run(req).await;
+    response.headers_mut().insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+    );
+    response
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -41,7 +59,12 @@ pub async fn serve(db_path: &str, port: u16, open_browser: bool) -> std::io::Res
         .route("/ops/format/preview", get(handlers::ops::format_preview))
         .route("/ops/format/run", post(handlers::ops::format_run))
         .route("/debug/snap-all", post(debug_snap::snap_all))
-        .nest_service("/static", ServeDir::new("static"))
+        .nest_service(
+            "/static",
+            axum::Router::new()
+                .nest_service("/", ServeDir::new("static"))
+                .layer(middleware::from_fn(no_cache_static)),
+        )
         .with_state(state);
 
     let addr = format!("127.0.0.1:{port}");
