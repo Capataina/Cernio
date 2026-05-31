@@ -20,7 +20,7 @@ atacanercetinkaya@gmail.com
 +44 7391 904514
 
 ## Location
-London, UK (East Croydon — Ten Degrees, operated by Greystar). Tenancy ending 24 May 2026; moving to [[Housing/Stratford/East-Village/_Overview|Get Living East Village]] in Stratford on 15 June 2026 (22A Hightail Point, reserved 2026-05-08; HomeLet referencing complete, waiting on Get Living for tenancy paperwork). See [[Housing/_Overview]] for the full situation.
+London, UK (East Croydon, Ten Degrees, operated by Greystar). Tenancy ending 24 May 2026; moving to [[Housing/Stratford/East-Village/_Overview|Get Living East Village]] in Stratford on 15 June 2026 (22A Hightail Point, reserved 2026-05-08; HomeLet referencing complete 2026-05-13; HomeLet Guarantor service application submitted 2026-05-14, awaiting HomeLet processing before deposit + first month + tenancy agreement issuance). See [[Housing/_Overview]] for the full situation.
 
 ## Family
 Both parents are independent self-employed lawyers based in Turkey. Father specialises in tax law; mother in family law. They fund Caner's UK living expenses — see [[Housing/Financial Model]] for how this works.

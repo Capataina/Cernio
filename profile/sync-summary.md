@@ -1,22 +1,20 @@
 ---
-sync_run: 2026-05-13 20:50:00 UTC
+sync_run: 2026-05-31
 skill_version: populate-from-lifeos
-files_changed: 17
+files_changed: 25
 files_added: 4
 files_deleted: 0
-files_unchanged: 3
-projects_synthesised: 13
+files_unchanged: 11
+projects_synthesised: 14
 projects_skipped: 0
-agents_dispatched: 14
-agents_returned_ok: 14
+agents_dispatched: 16
+agents_returned_ok: 16
 agents_failed: 0
 ---
 
-# Sync Summary — 2026-05-13 20:50
+# Sync Summary — 2026-05-31
 
-This file is the audit artefact for the most recent `populate-from-lifeos` run. Every change made by the skill is documented per-phase below. The WIDND section consolidates structured admissions of skipped or deferred work.
-
-The skill ran autonomously. No mid-run user prompts occurred. If anything below is unexpected or wrong, the source for the change is named so it can be inspected directly.
+This file is the audit artefact for the most recent `populate-from-lifeos` run. The skill ran autonomously across 8 phases. A new Phase 5 output target was added in this run: `profile/skills/lane-affinity.md` (per-lane evidence pack for downstream grading agents). A targeted GitHub-augmentation pass also ran for Performance Profiler at user request.
 
 ---
 
@@ -24,89 +22,83 @@ The skill ran autonomously. No mid-run user prompts occurred. If anything below 
 
 | Action | Count | Files |
 |---|---|---|
-| Replaced | 17 | cover-letter.md, education.md, experience.md, interests.md, lifestyle-preferences.md, personal.md, resume.md, visa.md, projects/cernio.md, projects/image-browser.md, projects/aurix.md, projects/neurodrive.md, projects/nyquestro.md, projects/vynapse.md, projects/asteroidsai.md, projects/consilium.md, projects/chrona.md, projects/xyntra.md, projects/zyphos.md, projects/tectra.md, projects/open-source-contributions.md, projects/index.md, skills.md, sync-summary.md (this file) |
-| Added | 4 | leetcode.md, linkedin.md, _overview.md, projects/tessarix.md |
-| Deleted | 0 | (legacy `projects.md` and `volunteering.md` already absent from prior sync) |
-| Unchanged | 3 | certifications.md, languages.md, military.md |
-| Cernio-native preserved | 2 | preferences.toml, portfolio-gaps.md |
-
-Note: the Replaced row count (24) exceeds the `files_changed` frontmatter (17) because the frontmatter counts only Phase 2 direct-copy replacements (8) plus Phase 5/6/8 orchestrator-written replacements; the table above includes the 13 Phase 3 + 1 Phase 4 synthesis writes which are "replaced" in the sense that prior versions existed for 13 of 14 projects (Tessarix was new). Both views are consistent: 8 Professional/ replacements + 12 projects/ replacements + 1 Tessarix add + 3 Phase 2 adds + open-source-contributions.md replacement + index.md replacement + skills.md replacement + sync-summary.md replacement = 27 write actions across 27 distinct target paths.
+| Replaced | 25 | profile/personal.md; 13 profile/projects/*.md (cernio, image-browser, aurix, neurodrive, nyquestro, tessarix, vynapse, asteroidsai, consilium, chrona, xyntra, zyphos, tectra); profile/projects/open-source-contributions.md; profile/projects/index.md; 8 profile/skills/*.md (_Overview, languages, frameworks, libraries, engines-runtimes, tools-platforms, concepts-domains, methodologies-soft); profile/sync-summary.md |
+| Added | 4 | profile/cover-letter-ata-caner-cetinkaya.md; profile/resume-ata-caner-cetinkaya.md; profile/projects/performance-profiler.md; profile/skills/lane-affinity.md |
+| Deleted | 0 | (none — legacy files profile/projects.md and profile/volunteering.md were already absent) |
+| Unchanged | 11 | profile/certifications.md, education.md, experience.md, interests.md, languages.md, leetcode.md, lifestyle-preferences.md, linkedin.md, military.md, visa.md, _overview.md |
+| Cernio-native preserved | 4 | preferences.toml, portfolio-gaps.md, portfolio-gaps/, career-goals.md |
 
 ---
 
 ## Phase 0 — Pre-flight
 
-- Working directory: `/Users/atacanercetinkaya/Documents/Programming-Projects/cernio`
-- `gh auth status`: ✓ Logged in to github.com account Capataina (keyring), token scopes: gist, read:org, repo, workflow.
-- `cernio/profile/preferences.toml` present: yes.
-- Pre-run modification timestamps captured for Cernio-native files:
-  - `preferences.toml`: Apr 26 22:38:47 2026
-  - `portfolio-gaps.md`: May 10 17:02:01 2026
-- Reference files loaded: lifeos-source-map.md, project-synthesis-schema.md, skills-derivation-rubric.md (all read end-to-end before Phase 1). summary-and-widnd-format.md loaded for Phase 8 composition.
+- Working directory: `/Users/atacanercetinkaya/Code/Cernio`
+- `gh auth status`: ✓ logged in as `Capataina` (keyring token)
+- `profile/preferences.toml` present: yes
+- Reference files loaded: `lifeos-source-map.md`, `project-synthesis-schema.md`, `skills-derivation-rubric.md` (now including new §"Lane Affinity File"), `summary-and-widnd-format.md` (Phase 8)
+- Pre-run modification timestamps captured:
+  - `preferences.toml`: 1780175220 (epoch)
+  - `portfolio-gaps.md`: 1780170658 (epoch)
 
 ## Phase 1 — README parse and allow-list
 
-- README fetched from: `https://github.com/Capataina/Capataina/blob/main/README.md` via `gh api repos/Capataina/Capataina/contents/README.md`.
-- Parse outcome: success.
-- Section counts:
-  - Active Projects: 6
-  - Other Projects: 7
-  - Open Source Contributions: 3 (rows)
-  - Private Projects: skipped (excluded by design)
-- Project allow-list (Active + Other = 13):
+- README fetched: `gh api repos/Capataina/Capataina/contents/README.md` (success)
+- Section counts: Active = 7, Other = 7, Open Source = 3 rows, Private = skipped
+- Project allow-list (Active + Other, 14 total):
   1. Cernio — https://github.com/Capataina/Cernio
   2. Image Browser — https://github.com/Capataina/PinterestStyleImageBrowser
   3. Aurix — https://github.com/Capataina/Aurix
   4. NeuroDrive — https://github.com/Capataina/NeuroDrive
   5. Nyquestro — https://github.com/Capataina/Nyquestro
-  6. Tessarix — https://github.com/Capataina/Tessarix (NEW — not present in prior sync)
-  7. Vynapse — https://github.com/Capataina/Vynapse
-  8. AsteroidsAI — https://github.com/Capataina/Asteroids-AI
-  9. Consilium — https://github.com/Capataina/Consilium
-  10. Chrona — https://github.com/Capataina/Chrona
-  11. Xyntra — https://github.com/Capataina/Xyntra
-  12. Zyphos — https://github.com/Capataina/Zyphos
-  13. Tectra — https://github.com/Capataina/Tectra
-- OSS allow-list (3 rows aggregated into one file):
-  1. tracel-ai/burn — PR #4894
-  2. tinygrad/tinygrad — PR #15453 (also #16119 resurrection)
-  3. Game mods — RimWorld, Minecraft, Terraria, Escape from Tarkov
+  6. Tessarix — https://github.com/Capataina/Tessarix
+  7. **Performance Profiler** — https://github.com/Capataina/TerrariaPerformanceProfilerMod *(NEW — previously missing from profile/projects/)*
+  8. Vynapse — https://github.com/Capataina/Vynapse
+  9. AsteroidsAI — https://github.com/Capataina/Asteroids-AI
+  10. Consilium — https://github.com/Capataina/Consilium
+  11. Chrona — https://github.com/Capataina/Chrona
+  12. Xyntra — https://github.com/Capataina/Xyntra
+  13. Zyphos — https://github.com/Capataina/Zyphos
+  14. Tectra — https://github.com/Capataina/Tectra
+- OSS allow-list: tracel-ai/burn (PR #4894), tinygrad/tinygrad (PR #15453), Game mods (no URL)
 
 ## Phase 2 — Professional/ direct copies
 
-LifeOS `Profile/Professional/` enumerated dynamically via `gh api`. 14 `.md` files returned.
+`gh api repos/Capataina/LifeOS/contents/Profile/Professional` returned 14 files.
 
 | LifeOS source | Cernio target | Verdict |
 |---|---|---|
-| Profile/Professional/Certifications.md | profile/certifications.md | unchanged |
-| Profile/Professional/Cover Letter - Ata Caner Cetinkaya.md | profile/cover-letter.md | replaced (name suffix stripped — judgment call; see WIDND) |
-| Profile/Professional/Education.md | profile/education.md | replaced |
-| Profile/Professional/Experience.md | profile/experience.md | replaced |
-| Profile/Professional/Interests.md | profile/interests.md | replaced |
-| Profile/Professional/Languages.md | profile/languages.md | unchanged |
-| Profile/Professional/LeetCode.md | profile/leetcode.md | added (NEW) |
-| Profile/Professional/Lifestyle Preferences.md | profile/lifestyle-preferences.md | replaced |
-| Profile/Professional/LinkedIn.md | profile/linkedin.md | added (NEW) |
-| Profile/Professional/Military.md | profile/military.md | unchanged |
-| Profile/Professional/Personal.md | profile/personal.md | replaced |
-| Profile/Professional/Resume - Ata Caner Cetinkaya.md | profile/resume.md | replaced (name suffix stripped — judgment call; see WIDND) |
-| Profile/Professional/Visa.md | profile/visa.md | replaced |
-| Profile/Professional/_Overview.md | profile/_overview.md | added (NEW — leading underscore stripped per normalisation rule) |
+| Certifications.md | profile/certifications.md | unchanged |
+| Cover Letter - Ata Caner Cetinkaya.md | profile/cover-letter-ata-caner-cetinkaya.md | **added** |
+| Education.md | profile/education.md | unchanged |
+| Experience.md | profile/experience.md | unchanged |
+| Interests.md | profile/interests.md | unchanged |
+| Languages.md | profile/languages.md | unchanged |
+| LeetCode.md | profile/leetcode.md | unchanged |
+| Lifestyle Preferences.md | profile/lifestyle-preferences.md | unchanged |
+| LinkedIn.md | profile/linkedin.md | unchanged |
+| Military.md | profile/military.md | unchanged |
+| Personal.md | profile/personal.md | **replaced** |
+| Resume - Ata Caner Cetinkaya.md | profile/resume-ata-caner-cetinkaya.md | **added** |
+| Visa.md | profile/visa.md | unchanged |
+| _Overview.md | profile/_overview.md | unchanged |
 
-Total: 3 unchanged, 8 replaced, 3 added.
+Total: 11 unchanged, 1 replaced, 2 added.
+
+**Note**: the two "added" files supersede the existing short-name files `profile/cover-letter.md` and `profile/resume.md`. Those become orphans (see Phase 7) — LifeOS renamed the source files to include `- Ata Caner Cetinkaya` suffixes, and the mechanical path normalisation produces correspondingly longer Cernio filenames. Decision (delete old short-name files vs rename LifeOS source back) is surfaced to the user, not auto-resolved.
 
 ## Phase 3 — Per-project synthesis (parallel agents)
 
-13 agents dispatched in parallel (1 inline + 12 background). All 13 returned successfully.
+14 standard subagents dispatched in parallel. All 14 returned successfully. Each agent embedded the full `project-synthesis-schema.md` verbatim (via Read-from-disk pattern, equivalent to inline embed).
 
 | Project | Output file | LifeOS files read | Agent verdict |
 |---|---|---|---|
-| Cernio | profile/projects/cernio.md | 23 | success |
+| Cernio | profile/projects/cernio.md | 26 | success |
 | Image Browser | profile/projects/image-browser.md | 30 | success |
 | Aurix | profile/projects/aurix.md | 29 | success |
-| NeuroDrive | profile/projects/neurodrive.md | 33 | success |
+| NeuroDrive | profile/projects/neurodrive.md | 45 | success |
 | Nyquestro | profile/projects/nyquestro.md | 22 | success |
-| Tessarix | profile/projects/tessarix.md | 17 | success (NEW project) |
+| Tessarix | profile/projects/tessarix.md | 17 | success |
+| Performance Profiler | profile/projects/performance-profiler.md | 21 | success (NEW file) |
 | Vynapse | profile/projects/vynapse.md | 14 | success |
 | AsteroidsAI | profile/projects/asteroidsai.md | 15 | success |
 | Consilium | profile/projects/consilium.md | 15 | success |
@@ -115,236 +107,188 @@ Total: 3 unchanged, 8 replaced, 3 added.
 | Zyphos | profile/projects/zyphos.md | 13 | success |
 | Tectra | profile/projects/tectra.md | 9 | success |
 
-Total dispatched: 13. Returned OK: 13. Partial: 0. Failed: 0.
+Total LifeOS files consumed in Phase 3: **280**. Every agent's evidence block (with verbatim last lines) is preserved in this session's transcript and is referenced from each per-project file's frontmatter (`sources_read`).
 
-Per-source-file evidence blocks for every agent are reproduced verbatim in the [Evidence Blocks by Agent](#evidence-blocks-by-agent) section below.
+### Phase 3.5 — GitHub-augmentation pass (Performance Profiler only)
+
+User-requested targeted augmentation: cross-check the Performance Profiler file against current GitHub state to catch anything LifeOS hadn't yet captured.
+
+- Repo: `Capataina/TerrariaPerformanceProfilerMod`
+- LifeOS anchor commit: `ff20711` (per `last_verified: 2026-05-22` in LifeOS frontmatter)
+- `gh api compare ff20711...main`: `{ahead: 0, behind: 0}` — main HEAD is exactly the LifeOS anchor commit.
+- Verdict: **no patch needed** — LifeOS source is byte-current with the repo.
+- Frontmatter receipt fields added to `profile/projects/performance-profiler.md`:
+  - `github_augmented_at: 2026-05-31`
+  - `github_augmented_at_commit: ff20711f`
+  - `github_augmentation_result: no-patch-needed-main-equals-lifeos-anchor`
+- Other projects did not receive this pass (user scoped to PP only; remaining projects assumed sufficiently current).
 
 ## Phase 4 — OSS aggregation
 
 - Source folder: `LifeOS/Projects/Open Source Contributions/`
-- Files read: 18 (9 cross-cutting + 9 Repos/ per-upstream)
-- Output file: `profile/projects/open-source-contributions.md` (170 lines, 22.5 KB)
-- Per-source-file evidence: see Evidence Blocks below.
+- Files read: 18 (9 top-level + 9 `Repos/` files)
+- Output file: `profile/projects/open-source-contributions.md` (269 lines)
+- Per-upstream subsections written for 9 vetted repos (burn, tinygrad, alloy, Tauri, tract, mistral.rs, candle, ratatui, tokio). README anchors only 3 (burn, tinygrad, game mods); LifeOS documents 9 with per-repo deep-research staging. Deepest sectioning on burn A-FINE + TensorContainer and tinygrad LSTM (shipped code); alloy (interest comment); lighter coverage on the six not-yet-engaged repos.
 
 ## Phase 5 — Skills derivation
 
-- Agent dispatched: 1 (single agent, cross-project synthesis)
-- Project files consumed: 14 (13 per-project + open-source-contributions.md)
-- Output file: `profile/skills.md` (replaced)
-- Per-category band distribution from agent return:
+Single subagent dispatched. Read all 15 project files (14 + OSS aggregated) end-to-end plus `profile/career-goals.md` (read-only, never written) to extract canonical 8-lane list.
 
-| Table | Proficient | Comfortable | Familiar | Beginner | Total |
-|---|---|---|---|---|---|
-| Programming Languages | 1 (Rust) | 3 (TypeScript, Python, SQL) | 3 (C++20, MDX, TOML) | 0 | 7 |
-| Frameworks | 1 (Tauri 2) | 5 (React 19, Bevy, Ratatui, Tokio, Vite) | 4 (MDX, Textual, LangChain, Arcade) | 0 | 10 |
-| Libraries | 0 | 6 (rusqlite, serde/serde_json, reqwest, chrono, thiserror, rand) | 22 | 0 | 28 |
-| Engines and Runtimes | 0 | 4 (ONNX Runtime, Bevy ECS, SQLite WAL, Tokio async runtime) | 3 | 0 | 7 |
-| Tools and Platforms | 1 (Git+GitHub) | 2 (Cargo, Claude Code skill runtime) | 9 | 0 | 12 |
-| Concepts and Domains | 2 (RL from first principles, Local-first software) | 20 | 9 | 0 | 31 |
-| **Totals** | **5** | **40** | **50** | **0** | **95** |
+- Project files consumed: 15
+- Lane count extracted from `career-goals.md` § "The eight active lanes": **8**
+- Output files written: **9** (was 7 group files + `_Overview.md` pre-change; now 8 + the new `lane-affinity.md`)
+  - `profile/skills/_Overview.md` (replaced)
+  - `profile/skills/languages.md` (replaced)
+  - `profile/skills/frameworks.md` (replaced)
+  - `profile/skills/libraries.md` (replaced)
+  - `profile/skills/engines-runtimes.md` (replaced)
+  - `profile/skills/tools-platforms.md` (replaced)
+  - `profile/skills/concepts-domains.md` (replaced)
+  - `profile/skills/methodologies-soft.md` (replaced)
+  - `profile/skills/lane-affinity.md` **(NEW)**
 
-Beginner deliberately unused per rubric guidance.
+### Per-category band distribution
 
-Three judgment calls flagged for user review:
-1. **Bevy held at Comfortable** rather than Proficient — appears only in NeuroDrive; deep single-project use without cross-domain breadth caps the band.
-2. **Lock-free concurrency deliberately omitted from Concepts** — Nyquestro's lock-free order book is roadmap not implemented (per D2 correctness-before-performance); the actual concurrency primitive in use is single-threaded with bounded-channel backpressure.
-3. **Python rated Comfortable rather than Proficient** — the substantial projects (AsteroidsAI, Consilium) are dormant; active-status discount per rubric's completion-stage dimension caps the band below Rust's evidence level.
+| Category | Entries | Proficient | Comfortable | Familiar |
+|---|---|---|---|---|
+| Programming Languages | 7 | 1 (Rust) | 3 (TypeScript, Python, C#/.NET 8) | 3 (C++, MDX, SQL) |
+| Frameworks | 14 | 2 (Tauri 2, Tokio) | 4 (Bevy, Ratatui, React 19, Cargo workspaces) | 8 |
+| Libraries | 26 | 0 | 9 (rusqlite, serde, reqwest, num-bigint, thiserror, chrono, ort, rand family, MonoMod/Cecil) | 17 |
+| Engines & Runtimes | 11 | 1 (SQLite WAL) | 4 (ONNX Runtime, Tauri WebView, Bevy ECS, Ethereum JSON-RPC) | 6 |
+| Tools & Platforms | 24 | 3 (Git/GitHub, Cargo, Claude Code skills) | 5 | 16 |
+| Concepts & Domains | 24 | 5 | 14 | 5 |
+
+### Per-lane evidence summary (lane-affinity.md)
+
+| Lane | Pinnacle | Supporting | Gaps |
+|---|---|---|---|
+| big-tech | (no pinnacle) | 5 projects | No Cloud/K8s/Docker/Terraform; no distributed-systems-at-scale; junior |
+| ai-ml | **NeuroDrive** | 6 projects | No production-scale ML; no CUDA-kernel work; no published research |
+| hft | **Nyquestro** | 3 projects | No C++ at depth; foundation-only lock-free; no kernel-bypass; no STP/journal/risk-guard yet |
+| crypto-mm | **Aurix** | 2 projects | Read-only by design; no live-trading PnL; no production CEX MM engine; no MEV/Flashbots |
+| bank-strats | (no pinnacle) | 4 projects | No e-trading internals; no kdb+/q; 2:2 credential filter |
+| systems-infra | **Cernio** | 8 projects | No distributed-database tenure; no kernel-bypass |
+| devtools | **Cernio** | 4 projects | No widely-used external dev-tool releases; no LSP/IDE work |
+| fintech | (no pinnacle) | 5 projects | No payments-rail/KYC/ledger; no production fintech engineering; no PCI DSS |
+
+Two lanes (big-tech, bank-strats, fintech — 3 actually) have honest "no pinnacle" admissions rather than promoted-supporting attributions. This is the design intent of the lane-affinity schema (gaps are the calibration counter-weight to pinnacle attributions for grading honesty).
 
 ## Phase 6 — Index generation
 
-- Output file: `profile/projects/index.md` (replaced)
-- Projects indexed: 14 (13 per-project + open-source-contributions)
-- Grouped by status: Active (7), Paused (2), Dormant (5).
+- Output file: `profile/projects/index.md` (47 lines)
+- Projects indexed: 15 (14 per-project + 1 aggregated OSS)
+- Mechanical extraction of name + status + source_repo + one-line summary from each project file's frontmatter and `## One-line summary` section.
 
 ## Phase 7 — Cleanup
 
-- `profile/projects.md` (legacy flat): absent — already cleaned in prior sync.
-- `profile/volunteering.md` (legacy): absent — already cleaned in prior sync.
-- Orphan files detected: none.
+- `profile/projects.md` (legacy flat): absent — no action needed.
+- `profile/volunteering.md` (legacy OSS): absent — no action needed.
+- Orphan files detected: 5 (see WIDND below for full details).
 - Cernio-native preservation check:
-  - `preferences.toml`: Apr 26 22:38:47 2026 → Apr 26 22:38:47 2026 — unchanged ✓
-  - `portfolio-gaps.md`: May 10 17:02:01 2026 → May 10 17:02:01 2026 — unchanged ✓
+  - `preferences.toml`: pre = 1780175220, post = 1780175220 — **unchanged ✓**
+  - `portfolio-gaps.md`: pre = 1780170658, post = 1780170658 — **unchanged ✓**
 
 ## Phase 8 — Summary write
 
-- Output file: `profile/sync-summary.md` (this file).
-- Run completed: 2026-05-13 20:50:00 UTC.
+- Output file: `profile/sync-summary.md` (this file)
+- Run completed: 2026-05-31
 
 ---
 
 ## What I Did Not Do
 
-This section enumerates structured admissions per the canonical WIDND categories. Silence on a category is not equivalent to "nothing to declare for that category" — every category appears, with either a specific entry or an explicit nothing-to-declare line.
-
 ### Projects on README but absent from LifeOS
 
-Nothing to declare for this category — every README-listed project (13 Active + Other entries) had a corresponding LifeOS folder at `Projects/<Name>/`.
+Nothing to declare for this category — every README-listed project had a corresponding LifeOS folder. Performance Profiler (newly added to profile/projects/ this run) was already present in LifeOS as `Projects/Performance Profiler/` — the gap was on the Cernio side, not the LifeOS side.
 
 ### Projects in LifeOS but excluded from the README
 
-- **Claude Config** — present in `LifeOS/Projects/` but listed in the README's *Private Projects* section. Intentional skip per the README-gatekeeper rule.
-- **LifeOS** — listed in *Private Projects*. Intentional skip.
-- **Flat Browser** — present in `LifeOS/Projects/` but absent from the README entirely. Intentional skip; if this should be synced, add it to the README's Active or Other section.
-- **Potential Projects** — present in `LifeOS/Projects/` but absent from the README; LifeOS-side ideation folder, not a buildable project. Intentional skip.
+The following LifeOS folders are deliberately skipped per the README gatekeeper rule (all appear in README's Private Projects section or are LifeOS-internal):
+
+- `Projects/Claude Config/` — README Private section
+- `Projects/Flat Browser/` — not on README
+- `Projects/LifeOS/` — README Private section
+- `Projects/Potential Projects/` — LifeOS staging area, not a real project
+
+These are intentional skips, not parsing failures.
 
 ### LifeOS files unreadable due to API errors
 
-Nothing to declare for this category — every fetched file returned successfully across all 14 agents (13 per-project + 1 OSS aggregation), plus Phase 2 Professional/ direct copies. No `gh api` 404, 403, or rate-limit errors encountered.
+Nothing to declare for this category — every `gh api` fetch returned successfully across all 14 per-project agents + 1 OSS agent + Performance Profiler GitHub-augmentation agent.
 
 ### Orphan files in cernio/profile/
 
-Nothing to declare for this category — no orphans detected. Three new top-level files added this run (`leetcode.md`, `linkedin.md`, `_overview.md`) are legitimately synced via Phase 2's dynamic-enumeration rule, not orphans.
+5 orphans detected, all surfaced for user review (none auto-deleted):
+
+| Path | mtime | Suggested action |
+|---|---|---|
+| `profile/application-voice.md` | 2026-05-30 22:50:58 (25KB) | Has no corresponding LifeOS source file in `Profile/Professional/`. Either: (a) add `Application Voice.md` to LifeOS Professional/ to make this sync target official, OR (b) extend the schema to mark this as Cernio-native, OR (c) delete if no longer needed. |
+| `profile/cover-letter.md` | 2026-05-30 22:50:58 (8KB) | Superseded by the newly-added `cover-letter-ata-caner-cetinkaya.md` (Phase 2). LifeOS source renamed from `Cover Letter.md` → `Cover Letter - Ata Caner Cetinkaya.md`. Safe to delete; the long-name file has the current content. |
+| `profile/resume.md` | 2026-05-30 22:50:58 (11KB) | Same situation as cover-letter — superseded by `resume-ata-caner-cetinkaya.md`. Safe to delete. |
+| `profile/resume.pdf` | 2026-05-30 22:50:58 (67 bytes) | Binary, no LifeOS source. Likely an LFS pointer or stub; delete or extend schema to allow non-markdown profile assets. |
+| `profile/skills.md` | 2026-05-30 22:50:58 (69KB) | Legacy flat-file output from the pre-refactor Phase 5. Superseded by `profile/skills/` folder (9 files including new `lane-affinity.md`). Safe to delete; folder structure has full content. |
+
+**Recommended Phase 7 extension for next skill iteration**: add `skills.md` (the legacy flat file) to the auto-cleanup list now that the folder structure is canonical. The `Cov`-tagged proposal would be to extend the `Legacy Files for Cleanup` table in `references/lifeos-source-map.md`.
 
 ### Cernio-native files preserved untouched
 
-- `preferences.toml`: confirmed unchanged (Apr 26 22:38:47 2026 pre = Apr 26 22:38:47 2026 post).
-- `portfolio-gaps.md`: confirmed unchanged (May 10 17:02:01 2026 pre = May 10 17:02:01 2026 post).
+- `preferences.toml`: confirmed unchanged (pre/post epoch timestamps match: 1780175220)
+- `portfolio-gaps.md`: confirmed unchanged (pre/post epoch timestamps match: 1780170658)
+- `portfolio-gaps/` (directory): not read, not written, not touched.
+- `career-goals.md`: read-only access only (Phase 5 lane-list extraction). Not written. The skill's preamble warning lists this as Cernio-native; the per-skill rule was honoured.
 
 ### Agents that returned partial evidence
 
-Nothing to declare for this category — every Phase 3 agent and the Phase 5 skills-derivation agent returned complete evidence blocks with verbatim last lines for every source file consumed. No partial reads detected; no re-dispatch required.
+Nothing to declare for this category — every agent (14 Phase 3 + 1 Phase 4 + 1 Phase 5 + 1 Phase 3.5 GitHub-augmentation = 17 total) returned a complete evidence block with verbatim last lines for every source file consumed. No re-dispatches required.
 
 ### Sections of the schema with no LifeOS source evidence
 
-Per agent returns:
-- **Xyntra** — the `Runtimes / engines / platforms` section is explicitly marked "no source evidence in LifeOS" per the anti-puffing rule rather than inventing wgpu/CUDA integration the code does not contain.
-- **Chrona** — the `Runtimes / engines / platforms` section is explicitly marked "no source evidence in LifeOS".
-- **No other project** had a schema section silently dropped. Every per-project file contains either substantive content or an explicit "no source evidence" placeholder for sections without LifeOS evidence.
+Nothing to declare for this category — every per-project agent reported zero "no source evidence in LifeOS" fallbacks. The closest cases were:
 
-To strengthen future syncs:
-- If Xyntra or Chrona pick up runtime/engine work, capture it in their LifeOS `Decisions.md` or `Systems/` notes; the next sync will pull it through.
+- **Vynapse** Systems/_Overview.md is a 42-line thin scaffold (vault-lint generated); substance came from 7 per-subsystem files instead. Not a gap — alternate evidence path satisfied the schema.
+- **OSS aggregation**: the README's "Game mods" row (RimWorld/Minecraft/Terraria/Tarkov, 150K+ aggregate downloads) has **zero source evidence in LifeOS** — no per-mod folder, no platform IDs, no patch histories. The aggregated file explicitly states "no source evidence in LifeOS" for that subsection per anti-puffing rules.
 
-### Additional admissions (this run)
-
-These don't fit a canonical WIDND category but are worth flagging for the audit:
-
-- **Cover Letter / Resume name normalisation** — LifeOS files are now named `Cover Letter - Ata Caner Cetinkaya.md` and `Resume - Ata Caner Cetinkaya.md` (renamed since last sync). Strict normalisation would produce `cover-letter-ata-caner-cetinkaya.md` and `resume-ata-caner-cetinkaya.md`, orphaning the existing `cover-letter.md` and `resume.md`. The skill applied judgment to strip the personal-name suffix and map to the existing target paths. If the user prefers the suffix-preserved form, surface that preference and the next sync will follow strict normalisation.
-- **Tessarix is a new project** — first appearance on the README and in LifeOS. Per-project file `projects/tessarix.md` generated for the first time; previously did not exist in `cernio/profile/projects/`.
-- **`_overview.md` added at profile root** — LifeOS `Profile/Professional/_Overview.md` is vault-internal navigation content. Phase 2 synced it per the dynamic-enumeration rule. If this file is unwanted in `cernio/profile/`, the cleanest fix is to remove `_Overview.md` from `Profile/Professional/` in LifeOS; the skill would then stop syncing it automatically. The strict-rule alternative is to add a `Profile/Professional/_Overview.md` exclusion to the skill's source map.
-
----
-
-## README Verbatim (Phase 1 parsed sections, for audit)
-
-The parsed sections from `Capataina/Capataina/README.md` that the gatekeeper used:
-
-### Active Projects section
-
-| Project | GitHub URL |
-|---|---|
-| Cernio | https://github.com/Capataina/Cernio |
-| Image Browser | https://github.com/Capataina/PinterestStyleImageBrowser |
-| Aurix | https://github.com/Capataina/Aurix |
-| NeuroDrive | https://github.com/Capataina/NeuroDrive |
-| Nyquestro | https://github.com/Capataina/Nyquestro |
-| Tessarix | https://github.com/Capataina/Tessarix |
-
-### Other Projects section
-
-| Project | GitHub URL |
-|---|---|
-| Vynapse | https://github.com/Capataina/Vynapse |
-| AsteroidsAI | https://github.com/Capataina/Asteroids-AI |
-| Consilium | https://github.com/Capataina/Consilium |
-| Chrona | https://github.com/Capataina/Chrona |
-| Xyntra | https://github.com/Capataina/Xyntra |
-| Zyphos | https://github.com/Capataina/Zyphos |
-| Tectra | https://github.com/Capataina/Tectra |
-
-### Open Source Contributions section
-
-| Project | Contribution |
-|---|---|
-| tracel-ai/burn | PR #4894 (A-FINE no-reference image-quality metric, +1864 LOC) |
-| tinygrad/tinygrad | PR #15453 / #16119 (ONNX LSTM operator) |
-| Game mods | 150,000+ aggregate downloads across RimWorld, Minecraft, Terraria, Escape from Tarkov |
-
-### Private Projects section
-
-Excluded by design. The README lists: LifeOS, .claude, OpenSourceContributions.
+**Recommended LifeOS additions** (feedback into the canonical source):
+- Add `Projects/Open Source Contributions/Game Mods.md` capturing the four-platform modding history.
+- Consider adding `Profile/Professional/Application Voice.md` to LifeOS if the existing `application-voice.md` should remain part of the synced profile.
 
 ---
 
 ## Evidence Blocks by Agent
 
-The per-source-file evidence from each Phase 3 agent and the Phase 5 agent is reproduced verbatim below. Each block lists every LifeOS file consumed with line count and verbatim last line. This is the Tier-3 evidence anchor enforcing read-everything; partial reads cannot produce verbatim last lines.
+Per-source-file evidence (Path | Lines | Verbatim last line) for every agent's read set is captured in each Phase 3 agent's return summary preserved in this session's transcript, plus in each per-project file's frontmatter `sources_read` count and the file's own body Evidence Block where present. Full reproduction here would add ~300 rows; the per-project files carry the authoritative per-file traces inline.
 
-Evidence blocks are also embedded inside each per-project file at `profile/projects/<name>.md` — the bottom-of-file Evidence Block section. The reproduction here ensures the sync-summary serves as a standalone audit artefact independent of the per-project files.
+**Phase 3 agent counts (LifeOS files consumed per project):**
 
-### Phase 3 — Cernio
-
-23 source files consumed. Evidence block reproduced in `profile/projects/cernio.md`.
-
-### Phase 3 — Image Browser
-
-30 source files consumed. Evidence block reproduced in `profile/projects/image-browser.md`.
-
-### Phase 3 — Aurix
-
-29 source files consumed. Evidence block reproduced in `profile/projects/aurix.md`.
-
-### Phase 3 — NeuroDrive
-
-33 source files consumed (largest project in the portfolio). Evidence block reproduced in `profile/projects/neurodrive.md`.
-
-### Phase 3 — Nyquestro
-
-22 source files consumed. Evidence block reproduced in `profile/projects/nyquestro.md`.
-
-### Phase 3 — Tessarix
-
-17 source files consumed. Evidence block reproduced in `profile/projects/tessarix.md`. This is the only project newly added to `cernio/profile/projects/` this run.
-
-### Phase 3 — Vynapse
-
-14 source files consumed. Evidence block reproduced in `profile/projects/vynapse.md`.
-
-### Phase 3 — AsteroidsAI
-
-15 source files consumed. Evidence block reproduced in `profile/projects/asteroidsai.md`.
-
-### Phase 3 — Consilium
-
-15 source files consumed. Evidence block reproduced in `profile/projects/consilium.md`.
-
-### Phase 3 — Chrona
-
-11 source files consumed. Evidence block reproduced in `profile/projects/chrona.md`.
-
-### Phase 3 — Xyntra
-
-13 source files consumed. Evidence block reproduced in `profile/projects/xyntra.md`.
-
-### Phase 3 — Zyphos
-
-13 source files consumed. Evidence block reproduced in `profile/projects/zyphos.md`.
-
-### Phase 3 — Tectra
-
-9 source files consumed. Evidence block reproduced in `profile/projects/tectra.md`.
-
-### Phase 4 — OSS aggregation
-
-18 source files consumed. Evidence block reproduced in `profile/projects/open-source-contributions.md`.
-
-### Phase 5 — Skills derivation
-
-14 project files consumed. Per-project files read end-to-end. Per-file evidence reproduced in `profile/skills.md`'s footer section (cite preserved by the agent return; agents' return summaries cite the verbatim last line of every file consumed).
+| Agent | Files read |
+|---|---|
+| cernio | 26 |
+| image-browser | 30 |
+| aurix | 29 |
+| neurodrive | 45 |
+| nyquestro | 22 |
+| tessarix | 17 |
+| performance-profiler | 21 |
+| vynapse | 14 |
+| asteroidsai | 15 |
+| consilium | 15 |
+| chrona | 11 |
+| xyntra | 13 |
+| zyphos | 13 |
+| tectra | 9 |
+| **Phase 3 total** | **280** |
+| Phase 4 OSS aggregation | 18 |
+| Phase 5 skills derivation | 15 (Cernio profile/projects/*.md files) |
+| **Grand total LifeOS+Cernio reads** | **313** |
 
 ---
 
-## Run statistics
+## Notable changes this run
 
-| Metric | Value |
-|---|---|
-| Total agents dispatched | 14 (13 per-project + 1 skills derivation) |
-| Agents returning successfully | 14 / 14 |
-| Agents with partial evidence | 0 |
-| Total LifeOS files consumed | 244 (Phase 3 sum: 244; Phase 4: 18 within OSS folder; Phase 5 reads cernio/profile/projects/ not LifeOS) |
-| Total `gh api` calls | ~280 (folder listings + per-file fetches across Phase 2 + Phase 3 + Phase 4) |
-| Total new files in cernio/profile/ | 4 (3 Phase-2 adds + Tessarix per-project file) |
-| Total files synchronously preserved | 2 (preferences.toml, portfolio-gaps.md) |
-| Cernio-native modification | none |
-| Sync run duration | ~12 minutes (12-agent parallel fanout dominated wall-clock; serial Phase 1+2+4+5+6+7+8 fitted around it) |
+1. **`profile/skills/lane-affinity.md` is new.** Per-lane evidence pack (one section per active lane from `career-goals.md`) with pinnacle/supporting/skills/gaps structure. Intended for downstream `grade-companies` and `grade-jobs` agents to embed verbatim. See `references/skills-derivation-rubric.md` §"Lane Affinity File" for the schema added this run.
 
-End of sync summary.
+2. **Performance Profiler synthesised for the first time.** Previously absent from `profile/projects/` despite being on the README's Active Projects section. Now present with a 239-line synthesis from 21 LifeOS files + GitHub-augmentation receipt.
+
+3. **Two new direct-copy files for cover-letter / resume.** LifeOS renamed both source files to include `- Ata Caner Cetinkaya` suffixes; mechanical path normalisation now produces matching long-name files. Old short-name files orphaned.
+
+4. **Three "no-pinnacle" admissions in lane-affinity** (big-tech, bank-strats, fintech) are the design intent of the schema — honest negative-space matters more than padded pinnacle attributions for grading calibration.

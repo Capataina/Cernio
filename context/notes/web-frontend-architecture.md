@@ -1,8 +1,50 @@
 # Web Frontend Architecture
 
 > Project-internal scope. Sister doc to `Projects/Cernio/Systems/Web.md` in LifeOS (project-meta scope). Both maintained independently per the dual-write principle — no cross-link sync.
+>
+> **Scale note (2026-05-31):** the web surface is now 22 Rust files (~5,165 LOC) + ~4,428 LOC of CSS + vanilla JS. It has effectively outgrown notes-shape; a `systems/web.md` promotion is recommended for a future Restructure pass.
 
 The web frontend ships alongside the TUI as a second UI surface. Same SQLite DB, different presentation layer. Boot via `cernio web` (localhost:7878).
+
+## Handler module structure (post-2026-05-30 split)
+
+`handlers/jobs.rs` (864 lines) and `handlers/companies.rs` (900 lines) were split into 6-file submodules each in commit `7e2e36c`. Both follow the same template:
+
+```
+src/web/handlers/
+├── dashboard.rs            (single file — page assembly is cohesive enough)
+├── jobs/
+│   ├── mod.rs              (re-exports: page, decision, DecisionForm, JobsQuery)
+│   ├── filters.rs          (chip-strip + query parsing — 7 axes)
+│   ├── charts.rs           (JSON-island builders for heatmap / freshness / funnel)
+│   ├── table.rs            (row rendering)
+│   ├── page.rs             (top-level page assembly)
+│   └── lanes_view.rs       (?view=lanes lane-columned alternative)
+├── companies/
+│   ├── mod.rs              (re-exports: page, CompaniesQuery)
+│   ├── filters.rs          (chip-strip + query parsing — 6 axes)
+│   ├── charts.rs           (JSON-island builders for company analytics)
+│   ├── table.rs            (row rendering)
+│   ├── page.rs             (top-level page assembly)
+│   └── lanes_view.rs       (?view=lanes lane-columned alternative)
+├── decisions.rs            (rebuilt 2026-05-30: funnel nav + next-actions pane)
+├── activity.rs             (timeframe + raw-events toggle)
+├── detail.rs               (drawer HTML fragments)
+├── ops.rs                  (clean + format preview + run)
+└── api.rs                  (stats.json + search-index.json)
+```
+
+> **Convention.** A third page added to the web frontend with this much surface would be expected to follow the same 6-file template. The split was not chosen page-by-page; it was a uniform decision.
+
+## `no_cache_static` middleware
+
+`src/web/mod.rs::no_cache_static` is an axum middleware applied to the `/static/*` mount that sets:
+
+```
+Cache-Control: no-cache, no-store, must-revalidate
+```
+
+on every static-asset response. Why: a stale cached CSS file silently broke the layout multiple times during the 2026-05 redesign — the browser kept serving the pre-refactor `components.css` after the file was split into ten siblings, and the page rendered with most styles missing. Cheap in dev (localhost single-user). Production would want different headers.
 
 ## Stack
 
@@ -48,15 +90,25 @@ Each handler chooses its assets:
 PageAssets::css_js("/static/css/jobs.css", "/static/js/jobs.js")
 ```
 
-### Shared bundle inventory
+### Shared bundle inventory (post-2026-05-30 component split)
+
+`components.css` (24 KB) was decomposed into component-shaped siblings to make styles findable by feature rather than alphabetised in one wall.
 
 | File | Role |
 |---|---|
 | `base.css` | Design tokens, reset, typography, ambient canvas styling, grid primitives, page entry transition |
 | `motion.css` | 4 motion archetypes (lift / flash / pulse / drift), marquee, ripple, `prefers-reduced-motion` cascade |
-| `components.css` | Panel, KPI strip, lane chip, grade pill, button, table, role-row, activity-row, day-header, status pill |
 | `chrome.css` | Topbar, tabs, brand, status strip, lane-legend topbar popover |
-| `filters.css` | `.filter-strip` + `.chip` variants (lane / grade / plain / segmented) + filter summary row |
+| `chips.css` | Filter chip variants (lane / grade / plain / segmented) |
+| `buttons.css` | Apply / Watch / Reject + ops controls |
+| `rows.css` | `.row-clickable` + lane-accent strip + ambient glow + hover state. **Sensitive file** — the `grid-area:1/1/-1/-1` trap + `.row-title-text { display: block }` border-bar bug + variable-row-height accent geometry all lived here. Fixed in commit `3baaea0`; see `notes/css-grid-absolute-positioning.md`. |
+| `tables.css` | Table grid declarations |
+| `components.css` | Residue after the split — panels, KPI strips, charts (everything that did not split out) |
+| `filters.css` | `.filter-strip` outer layout + filter summary row |
+| `filters-pie.css` | Inline-SVG lane-pie filter visualisation (new 2026-05-30) |
+| `jobs-lanes.css` | Lane-columned `/jobs?view=lanes` view |
+| `companies-lanes.css` | Lane-columned `/companies?view=lanes` view |
+| `decisions.css` | Rebuilt decisions page styling (funnel nav + next-actions pane) |
 | `debug.css` | Snap button + toast |
 | `ops.css` | Ops menu button + popover + chip-style preview detail |
 | `drawer.css` | Side drawer slide-in + backdrop |
@@ -84,8 +136,10 @@ Each page has one CSS + one JS file with page-specific layout and chart bootstra
 ```
 GET  /                          dashboard
 GET  /jobs                      jobs (filter axes: lane, grade, decision, archive, ATS, posted, sponsor, company)
+GET  /jobs?view=lanes           lane-columned alternative view of /jobs (8 lane columns, rows distributed by primary lane)
 GET  /companies                 companies (filter axes: lane, grade, status, ATS, sponsor, location, has_jobs)
-GET  /decisions                 decisions (filter: kind = all|watching|applied|interview|rejected)
+GET  /companies?view=lanes      lane-columned alternative view of /companies
+GET  /decisions                 decisions (filter: kind = all|watching|applied|interview|rejected) — funnel nav + next-actions pane
 GET  /activity                  activity (filter: window=7d|30d|90d, raw=1)
 POST /jobs/:id/decision         record user decision; returns updated decision-buttons fragment
 POST /activity/group            (placeholder, no-op)
@@ -108,7 +162,10 @@ Single source of truth for lane colours: `src/data/lane.rs::lane_hex(key)`. The 
 - TUI (via `tui/theme` mapping)
 - Web CSS chips (via `style="--lane-color: <hex>"` inline style)
 - ECharts series colours (via JSON island data + per-page chart builder)
+- Ambient row accent + lane-pie SVG filter (via inline `style` on rendered elements)
 - Ops menu chip rendering in `ops.js` (via embedded `LANE_HEX` constant — duplicated by necessity since ops menu loads on every page)
+
+Lane gradient on rows is rendered via `src/data/lane.rs::lane_accent_gradient(lanes_json)`. The helper returns a `linear-gradient(to bottom, ...)` when a company has multiple lanes (two-band split, three-band split, four-band cap) and a solid colour for single-lane companies. The horizontal fade-out is applied CSS-side via `mask-image`. The 2026-05-31 ambient-glow rework (commit `51fa15d`) replaced an earlier row-wide tint with a fixed-size 140×28 px elliptical halo over the lane-badge area — heavy `blur(26-28px)`, no hard edges. Fixed dimensions (not stretchy `top/bottom`) prevent jobs-rows-taller-than-companies-rows visual inconsistency.
 
 Grade colours live in `:root` CSS custom properties: `--grade-ss` through `--grade-f`.
 
@@ -227,6 +284,26 @@ Suppressed inside inputs / textareas / contenteditable.
 9. Tears down the server
 
 Used both as a self-service CLI and as the floating `snap all` button (POST `/debug/snap-all` from `debug.js`).
+
+**`PAGES` const (current):**
+
+```rust
+const PAGES: &[(&str, &str)] = &[
+    ("dashboard",           "/"),
+    ("companies",           "/companies"),
+    ("jobs",                "/jobs"),
+    ("jobs-filtered",       "/jobs?lane=hft"),
+    ("companies-filtered",  "/companies?lane=hft"),
+    ("jobs-lanes",          "/jobs?view=lanes"),
+    ("companies-lanes",     "/companies?view=lanes"),
+    ("decisions",           "/decisions"),
+    ("activity",            "/activity"),
+];
+```
+
+`CHROME_PATH` is hardcoded to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` — macOS only. Replace with env var if/when the snap loop needs to work on Linux.
+
+Discipline (when to use it, the verification gate) in `notes/snap-self-driven-debug.md`.
 
 ## Verified bugs fixed this session
 

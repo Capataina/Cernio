@@ -136,6 +136,22 @@ Packages are auto-deleted when a job is marked "applied" via any TUI path (`o`, 
 
 The database can always be recreated from scratch by deleting `state/cernio.db` and restarting — the migration rebuilds everything. The data is lost, but the schema is code.
 
+### Lane-based-relativity schema additions (2026-05 refactor)
+
+The lane-based-relativity refactor (`context/plans/cernio-full-refactor.md`, design-locked 2026-05-28) added columns to `companies` and `jobs` that this section's headline schema tables predate. Until the refactor settles, the additions are summarised below; the headline tables above will be re-spec'd in a future Restructure pass.
+
+| Table | Column | Type | Notes |
+|---|---|---|---|
+| `companies` | `lanes` | TEXT | JSON-array string of lane keys (`["hft","ai-ml"]`). Source of truth for lane classification; consumed by web frontend chip filters, TUI badges, grading skills. |
+| `companies` | `sponsors_uk` | TEXT | `"yes"` / `"no"` / `null`. Mandatory `yes` for retention (sponsor-only universe rule in `profile/career-goals.md`). Codeplay archived 2026-05-31 after losing sponsor licence. |
+| `companies` | `pinnacle_status_per_lane` | TEXT | JSON map of lane → pinnacle position. Emerges from `grade-companies` Phase 2 relativity pass; wiped alongside `grade` on regrade. |
+| `jobs` | `lanes` | TEXT | JSON-array string of lane keys, cached from the parent company at insert. The cached column lets `src/db/events.rs::lookup_job_label` return label + lane + grade in one query without a join. |
+| `jobs` | `grade` | (existing) | The grade column is the only grade-related field wiped during a regrade — `grade_reasoning`, `graded_at`, and `pinnacle_status_per_lane` reset alongside it; everything else (lanes, sponsor, ATS slugs, location, sector tags) is preserved. See `notes/lane-aware-universe-rebuild.md` §"Grade-wipe philosophy". |
+
+**Append-only activity log.** A separate `events` table was added in the same refactor wave for the TUI Activity view + web `/activity` page. Helper functions in `src/db/events.rs` cache `subject_label / lane / grade` at insert time so the activity timeline can render without joins. Event types use a `raw.*` prefix for migration-source events that should be excluded from activity charts (the web `/activity` handler filters them out — see `notes/web-frontend-architecture.md`).
+
+**Known follow-up.** The `cernio import` markdown parser (`src/pipeline/import.rs::parse_potential_md`) silently drops `Lane:` and `Sponsor:` fields. The 2026-05-31 discovery run had to backfill 226 companies via `/tmp/cernio-backfill-lanes.py`. The parser should be extended.
+
 ### Tests
 
 11 tests in `src/db/schema.rs` (includes `archived_status_accepted` test for MIGRATION_003):

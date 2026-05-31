@@ -140,7 +140,9 @@ These are the per-provider hazards the tests are designed to catch. Every one of
 
 ### Contract with `config`
 
-`SearchFilters::passes_location(provider, locations)` takes the provider name (`"lever"`, `"greenhouse"`, ...) as a string and looks up that provider's location patterns from `profile/preferences.toml`. This means **provider names are a shared identifier** between `ats/`, `config`, and `preferences.toml`. If a new provider is added, `preferences.toml` needs a matching `[search_filters.locations.<provider>]` entry or every job from that provider will fail the location filter.
+`SearchFilters::passes_location(locations)` takes a slice of location strings and matches them against a **single shared pattern list** held at `[search_filters.locations].patterns` in `profile/preferences.toml`. The per-provider subtable split was retired in commit `f592ca2` (2026-05-29) — every provider had matched the same UK + remote vocabulary case-insensitively, so the six subtables were 100% duplicated content. Format differences (workable `"GB"` vs smartrecruiters `"gb"` vs greenhouse `"London, England"`) are handled by the shared lowercased `contains()` match in `src/config.rs:155-177`.
+
+**Implication:** new providers no longer need a per-provider `[search_filters.locations.<provider>]` entry. They inherit the shared list automatically. Provider names are still a shared identifier between `ats/`, `config` (the `ats_provider` CHECK in `company_portals`), and `preferences.toml` (in the `SUPPORTED_ATS_PROVIDERS` invariant test) — just no longer in the location-filter layer. See `notes/lane-aware-universe-rebuild.md` §"Shared location list" for the full rationale.
 
 ### Contract with `db`
 

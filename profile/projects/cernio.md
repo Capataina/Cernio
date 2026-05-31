@@ -1,566 +1,376 @@
 ---
 name: Cernio
 status: active
-source_repo: https://github.com/Capataina/cernio
+source_repo: https://github.com/Capataina/Cernio
 lifeos_folder: Projects/Cernio
-last_synced: 2026-05-13
-sources_read: 23
+last_synced: 2026-05-31
+sources_read: 26
 ---
 
 # Cernio
 
 ## One-line summary
 
-Local-first collaborative job discovery and curation engine in Rust — combines a SQLite store, 6 ATS provider fetchers, a 5-view Ratatui TUI, and 9 native Claude Code skills into a system where scripts handle volume and AI handles judgment inside conversational sessions.
+Local-first, conversational job-discovery and curation engine in Rust — SQLite single source of truth, six ATS provider fetchers, six pipeline scripts, nine native Claude Code skills, a 26-file Ratatui TUI, and an embedded axum web UI — built around the principle that scripts handle volume and AI handles judgment.
 
 ## What it is
 
-Cernio is a **local-first, collaborative job discovery and curation engine** built in Rust. It combines a SQLite database, a Ratatui terminal UI, 6 ATS provider fetchers (plus Eightfold as bespoke), 6 pipeline scripts (resolve / search / clean / check / import / format), and 9 native Claude Code skills into a system where a human and an AI work together in conversational sessions to find, evaluate, and curate job opportunities. The architectural split is deliberate: **scripts handle volume (scanning hundreds of ATS boards in seconds), Claude handles judgment (reading descriptions, assessing fit against a nuanced profile), and the user owns every decision**. Nothing is automated end-to-end — every action happens inside a conversational session where the orchestrator (Claude) invokes scripts and skills the user approves. The TUI is the real-time window into everything, not the primary interaction mode. The project is *operational*, not aspirational: a database of 456 companies and ~1,370 graded jobs sits behind it, with grading semantics that have been through five major rubric iterations driven by production failures with real data.
+Cernio is a single-developer, Claude-Code-collaborator system for finding, evaluating, and curating job opportunities against a structured personal profile. It composes a SQLite database, six ATS provider fetchers (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday — plus Eightfold accepted in the schema CHECK constraint with no fetcher), six pipeline CLI commands (`resolve`, `search`, `clean`, `check`, `import`, `format`), nine project-local Claude Code skills under `.claude/skills/`, a five-view Ratatui terminal dashboard with mouse support, and (since 2026-05-30) an embedded axum HTML interface on `localhost:7878` over the same SQLite DB.
+
+It is deliberately not an automated pipeline. The original design called for a daily `cernio refresh` and was revised in the first design session: every action happens in a conversational session where the user and Claude decide together what to do. Scripts handle combinatorial volume (probing ~5,000 ATS slug candidates, scanning hundreds of job boards); skills handle reasoning (rubric-based grading, fit assessment, portfolio-gap maintenance); the user owns every application decision. The TUI and web UI are real-time windows into the SQLite database; they never modify data independently.
+
+The project also functions as a career-coaching feedback loop. Grading reveals market patterns; patterns become entries in `profile/portfolio-gaps.md`; gap closure improves the profile; the improved profile shifts future grades. As of the latest LifeOS snapshot the DB carries ~1,370 graded jobs and 456+ companies across resolved + bespoke statuses; the lane-based-relativity refactor on 2026-05-29 expanded the universe to ~706 companies and ~1,068 lane-tagged jobs, and the web frontend redesign on 2026-05-30 added a second UI surface.
 
 ## Architecture
 
-Three-layer architecture with strict downward dependency through SQLite as the shared contract:
+Strict three-layer design, dependencies flowing downward through SQLite as the shared contract.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                Conversational Session                            │
-│                (User + Claude Code)                              │
-│  - Decide what to do: discover / populate / search / evaluate    │
-│  - Claude orchestrates skills + scripts, evaluates results       │
-│  - User makes all application decisions                          │
-└────────┬───────────────────────────────┬────────────────────────┘
-         │ invokes                       │ writes evaluations
-         ▼                               ▼
+│                   Conversational Session                         │
+│                   (User + Claude Code)                           │
+│  • Decide what to do: discover, populate, search, evaluate      │
+│  • Claude orchestrates skills/scripts, evaluates results        │
+│  • User makes all application decisions                         │
+└──────────┬──────────────────────────────────────────────────────┘
+           │ invokes                          │ writes evaluations
+           ▼                                  ▼
 ┌─────────────────────────┐    ┌──────────────────────────────────┐
-│   Rust Scripts          │    │   SQLite (state/cernio.db)        │
-│   (parameterised tools) │───►│                                   │
-│  resolve / search /     │    │  companies   potential→resolved/  │
-│  clean / check /        │    │               bespoke             │
-│  import / format        │    │  jobs        pending→evaluating→  │
-└─────────────────────────┘    │               strong_fit/weak_fit │
-                               │  user_decisions   watching/       │
-                               │               applied/rejected    │
-                               │  application_packages             │
-                               │  company_portals                  │
-                               └──────────────┬───────────────────┘
-                                              │ watches (2s poll)
-                                              ▼
-                               ┌──────────────────────────────────┐
-                               │       Ratatui TUI                 │
-                               │       5 views, 26 source files    │
-                               │  Dashboard / Companies / Jobs /   │
-                               │  Pipeline (kanban) / Activity     │
-                               └──────────────────────────────────┘
+│    Rust Scripts          │    │      SQLite (state/cernio.db)    │
+│                          │───►│  companies: potential →          │
+│  • resolve  • search     │    │    resolved / bespoke            │
+│  • clean    • check      │    │  jobs: pending → evaluating →    │
+│  • format   • import     │    │    SS / S / A / B / C / F        │
+└──────────────────────────┘    │  user_decisions: watching /      │
+                                │    applied / rejected            │
+                                │  + company_portals,              │
+                                │    application_packages          │
+                                └──────────────┬───────────────────┘
+                                               │ watched by
+                              ┌────────────────┴────────────────┐
+                              ▼                                 ▼
+                  ┌──────────────────────┐         ┌────────────────────────┐
+                  │   Ratatui TUI v5     │         │   Web UI (axum + maud) │
+                  │   5 views · 26 files │         │   5 tabs · localhost   │
+                  └──────────────────────┘         └────────────────────────┘
 ```
 
-Layer responsibilities (load-bearing — violations are surfaced as architectural bugs):
+Layer responsibilities are strictly partitioned. The conversation layer orchestrates skills and scripts and tracks portfolio gaps; it never auto-submits applications. The Rust scripts do combinatorial volume — scan ATS boards, probe slug patterns, fetch job JSON — and never read the profile or make judgments. SQLite is the contract; the TUI and web UI poll/read but write back only through user actions. No layer depends upward.
 
-| Layer | Does | Does not |
-|---|---|---|
-| Conversation | Orchestrates skills + scripts, evaluates jobs against profile, recommends actions, tracks portfolio gaps | Submit applications, decide without user input |
-| Rust scripts | Combinatorial volume: scan ATS boards, probe slug patterns, fetch job JSON, generate exports | Make judgments, know about the profile, decide what to search for |
-| TUI | Real-time display of company universe, evaluation progress, user decisions; markdown export on keypress | Run scripts, evaluate jobs, modify data independently |
-| SQLite | Single source of truth — the contract between every other layer | Contain business logic |
-
-Module map (~14k lines Rust across 56 files, ~494KB):
+Module map (Rust, ~14k lines across 56 source files at the last LifeOS snapshot):
 
 ```
-cernio/
-├── src/
-│   ├── lib.rs               # Library surface (session-9 split — unblocks tests/)
-│   ├── main.rs              # Thin shim calling into lib; CLI dispatch only
-│   ├── config.rs            # TOML config parser (preferences.toml → typed structs)
-│   ├── http.rs              # Shared HTTP client with retry logic
-│   ├── db/
-│   │   ├── mod.rs           # Public DB interface
-│   │   └── schema.rs        # 6 migrations, 5 tables, 29 inline tests
-│   ├── ats/                 # 6 provider fetchers + common types
-│   │   ├── common.rs        # Shared retry helpers, slug normalisation, AtsJob struct
-│   │   ├── greenhouse.rs    # Greenhouse boards-api
-│   │   ├── lever.rs         # US + EU dual-endpoint probe, offset pagination
-│   │   ├── ashby.rs         # POST-based job-board API
-│   │   ├── workable.rs      # Offset-paginated, per-job detail fetch
-│   │   ├── smartrecruiters.rs # totalFound>0 verification, ?country=gb filter
-│   │   └── workday.rs       # Variable {company}.wd{1-12}.myworkdayjobs.com + site
-│   ├── autofill/            # Chrome CDP automation (scaffolded, broken)
-│   │   ├── mod.rs           # ApplicantProfile + provider dispatch
-│   │   ├── common.rs        # Chrome launch via chromiumoxide
-│   │   └── greenhouse.rs    # CSS selectors (untested against real DOM)
-│   ├── pipeline/            # 6 CLI commands
-│   │   ├── resolve.rs       # Slug-candidate probing across all providers
-│   │   ├── search.rs        # Fetch → filter chain (location/exclude/include) → INSERT OR IGNORE
-│   │   ├── clean.rs         # Tiered archival lifecycle (SS 28d → C/F 3d)
-│   │   ├── check.rs         # Integrity report (health/completeness/staleness)
-│   │   ├── import.rs        # Bulk import from markdown discovery files
-│   │   └── format.rs        # HTML → plaintext (idempotent, 514 lines)
-│   └── tui/                 # 26 files, modular v5 architecture
-│       ├── mod.rs           # Terminal setup/teardown + event loop
-│       ├── app/             # 6 files — App state, navigation, actions, pipeline, cleanup
-│       ├── handler/         # 4 files — top-level dispatch, per-view, overlays, mouse
-│       ├── views/           # 8 files — dashboard (31.5KB), companies, jobs, pipeline, activity
-│       ├── widgets/         # 5 files — grade_bar, text_utils, toast, layout.distribute()
-│       ├── queries.rs       # ~20 DB query functions (17.4KB)
-│       └── theme.rs         # Semantic colour palette
-├── tests/                   # Integration tests
-│   ├── cli.rs               # 16 CLI tests via assert_cmd + CERNIO_DB_PATH tempdir
-│   ├── pipeline_clean.rs    # 11 tests
-│   ├── pipeline_format.rs   # 5 tests
-│   ├── pipeline_import.rs   # 12 tests
-│   ├── ats_strip_html_parity.rs  # 6 tests (code-health-audit follow-up)
-│   ├── preferences_integrity.rs  # 21 tests (session 10 — guards preferences.toml shape)
-│   └── common/, smoke.rs
-├── profile/                 # Synced from LifeOS (one-way) via populate-from-lifeos
-│   ├── personal/education/experience/visa/... .md  # Direct-copies from LifeOS Profile/Professional/
-│   ├── projects/<name>.md × N      # Per-project synthesis files
-│   ├── projects/index.md            # Generated navigation index
-│   ├── projects/open-source-contributions.md  # Aggregated OSS record
-│   ├── skills.md                    # Derived from per-project files
-│   ├── preferences.toml             # Cernio-native — search filters + cleanup config
-│   ├── portfolio-gaps.md            # Cernio-native — check-integrity output (454 lines)
-│   └── sync-summary.md              # Per-run audit artefact
-├── companies/               # Discovery landing zone (potential.md)
-├── .claude/skills/          # 9 native Claude Code skills (.claude location, session 9 migration)
-├── context/                 # Project memory (architecture, systems/, references/, plans/, notes/)
-├── exports/                 # Generated markdown reports
-├── CLAUDE.md                # Principal-engineer personality + Cernio doctrine
-└── state/                   # SQLite DB (gitignored)
+src/
+├── lib.rs                    # Library crate — session-9 split to unblock tests/
+├── main.rs                   # Thin shim, CLI dispatch
+├── config.rs                 # TOML → typed structs from preferences.toml
+├── http.rs                   # Shared HTTP client with retry
+├── db/
+│   ├── mod.rs                # Public DB interface
+│   └── schema.rs             # 6 migrations, 5 tables, 29 inline tests
+├── ats/                      # 6 provider fetchers + common types
+│   ├── mod.rs, common.rs     # Provider dispatch + retry/slug helpers
+│   ├── greenhouse.rs         # No pagination; ?content=true for descriptions
+│   ├── lever.rs              # Dual US + EU endpoint probe
+│   ├── ashby.rs              # POST API
+│   ├── workable.rs           # ?offset= pagination
+│   ├── smartrecruiters.rs    # totalFound>0 verification (200 ≠ success)
+│   └── workday.rs            # Variable subdomain + site; complex resolution
+├── autofill/                 # Chrome CDP automation (scaffolded, broken)
+│   ├── mod.rs, common.rs, greenhouse.rs
+├── pipeline/                 # 6 CLI commands
+│   ├── resolve.rs, search.rs, clean.rs, check.rs, import.rs, format.rs
+├── tui/                      # 26 files: app/, handler/, views/, widgets/, queries.rs, theme.rs
+└── web/                      # axum router + maud templates + handlers + debug_snap CLI
+    ├── mod.rs, templates.rs, debug_snap.rs
+    └── handlers/{dashboard, companies, jobs, decisions, activity, detail, ops, api}.rs
+
+tests/                        # Integration tests (346 passing)
+├── common/mod.rs, cli.rs, pipeline_clean.rs, pipeline_format.rs,
+├── pipeline_import.rs, ats_strip_html_parity.rs,
+├── preferences_integrity.rs (21 build-time assertions on preferences.toml),
+└── smoke.rs
+
+profile/                      # Synced from LifeOS one-way; Cernio-native files preserved
+├── personal.md, education.md, experience.md, visa.md, ...
+├── projects/<name>.md × N    # Synthesised per-project files (this file is one)
+├── skills.md, preferences.toml (Cernio-native), portfolio-gaps.md (Cernio-native)
+└── sync-summary.md
+
+.claude/skills/               # 9 native Claude Code skills, all skill-creator-audited
+context/                      # Project memory — architecture.md, notes/, systems/, plans/
+state/cernio.db               # SQLite (WAL mode); gitignored historically; web added on 2026-05-30
 ```
 
-Key architectural properties surfaced by the LifeOS evidence base:
+Dependency direction is enforced by Rust's lib/bin split: `main.rs` is a thin shim over `lib.rs`, and integration tests in `tests/` import public items from the library crate. Every new top-level module must be declared in `lib.rs`. The CLI reads `CERNIO_DB_PATH` env var (fallback `state/cernio.db`) so integration tests can target tempdir DBs without filesystem contention.
 
-- **Idempotency everywhere.** Every pipeline command is safe to run repeatedly. `cernio format` only processes descriptions still containing HTML; `cernio import` deduplicates via URL UNIQUE; `cernio resolve` skips already-resolved companies. `cernio format` runs silently on every TUI startup via `run_silent()` — the idempotency-on-realistic-payload test is the guard that prevents a silent corruption loop.
-- **WAL mode** — SQLite runs in WAL on every connection open, so the TUI can read while pipeline scripts write.
-- **No hardcoded configuration.** Every filter, keyword, location pattern, cleanup threshold, and grade boundary lives in `profile/preferences.toml`, read as typed structs via `src/config.rs`.
-- **Graceful degradation.** If `preferences.toml` is missing or malformed, `config.rs` falls back to sensible defaults (min grade B, 14-day stale threshold, exclude F/C). This is documented as a known coupling — the loader is intentionally lenient, so typos silently fall back to defaults with only a stderr warning. The session-10 `tests/preferences_integrity.rs` guard exists specifically because this leniency had been masking real bugs.
-- **Lib + bin split** (session 9, load-bearing). `main.rs` is a thin shim re-exporting from `lib.rs` so integration tests under `tests/` can see public items. Every new top-level module must be declared in `lib.rs`.
-- **`CERNIO_DB_PATH` env var** lets the CLI binary be retargeted at tempdir DBs for `assert_cmd` integration tests; falls back to `state/cernio.db` when unset.
+Key architectural properties:
 
-Inter-system relationships (session-9-formalised contracts whose breakage produces silent dropouts):
+- **Idempotency everywhere.** Every pipeline command is safe to re-run. `cernio format` only processes descriptions still containing HTML; `cernio import` deduplicates via URL UNIQUE; `cernio resolve` skips already-resolved companies.
+- **WAL mode** so the TUI/web reads while pipeline scripts write.
+- **No hardcoded config.** Every filter, keyword, location pattern, cleanup threshold, and grade boundary lives in `profile/preferences.toml`. The `config.rs` loader is intentionally lenient (typos → defaults + stderr warning), guarded by `tests/preferences_integrity.rs`'s 21 build-time assertions.
+- **Graceful degradation.** Missing/malformed `preferences.toml` falls back to sensible defaults: min grade B, 14-day stale threshold, exclude F/C.
 
-| A | B | Mechanism | Failure mode |
-|---|---|---|---|
-| `ats/` provider modules | `config::SearchFilters::passes_location` | Shared provider-name string used as module name AND TOML key | A new provider without a `[search_filters.locations.<provider>]` entry produces zero jobs post-filter (mitigated by unknown-provider passthrough but still a silent dropout for non-UK locations) |
-| `pipeline/search` | `db` `jobs` table | `INSERT OR IGNORE INTO jobs` keyed on `url UNIQUE` | The UNIQUE constraint is the dedup mechanism; `INSERT OR IGNORE` vs plain `INSERT` is load-bearing |
-| `pipeline/format` | `tui/mod::run_silent` | Called on TUI startup as subprocess; MUST be idempotent | A non-idempotent format would mangle cleaned descriptions on every launch — silent corruption loop |
-| `db` `application_packages` | `autofill/` | JSON answers written by `prepare-applications`, read by autofill binary | JSON key-set drift → partial forms silently |
-| Skills in `.claude/skills/` | `profile/` | Mandatory-read protocol — every skill reads fresh on every invocation | Skills that embed profile snapshots go stale the moment the profile updates (Living System rule) |
-| `tests/preferences_integrity.rs` | `profile/preferences.toml` + `src/config.rs` + `src/ats/<provider>.rs` | Build-time assertions over file shape; `every_supported_ats_provider_has_a_location_subtable` drives off `SUPPORTED_ATS_PROVIDERS` const | Without these tests, a typo in preferences.toml silently falls back to defaults (the actual failure mode that masked the Workday UK-filter bypass for the fetcher's entire lifetime until session 10) |
-| `populate-from-lifeos` skill | `profile/` + LifeOS repo via `gh api` + `Capataina/Capataina` README via `gh api` | One-way orchestrator; Phase 7 verifies Cernio-native preservation by pre/post-timestamp comparison | If the README is unparseable the skill aborts — the gatekeeper would be unreachable and silent fallback would import private projects |
-
-Hidden coupling worth surfacing (from LifeOS Architecture):
-- **Provider names are a shared string across `ats/`, `config.rs`, `preferences.toml`, AND the `db` `ats_provider` CHECK constraint.** Renaming `smartrecruiters` anywhere requires touching all four — no single source of truth.
-- **`ats_extra` JSON structure is provider-specific and unversioned.** Changing Workday's `{subdomain, site}` shape without migrating existing rows silently zeros out Workday-portal job runs.
-- **TUI does not re-read `preferences.toml` while running.** Edits during a TUI session take effect on restart only.
-
-Critical path — `cernio search` blast radius:
-
-```
-argv → main.rs → config::load → pipeline::search::run
-  → get_search_targets (SELECT FROM company_portals WHERE companies.grade >= threshold)
-  → fetch_all_parallel (Tokio Semaphore, N × {provider}::fetch_jobs)
-  → per-portal HTTP via common::get_with_retry (exponential backoff)
-  → serde deserialise → normalise_* → Vec<AtsJob>
-  → filter stack (location → exclusion → inclusion)
-  → db::job_exists → INSERT OR IGNORE INTO jobs
-  → UPDATE companies SET last_searched_at
-  → TUI picks up via 2s poll → Jobs view, "New ●" badge
-```
-
-HTTP failures fail per-portal (other portals keep going); deserialise failures silently drop that portal; filter drops are counted and reported; DB writes are atomic per-URL via `INSERT OR IGNORE`.
+Critical path is `cernio search`: argv → `config::load` → `pipeline::search::run` → `get_search_targets` SELECT → `fetch_all_parallel` (Tokio semaphore over per-provider fetchers) → per-portal HTTP via `common::get_with_retry` → serde deserialise → normalise → location/exclusion/inclusion filters → `db::job_exists` → `INSERT OR IGNORE INTO jobs` → `UPDATE companies SET last_searched_at` → TUI 2s poll picks it up. Blast radius is per-portal: HTTP failures fail one portal at a time; the unique URL constraint is the dedup; filter drops are counted and reported.
 
 ## Subsystems and components
 
-### ATS Providers
+### Database (SQLite via `rusqlite`, bundled, WAL mode)
 
-Six provider fetchers in code plus Eightfold accepted by the CHECK constraint as bespoke (no fetcher module — only 1 company uses it, ROI stayed low). Each provider lives in `src/ats/<name>.rs` with probe / fetch / parse functions and shares `common.rs` for retry, slug normalisation, and the unified `AtsJob` struct.
+5 tables, 6 migrations. `companies` (name, website UNIQUE, what_they_do, status enum `potential|resolved|bespoke|archived`, location, sector_tags, careers_url, why_relevant, grade S/A/B/C, grade_reasoning, last_searched_at). `company_portals` (FK to companies, ats_provider CHECK constraint listing all 7 providers, ats_slug, ats_extra JSON for Workday subdomain+site, UNIQUE on company+provider+slug). `jobs` (FK to companies, url UNIQUE as dedup, raw_description, evaluation_status, fit_assessment, fit_score, grade SS/S/A/B/C/F, archived_at). `user_decisions` (watching/applied/rejected/interview, multiple per job permitted). `application_packages` (PK job_id, JSON answers, auto-deleted on applied). Migrations 002 and 003 rebuild tables because SQLite lacks `ALTER CHECK`; the pattern is `create _new` → `INSERT FROM` old → `DROP` old → `RENAME`. All migrations are idempotent.
 
-| Provider | API base | Pagination | Companies (session-7 snapshot) |
-|---|---|---|---|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` | None (all in one response) | 114 |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` (POST) | None | 70 |
-| Workable | `apply.workable.com/api/v1/widget/accounts/{slug}` | `?offset=` | 31 |
-| Lever | `api.lever.co/v0/postings/{slug}` + EU endpoint | Offset, 10/page | 26 |
-| Workday | `{company}.wd{1-12}.myworkdayjobs.com/wday/cxs/{company}/{site}/jobs` (POST) | `limit`+`offset` in body | 20 |
-| SmartRecruiters | `api.smartrecruiters.com/v1/companies/{slug}/postings` | `limit`+`offset` max 100 | 8 |
-| Eightfold | `{subdomain}/api/apply/v2/jobs?domain={domain}` | — | 1 (bespoke, no fetcher) |
+Tiered archival lifecycle is grade-aware: SS 28d active → 14d archive expiry, S 21d/14d, A 14d/14d, B 7d/14d, C/F 3d/14d. After archive expiry the row is fully deleted to allow re-discovery under a potentially updated profile. Companies are never auto-archived by grade — a C company may still post one good role, and the grading cost is cheap relative to a missed opportunity.
 
-Per-provider quirks documented in LifeOS Systems/ATS Providers.md:
+### Pipeline (6 commands)
 
-- **SmartRecruiters returns 200 for ANY slug** — the single most dangerous false positive in the system. The API returns `{"totalFound": 0, "content": []}` for completely fake company names; HTTP 200 is NOT evidence of a company using SmartRecruiters. Only `totalFound > 0` is reliable verification.
-- **Greenhouse** description requires `?content=true` parameter or detail-endpoint fetch; `metadata` field can be null or array; `offices[]` is the most structured location data.
-- **Lever** has dual US (`api.lever.co`) and EU (`api.eu.lever.co`) endpoints; the probe function tries both. Description included by default in both HTML and `descriptionPlain`.
-- **Workday** is the most complex: variable subdomain (`wd1` through `wd12`) and site name, both stored in `ats_extra` JSON. No public probe endpoint — resolution requires manual identification or web search via the `resolve-portals` AI fallback skill.
-- **Workable** has the most structured location data (`location.city` and `location.country` separately).
-- **Slug guessing is unreliable for some companies** — XTX Markets uses `xtxmarketstechnologies` (legal entity name). Parent-company slug expansion (LexisNexis → `workday/relx`) and numeric suffixes (DigitalOcean → `greenhouse/digitalocean98`) currently fall through to AI fallback.
+`cernio resolve` generates ~10-20 slug candidates per company (lowercase, hyphenated, no-spaces, first-word, first-two-words, stripped corporate/domain suffixes, acronyms, parenthesised content) and probes them across all providers without early termination. SmartRecruiters is probed for all companies (not just unresolved) because it requires `totalFound > 0` verification — HTTP 200 alone is the system's single most dangerous false positive.
 
-Shared infrastructure in `common.rs`: `get_with_retry` retries on timeout/connection/request errors with exponential backoff (500ms × attempt); `post_json_with_retry` mirrors for POST endpoints; `AtsJob` is the unified type (title, url, location Vec, posted_date, description); slug normalisation is centralised.
+`cernio search` runs the three-stage filter chain (location → exclusion → inclusion) plus dedup → `INSERT OR IGNORE`. Observed ratios at session-7 baseline: ~16,180 raw jobs → ~2,001 after filtering (~88% removed), ~484 actionable after archival (~3% of raw), ~110 SS+S+A (~0.7% of raw). The 0.7% number is the foundational economic case for the architecture: mechanical volume to find the 7-in-1000, AI judgment to identify which 7.
 
-121 + 17 = 138 bespoke companies use unsupported ATS providers (iCIMS, Taleo, BambooHR, Pinpoint HQ, Personio, custom portals) and are handled via the `search-jobs` skill's bespoke-subagent dispatch — careers-page + aggregator (LinkedIn, Indeed, Glassdoor, BuiltIn) searches.
+`cernio clean` runs tiered archival; `cernio check` runs a three-category integrity report (health, completeness, staleness); `cernio import` bulk-loads companies from markdown (auto-clearing the source file after a successful import); `cernio format` is the 514-line HTML-to-plaintext converter that runs silently on every TUI/web startup. Format's idempotency (`format_description(format_description(x)) == format_description(x)`) is load-bearing — without it, every TUI launch would further mangle already-cleaned descriptions. Three direct invariant tests guard the property plus an explicit `idempotency_on_realistic_payload` test against a Greenhouse-shaped payload.
 
-### Pipeline (6 CLI commands)
+### ATS Providers (6 fetchers + Eightfold as bespoke)
 
-| Command | Purpose | Async |
-|---|---|---|
-| `cernio resolve` | Probe ATS slug candidates across 7 providers | Yes |
-| `cernio search` | Fetch jobs → filter → dedup → insert | Yes |
-| `cernio clean` | Tiered archival and stale job removal | No |
-| `cernio check` | Integrity report (health / completeness / staleness) | Yes |
-| `cernio import` | Bulk import companies from markdown files | No |
-| `cernio format` | HTML / entity-encoded descriptions → clean plaintext (idempotent) | No |
+Per-provider quirks captured in module-local handling. Greenhouse: no pagination, descriptions need `?content=true`, locations vary "Hybrid"/"Berlin; London"/"offices[]" depending on company. Lever: dual US (`api.lever.co`) + EU (`api.eu.lever.co`) endpoints, some UK companies are EU-only; has `workplaceType` field unavailable elsewhere. Ashby: POST API with `{"jobBoardSlug": slug}` body, all jobs in one response. Workable: `?offset=` pagination, per-job detail fetch for descriptions, structured `location.city` + `location.country`. SmartRecruiters: `limit`+`offset` pagination capped at 100, supports server-side `?country=gb` (Wise: 369 → 138), per-job detail fetch for descriptions. Workday: most complex — variable subdomain (`{company}.wd{1-12}.myworkdayjobs.com`) and site name, POST-based search, no public probe endpoint so resolution requires manual identification or AI fallback. Shared infrastructure in `common.rs`: `get_with_retry` and `post_json_with_retry` with exponential backoff (500ms × attempt), unified `AtsJob` struct, slug normalisation.
 
-All accept `--dry-run`. `resolve` and `search` accept `--company NAME`. `search` accepts `--grade G` to scope by company grade.
+Company distribution by provider (pre-dad-list snapshot): Greenhouse 114 (40%), Ashby 70 (24%), Workable 31 (11%), Lever 26 (9%), Workday 20 (7%), SmartRecruiters 8 (3%), Eightfold 1, bespoke 121. Greenhouse + Ashby together cover 64% of resolved companies, so a bug in either affects the majority of the searchable universe.
 
-**Resolve** generates ~10–20 candidate slugs from each company name (lowercase, hyphenated, no-spaces, first-word, first-two-words, stripped domain/corporate suffixes, acronyms, parenthetical content) and probes ALL slugs against ALL providers (no early termination — this finds multi-ATS companies like ClearBank with both Ashby and residual Workable). Companies remain `potential` if nothing hits.
+### TUI (Ratatui 0.29 + Crossterm, 26 files, 5 views)
 
-**Search** applies a three-stage filter chain after fetching:
+Modular `src/tui/` layout: `app/` (6 files: state, navigation, actions, pipeline, cleanup), `handler/` (4 files: keys, overlays, mouse), `views/` (8 files: dashboard, companies, jobs, pipeline kanban, activity timeline, chrome, overlays), `widgets/` (5 files: grade_bar, text_utils, toast, layout with `distribute()` for responsive sizing), `queries.rs` (~20 DB query functions), `theme.rs` (semantic palette: grades, freshness, activity, badges, countdowns). Three responsive layout modes: Full (≥120 cols, side-by-side master/detail), Stacked (80-119, single column), Compact (<80, abbreviated). Mouse support is first-class: scroll wheel moves viewport (3 lines/tick), click selects rows and auto-focuses panes, Ctrl-click toggles multi-select, Shift-click range-selects, MacBook trackpad two-finger scroll works natively. Dashboard carries GitHub-style 7×12 activity heatmap, search-pulse with freshness colouring, application progress bar, visa countdown with urgency colours, top-companies leaderboard, session welcome diff (12h lookback), grade distributions, pipeline-health bar. Largest single file is `src/tui/views/dashboard.rs` at 31.5KB (946 lines), flagged for split in the code-health audit.
 
-```
-Raw ATS jobs (~16,180)
-  ▼ Location filter (per-provider patterns; empty locations → KEEP)
-Filtered ~8,000
-  ▼ Exclusion filter (34+ title keywords: Principal, Director, VP, Staff, Sr., Sr , Lead, Manager, Head of, Chief, Distinguished, Fellow, Architect …)
-Filtered ~4,000
-  ▼ Inclusion filter (OR logic; empty list → pass-through)
-Filtered ~2,001
-  ▼ Dedup via URL UNIQUE
-  ▼ INSERT OR IGNORE INTO jobs
-```
+### Web (axum + maud + tower-http + HTMX + ECharts, added 2026-05-30)
 
-The observed actionable-rate is ~0.7% (raw → SS+S+A); under the post-realism semantic it tightens to ~3-4% combined SS+S+legit-A on the post-filter pool. Filter design bias is toward inclusion — empty location data passes, empty include list passes. *False negatives are the enemy.*
+Embedded local-only server on `localhost:7878` over the same SQLite DB. Five tabs (Dashboard, Companies, Jobs, Decisions, Activity), each a focused view rather than a list. Filter system uses chip-based multi-select on Companies and Jobs: four chip personalities (`chip-lane` coloured pill with dot; `chip-grade` outline + grade colour; `chip-plain` monochrome enum; `seg-group .seg` segmented control for binary/ternary toggles). Each chip is a hyperlink whose href is built server-side by toggling that value in the URL via CSV (`?lane=hft,ai-ml&grade=SS,S`); every pane on the page recomputes from the filtered set together. Detail drawer slides in from the right with URL persistence (`?detail=job-N | co-N`); two routes (`GET /detail/job/:id`, `GET /detail/company/:id`) return HTML fragments; HTMX is re-processed inside the drawer body so Apply/Watch/Reject continue working post-swap. Clickable charts cross-filter via `chart.on('click') → location.href`. Cmd-K command palette with substring + prefix + grade ranking; g-leader keyboard shortcuts (`g d/c/j/a/x` → Dashboard/Companies/Jobs/Activity/Decisions) with 1.5s timeout + floating hint. LocalStorage-backed saved searches (cap 30). Ops menu exposes only Clean DB + Format (Check/Search/Unarchive dropped from web — they belong on the CLI). `cernio snap` CLI drives headless Chrome (chromiumoxide, already in deps for autofill) over all 5 tabs and captures full-page, per-pane, and viewport-slice PNGs into `/tmp/cernio-debug/<ts>/` for self-driven visual debugging. Modular bundles: `static/css/{base,motion,components,chrome,filters,debug,ops,drawer,cmdk,presets}.css` + per-page bundles, mirrored in `static/js/`.
 
-**Clean** runs tiered archival (SS 28d → S 21d → A 14d → B 7d → C/F 3d active windows; archived items expire 14d after `archived_at`). Jobs with user decisions and SS/S/A are protected from staleness archival; companies are never auto-archived by grade.
+### Skills layer (9 native Claude Code skills under `.claude/skills/`)
 
-**Check** produces a three-category integrity report (health, completeness, staleness) including ATS slug re-verification, orphaned decisions, duplicate companies, ungraded entities, missing descriptions, and stale grades >30d.
-
-**Format** is the largest pipeline module at 514 lines — handles entity-encoded strings, nested tags, quoted attributes containing `>`, inconsistent whitespace. Three invariants guarded by tests: never produces raw HTML tags, never produces triple blank lines, never panics on malformed HTML. The `idempotency_on_realistic_payload` test guards against re-mangling.
-
-**Import** parses markdown table format from `companies/potential.md`, INSERT OR IGNOREs via website UNIQUE, then **auto-clears the source file** to prevent stale entries.
-
-### TUI (5 views, 26 source files, v5)
-
-Five views: Dashboard (`1`), Companies (`2`), Jobs (`3`), Pipeline kanban (`4`), Activity timeline (`5`).
-
-Modular architecture (post-session-7 split when 3 monolithic files exceeded 500 lines each):
-
-```
-src/tui/
-├── mod.rs           # Terminal setup/teardown + event loop
-├── app/    (6 files) # App state, navigation, actions, pipeline kanban, cleanup
-├── handler/ (4 files)# Key dispatch, per-view nav, overlay input, mouse
-├── views/  (8 files) # Dispatcher, chrome, overlays, dashboard, companies, jobs, pipeline, activity
-├── widgets/(5 files) # grade_bar, text_utils, toast, layout.distribute()
-├── queries.rs        # ~20 DB query functions (17.4KB)
-└── theme.rs          # Semantic colour palette + freshness/activity/badge styles
-```
-
-Design principles: dynamic over hardcoded (`Percentage(80)` not `Length(25)`), density over whitespace, mouse-first keyboard-enhanced, grade is the primary metric (`evaluation_status` adds nothing beyond `grade` and is not displayed).
-
-Dashboard components: activity heatmap (GitHub-style 7×12, action-type coloured), search pulse with freshness colours, application progress bar, visa countdown with urgency colours, top companies leaderboard, session welcome diff (12h lookback), grade distribution, pipeline health by ATS provider.
-
-Interaction: `j/k` navigate, `Space` quick-peek popup, `Enter` drill in, `w/a/x/i` decisions (watching/applied/rejected/interview), `o` open URL + auto-mark applied, `y` copy URL, `g` grade picker, `Ctrl+G` smart grouping, `s` cycle sort, `f` focus mode (hide F/C+applied), `D` archive F immediately, `/` instant search, `e` export markdown, `?` help, `A` toggle archived. Mouse: scroll moves viewport not selection, Ctrl+click toggles multi-select, Shift+click range, click tab bar switches.
-
-Responsive layout: Full (120+ cols, side-by-side master/detail), Stacked (80–119, single column list-above-detail), Compact (<80, list only). Pipeline columns size proportionally — empty collapses to 20-char minimum.
-
-### Database (SQLite, 5 tables, 6 migrations, 29 inline tests)
-
-Five tables:
-
-- **companies** — id, name, website (UNIQUE — dedup key across all layers), what_they_do (3–5 sentence enrichment from `grade-companies`), discovery_source, discovered_at, status (`potential`/`resolved`/`bespoke`/`archived`), location, sector_tags, careers_url, why_relevant + relevance_updated_at, grade (S/A/B/C nullable), grade_reasoning, graded_at, last_searched_at (migration 004).
-- **company_portals** — maps a company to its ATS providers (a company can have multiple portals); UNIQUE(company_id, ats_provider, ats_slug); `ats_provider` CHECK accepts greenhouse/ashby/lever/workable/smartrecruiters/workday/eightfold; `ats_extra` for provider-specific JSON (Workday subdomain + site).
-- **jobs** — id, company_id, portal_id, title, url (UNIQUE — dedup key), location, remote_policy, posted_date, raw_description, parsed_tags, evaluation_status (pending/evaluating/strong_fit/weak_fit/no_fit/archived), fit_assessment, fit_score, grade (SS/S/A/B/C/F), discovered_at, archived_at (migration 005).
-- **user_decisions** — multiple decisions per job allowed (watching → applied).
-- **application_packages** — migration 006; `job_id` PK; `answers` JSON; auto-deleted when the job is marked applied.
-
-Migration ladder: 001 base, 002 add `archived` to companies status CHECK (table rebuild), 003 add `archived` to jobs evaluation_status CHECK + `archived_at` column, 004 add `last_searched_at` to companies, 005 add `archived_at` to jobs for tiered expiry, 006 add `application_packages`. SQLite CHECK constraint changes require table rebuilds (`create _new → INSERT → DROP → RENAME`); foreign keys are temporarily disabled during rebuilds. All migrations are idempotent.
-
-Indices on companies.status, companies.grade, company_portals.company_id, jobs.company_id, jobs.evaluation_status, jobs.grade, user_decisions.job_id.
-
-Tiered archival lifecycle: SS 28d active / S 21d / A 14d / B 7d / C+F 3d, then 14d archive expiry before full deletion (allows re-discovery with a potentially-updated profile).
-
-### Grading System (5 phases, the most-iterated subsystem)
-
-Companies grade S/A/B/C. Jobs grade SS/S/A/B/C/F. Grades map directly to TUI behaviour — SS/S surface first, F invisible unless toggle, focus mode hides F/C+applied, Pipeline kanban shows only decisions.
-
-Five rubric phases driven by production failures:
-
-1. **Dimension-weighted scoring** (sessions 1–3) — agents assigned middling scores arriving at B without genuine reasoning. Amazon at B, Monzo at C, Netflix at B.
-2. **Hard grade floors** (session 4) — FAANG min A, large UK sponsors min B, Rust min B. Failed because floors are rigid (Solutions Architect at Amazon forced to A).
-3. **Career-stage calibration + relative grading** (session 4) — dimension reweighting for a candidate with no work experience; CV signal and sponsorship at very high weight, tech stack at low. Improved but still mechanical.
-4. **Question-first reasoning** (sessions 4–5) — complete rewrite. Five job questions: Can I get it? / Good CV line? / Do I have an edge? / Would I enjoy it? / Practical constraints? Four company questions: Would you be proud to work here? / Could they hire you? / Would you grow? / Would you find it engaging? Dimensions become analytical support, not primary scoring.
-5. **Realism semantic** (session 11, commit `389b1e8a`, 2026-04-29) — explicit decoupling of reputation (Q2 — CV value) from selectivity (Q1 — realistic achievability). A reputable name on a CV says nothing on its own about whether the candidate can realistically be hired; the two axes are independent and must be assessed separately. When reasoning about Q1, ignore Q2's signal entirely. Wide-funnel reputable firms (Amazon SDE-1, Bloomberg, Microsoft Graduate, Cloudflare interns, Anthropic Fellows, HRT 2026 Grad SWE, Squarepoint Graduate) anchor SS correctly; narrow-funnel reputable firms (Jane Street SWE UK, Anthropic London non-Fellows, regular Citadel/Two Sigma/D.E. Shaw/HRT roles outside their grad pipelines) cap at A-stretch.
-
-Calibration anchors (session 5) — before grading, pull 2–3 real examples at each tier from the existing DB. Grade each job against those anchors rather than enforcing a within-batch distribution. Mandatory description citation prevents title-only grading (the Phase 3 failure mode that put "entry-accessible" labels on jobs requiring 3-5 years).
-
-Status-based project weighting (session 10) replaces the retired Flagship/Notable/Minor Tier system. Frontmatter status (`active`, `complete` substantive depth → primary evidence; `paused`, `scaffold`, `active-status-undecided` → secondary; `dormant`, `#dormant`, `#skeleton` → avoid citing).
-
-Lifestyle modulator (session 8) — `profile/lifestyle-preferences.md` is read alongside the main profile by every grading invocation as a same-tier modulator, not a Tier 3 tiebreaker. Kings Cross / Nine Elms-class areas lift boundary grades; Croydon-class areas push them down. A borderline A/B role in Kings Cross lifts to A; the same role in outer Croydon drops to B.
-
-Production impact of the realism semantic (2026-04-29 morning batch, 300 jobs): 15 SS / 21 S / 62 A / 35 B / 51 C / 116 F. 12% S+ density confirms calibration (rubric warns if >20%). Jane Street prestige-trap pattern confirmed across 18 roles → 0 SS / 0 S / 4 A-stretch / 5 B / rest C-F.
-
-### Skills Ecosystem (9 native Claude Code skills, ~290KB documentation)
+All skills migrated from `skills/` to `.claude/skills/` in session 9 for native Skill-tool auto-discovery via YAML frontmatter with engineered triggers and negative-trigger clauses. Each SKILL.md was then iterated through skill-creator: evidence-anchored mandatory-read tables (replacing exhortation framing), What-I-Did-Not-Do declarations between workflow steps, Tier 3 quality checklists. Inventory:
 
 | Skill | Purpose |
 |---|---|
-| `populate-from-lifeos` (s10 NEW) | Sync `profile/` from LifeOS canonical source via the GitHub README allow-list — one-way flow, never writes to LifeOS, never touches Cernio-native files (`preferences.toml`, `portfolio-gaps.md`). Replaces retired `profile-scrape`. 8-phase autonomous workflow. |
-| `discover-companies` | Profile-aware company discovery via parallel sector agents (AI/ML, fintech, trading, systems, devtools, non-obvious sources) with creative web search. |
-| `populate-db` | Research companies from discovery, find ATS slugs, insert into SQLite. |
-| `resolve-portals` | AI fallback for companies that fail script-based resolution. |
-| `search-jobs` (s9 upgrade + s11 mini-iteration) | Orchestrates full search cycle — script half (`cernio search`) + bespoke half (AI agents for companies without ATS), insert-obligation-anchored. |
-| `grade-companies` | Enrich + grade companies (S/A/B/C) with profile-grounded reasoning, question-first rubric, calibration-anchored. |
-| `grade-jobs` (s9 + s11 realism rewrite) | Grade jobs SS-F with question-first rubric, mandatory description citation, calibration anchors, lifestyle modulator, and the realism semantic with reputation × selectivity decoupling. 371-line reference rubric. |
-| `check-integrity` | AI-driven re-evaluation, cross-checking, portfolio gap maintenance. The most complex skill with 4 reference files. |
-| `prepare-applications` | Generate tailored application answers per job (cover letter / why-this-role / project-answer / common Qs), JSON-stored in `application_packages` table, consumed by autofill via TUI `p` key. |
+| `populate-from-lifeos` | One-way sync `profile/` from LifeOS canonical source via the `Capataina/Capataina` README allow-list; never writes to LifeOS; never touches `preferences.toml` or `portfolio-gaps.md`. Replaces retired `profile-scrape`. |
+| `discover-companies` | Profile-aware company discovery with parallel sector agents and creative non-obvious sources. |
+| `populate-db` | Validate discovered companies, run `cernio resolve`, AI fallback for failures, write to DB. |
+| `resolve-portals` | AI fallback for companies that fail script-based ATS resolution. |
+| `search-jobs` | Orchestrate full search cycle: `cernio search` (script half) + parallel bespoke subagents (AI half). Insert-obligation-anchored. |
+| `grade-companies` | Enrich + grade companies S/A/B/C with profile-grounded reasoning. |
+| `grade-jobs` | Grade jobs SS-F with question-first rubric, calibration anchors, lifestyle modulator, realism semantic (reputation × selectivity decoupling). |
+| `check-integrity` | AI-driven re-evaluation; portfolio-gap maintenance; cross-tier consistency. |
+| `prepare-applications` | Generate tailored application answers per job; store JSON in `application_packages`. |
 
-All skills enforce a **mandatory-read protocol** (added session 3): every skill agent must read its SKILL.md, every file in its `references/` directory, and all relevant files in `profile/` — every file, every time, on every invocation. Skills are obligation-anchored (session 9) — verifiable checklists with evidence outputs replace vague exhortation language ("be thorough"). Three skills (`resolve-portals`, `grade-jobs`, `prepare-applications`) had step-0 script-call patches added in commit `bee129a` to enforce `cernio resolve` / `cernio format` precursors and prevent the F12/F15 tool-action / script-obligation asymmetry.
+Total skill documentation ~290KB — nearly as large as the Rust source code (~494KB). The reference documentation IS the quality bar; without it, agents default to generic "good company, decent tech" output. Every skill enforces the mandatory-read protocol: SKILL.md → every reference file → all of `profile/` fresh on every invocation.
 
-### Testing Infrastructure (346 tests, 6+ phases)
+### Profile system (post-session-10 schema)
 
-Architectural decisions that made the test surface viable:
-1. **Lib + bin split** — `main.rs` is a thin shim over `lib.rs` so integration tests under `tests/` can see public items.
-2. **`CERNIO_DB_PATH` env var** — CLI binary reads it with fallback to `state/cernio.db`, so each `tests/cli.rs` case targets a per-test tempdir.
-3. **`test_support::open_in_memory_db()`** — exposed via `cernio::test_support` under `#[doc(hidden)]`; fresh in-memory SQLite with all migrations on every call. The workhorse fixture.
-4. **Inline for private pure helpers, integration for public flows** — private pure functions live in `#[cfg(test)] mod tests` at the bottom of their source files; public flows and the CLI binary live under `tests/`.
-5. **Offline JSON fixtures, never HTTP mocking** — ATS parser tests construct minimal JSON shaped like real responses and call `normalise()` directly. Deterministic, fast, doubles as response-shape documentation.
-6. **TUI tested by state, not by rendering** — zero rendering tests; pure helpers (`distribute()`, `clean_description`, `relative_date`, `truncate_chars`) only.
+Each pipeline invocation and skill reads `profile/` fresh — the profile is the lens through which every grading happens. Schema after session-10's `populate-from-lifeos` migration: direct-copy files from LifeOS `Profile/Professional/` (`personal.md`, `education.md`, `experience.md`, `interests.md`, `visa.md`, `languages.md`, `certifications.md`, `military.md`, `lifestyle-preferences.md`, `resume.md`, `cover-letter.md`); synthesised per-project files in `profile/projects/<name>.md` (one per allow-listed project, each comprehensive evidence-anchored synthesis of its LifeOS source); aggregated `projects/open-source-contributions.md`; derived `skills.md` (six tables, four bands) generated by a skills-derivation subagent reading the synthesised projects; navigation `projects/index.md`; per-run `sync-summary.md` audit artefact. Cernio-native files (`preferences.toml`, `portfolio-gaps.md`) are explicitly off-limits to the sync — they remain Cernio's source of truth because they are runtime config and skill output, not profile data.
 
-Test count by area: 85 in `format.rs`, 31 in `config.rs`, 30 in `resolve.rs`, 29 in `schema.rs`, 16 Lever, 14 jobs view, 13 Greenhouse, 13 Workday, 12 SmartRecruiters, 11 layout, 10 Workable, 8 Ashby, 16 CLI integration, 11 pipeline_clean, 12 pipeline_import, 5 pipeline_format, 6 strip_html parity, 21 preferences_integrity, 2 smoke — **346 total**.
+### Location-evaluation subsystem (session 8)
 
-Idempotency guarantee — the single most load-bearing property:
-```rust
-format_description(format_description(x)) == format_description(x)
-```
-Three direct invariant tests plus an explicit Greenhouse-shaped-payload idempotency test guard this. `cernio format` runs silently on every TUI startup, so non-idempotency would mangle cleaned descriptions on every launch.
+Not a scoring formula — a reasoning framework. 22-factor three-tier rubric (Tier 1 dominant, Tier 2 meaningful, Tier 3 fine-tuning) evaluating cities at city/country/hybrid level across current state and trajectory horizons (1-3 / 5-7 / 10-15 years). Tier 1 includes visa accessibility for a Turkish national at entry level, target-firm density in chosen sectors, urban aesthetic match, safety and civic order, political/legal 10-15 year stability. 10-agent parallel research pass produced `context/references/location-master.md` (71KB synthesis) plus per-agent files (~6,500 lines combined). Two headline conclusions: London #1 by unanimous agreement, "Amsterdam rejected" in prior profile was overturned unanimously. The `profile/lifestyle-preferences.md` (17.5KB) is read alongside the main profile as a same-tier grading modulator: Kings Cross / Nine Elms-class areas lift boundary grades, Croydon-class areas push them down. This is grade movement across boundaries, not within-grade tiebreaking.
 
-Bugs found by the test/integrity investment:
-- **Two silent data-loss bugs** in session 9 (commit `12897aa`) — surfaced by the retroactive pass.
-- **Workday UK-filter silent bypass** in session 10 (commit `86097a6`) — the `[search_filters.locations.workday]` subtable had been absent since the fetcher shipped, silently bypassing the UK location filter. The new `every_supported_ats_provider_has_a_location_subtable` test in `preferences_integrity.rs` was added in the same commit alongside the fix.
-- **Timestamp format mismatch** in session 11 (commit `50359b13`) — cleanup queries compared `discovered_at` as raw strings against SQLite's `datetime('now')`; inserts used chrono format `%Y-%m-%dT%H:%M:%S` while SQLite emits `%Y-%m-%d %H:%M:%S` (space, not T). Shift+D archive was silently broken. Patched 7 files (`pipeline/check.rs`, `clean.rs`, `search.rs`, `tui/app/actions.rs`, `cleanup.rs`, `pipeline.rs`, `tui/queries.rs`).
+### Testing infrastructure (346 tests; 18 at session 7)
 
-### Autofill (scaffolded, broken — Priority 1 fix)
+Six architectural decisions shape every test: lib+bin split, `CERNIO_DB_PATH` env var, `test_support::open_in_memory_db()` workhorse fixture (returns fresh in-memory SQLite with all migrations applied), inline tests for private pure functions / integration tests for public flows + CLI, offline JSON fixtures over HTTP mocking, TUI tested by state not by rendering. 327 net new tests added in seven phases across sessions 9-10. Highest test concentration: `format.rs` 85 inline (idempotency), `config.rs` 31, `resolve.rs` 30 (`slug_candidates` regression-proofed against 13 real Cernio companies), `schema.rs` 29, ATS modules 72, `cli.rs` 16, `preferences_integrity.rs` 21 (build-time invariants on `preferences.toml` shape including `every_supported_ats_provider_has_a_location_subtable` driven off a `SUPPORTED_ATS_PROVIDERS` constant). The test pass surfaced three silent bugs that had been live in production: two data-loss bugs in session 9 (commit `12897aa`), the silent Workday UK-filter bypass in session 10 (`86097a6` — Workday's `[search_filters.locations.workday]` subtable was missing since the fetcher shipped), and the timestamp format mismatch breaking Shift+D archive in session 11 (`50359b13` — inserts used `%Y-%m-%dT%H:%M:%S` while SQLite emits `%Y-%m-%d %H:%M:%S` with a space, not T; 7 files patched).
 
-Architecture is in place — Chrome launches via `chromiumoxide`, navigates to the job URL, the DB table works, the TUI integration works. But form filling does not work on real Greenhouse forms: JavaScript value injection (`el.value = "..."; el.dispatchEvent(...)`) does not trigger Greenhouse's React state management. React-controlled inputs ignore direct `.value` assignment — they need synthetic React events or `nativeInputValueSetter` tricks. Documented fix: replace JS value-injection with CDP `Input.insertText` or `nativeInputValueSetter`, test against a real Greenhouse form, update CSS selectors from real DOM inspection, add Lever + Ashby modules. The "Chrome is being controlled by automated test software" banner also needs the `--disable-blink-features=AutomationControlled` flag evaluated.
+### Autofill (Chrome CDP, scaffolded but broken — #1 known gap)
 
-### Location Evaluation (session-8 subsystem)
-
-A reasoning framework, not a scoring formula. Three-tier rubric across 22 factors evaluating cities at city / country / hybrid level across current state and three trajectory horizons (1-3 / 5-7 / 10-15 years). Tier 1 (deal-makers / breakers): visa accessibility for a Turkish national at entry level (country), target firm density in HFT / fintech infra / AI infra / systems / Rust / modern devtools (city), urban aesthetic match (city — mixed-scale, integrated greenery, walkability), safety and civic order (city), political/legal stability (country). Tier 2 (shifts the verdict without overriding Tier 1) covers nightlife trajectory, salary × cost-of-living, tax regime for high earners, secular public culture, café culture, path to permanent residency, frontier-tech access (Waymo-class), gym infrastructure (Third Space-class), English accessibility, climate tolerance. Tier 3 (tiebreakers) covers integration quality, housing depth, airport connectivity, food, healthcare, time-zone overlap, currency stability.
-
-Mechanical constraints the evaluator cannot override: Turkish national (no dual citizenship → excludes UK SC/DV and US clearance), UK Graduate visa expires August 2027 (dominant forcing function), zero years professional work history (3+ year roles mechanically out of reach), BEng CS 2:2 University of York (some firms enforce 2:1), languages Turkish native / English fluent / German A2-B1 / nothing else.
-
-Session-8 research pass: 10 parallel agents over candidate cities, ~6,500 combined lines per-agent + 71KB `location-master.md` synthesis. London #1 by unanimous agreement. "Amsterdam rejected" overturned unanimously from prior profile verdict.
-
-### Code Health Audit (27 open findings, none implemented yet)
-
-Full two-pass repository audit landed at session 9 (commit `c7973e0`). **The audit modified no production code** — it added `context/plans/code-health-audit/*` and one new test file (`tests/ats_strip_html_parity.rs`, 6 tests). 27 actionable findings across 8 systems: 4 high-severity, 14 medium, 7 low, 2 triage. Plus a modularisation verdict table (3 split / 11 leave / 1 n/a) and a 37-row dead-code-sweep disposition.
-
-Four high-severity findings (worth naming):
-
-1. **Four divergent `strip_html` implementations across `src/ats/`** — two diverge on quote-handling; the divergent Workable version is live (latent correctness bug on descriptions with `>` inside quoted HTML attributes). Consolidation removes 70 lines.
-2. **N+1 query in `pipeline::search::run_by_grade`** — 288 round-trips per grade-scoped search at 287 resolved companies; a single `SELECT ... WHERE c.grade = ?` replaces the loop.
-3. **`fetch_stats` issues 16 SQL queries per dashboard poll** — at 2s polling that is ~29,000 round-trips/hour of TUI use. Consolidation into 4-6 `GROUP BY` queries reduces by 3-4×. *The audit's largest observable performance win.*
-4. **SmartRecruiters pagination missing `get_with_retry`** — transient 502 mid-pagination produces silent partial fetch with no error surfacing.
+Architecture is in place: Chrome launches via `chromiumoxide`, navigates to job URL, `application_packages` DB table works, TUI `p` key spawns autofill, yellow ● indicator shows packages-ready, package auto-cleanup on applied. Broken at form filling: JS `el.value = "..."` does not trigger Greenhouse's React controlled component state. Fix path is documented: replace with CDP `Input.insertText` or `nativeInputValueSetter`, then verify CSS selectors against real Greenhouse DOM (currently written from documentation, not inspection), then add Lever and Ashby modules.
 
 ## Technologies and concepts demonstrated
 
 ### Languages
 
-- **Rust (edition 2024)** — entire codebase. ~14k lines across 56 files. Used across pipeline, TUI, ATS code, DB layer, config, autofill scaffolding, and tests. The library/binary crate split is itself a Rust-mechanic choice (binary-only crates cannot be integration-tested via `tests/`).
-- **TOML** — `profile/preferences.toml` is the runtime configuration surface, parsed by `toml = "0.8"` into typed Rust structs in `src/config.rs` with serde derives.
-- **SQL** — SQLite dialect; 6 migrations, 5 tables, 7 indices. Migrations include manual table-rebuild patterns for CHECK constraint changes.
-- **Markdown** — discovery landing zone (`companies/potential.md`), exports, README, profile files, the entire LifeOS-side documentation surface.
-- **JavaScript (CDP-injected)** — autofill's broken value-injection path; the documented fix uses CDP `Input.insertText` to bypass JS for React forms.
+- **Rust (edition 2024)** — primary and only language for the entire pipeline, TUI, web layer, ATS fetchers, autofill scaffold. ~14k lines across 56 source files. Lib+bin split (`src/lib.rs` library crate + thin `src/main.rs` shim) is load-bearing for integration testability.
 
 ### Frameworks and libraries
 
-- **`rusqlite` (bundled)** — SQLite with WAL mode enabled on every connection open. Bundled SQLite means no system dependency.
-- **`tokio`** — async runtime for pipeline scripts. `pipeline::search::fetch_all_parallel` uses a `Semaphore` to bound concurrent provider calls.
-- **`reqwest`** — HTTP client. Shared `http::build_client()` plus the `ats::common::get_with_retry` / `post_json_with_retry` helpers wrap it with exponential backoff retries (500ms × attempt) on timeout/connection/request errors; non-retryable 4xx errors return immediately.
-- **`ratatui` 0.29** — TUI framework. Five views, modular widget architecture, responsive layout, `Percentage`-based sizing.
-- **`crossterm`** — terminal backend for `ratatui`. Mouse support including Ctrl+click multi-select and Shift+click range.
-- **`serde` + `serde_json`** — JSON for ATS responses + provider-specific `ats_extra` payloads. TOML deserialisation for preferences. `application_packages.answers` JSON.
-- **`toml = "0.8"`** — preferences parser.
-- **`chromiumoxide`** — Chrome DevTools Protocol bindings for autofill. Currently scaffolded (Chrome launches headed) but the form-filling path is broken on React controlled components.
-- **`assert_cmd`** — CLI integration tests; `Command::cargo_bin("cernio")` spawns the real binary against a tempdir DB via `CERNIO_DB_PATH`.
-- **`proptest`** — property-based testing (one of the test-suite tools listed in the Overview's stack table).
-- **`tempfile`** — per-test tempdirs for CLI integration tests.
-- **`predicates`** — `assert_cmd` assertion library.
-- **`gh` CLI (runtime cross-vault dependency)** — the `populate-from-lifeos` skill calls `gh api` to fetch LifeOS folder contents and the `Capataina/Capataina` README. Cross-repo dependency added in session 10.
+- **`rusqlite`** (bundled) — SQLite access; no system SQLite dependency. WAL mode set on every open. `test_support::open_in_memory_db()` is the workhorse integration-test fixture.
+- **Tokio** — async runtime for pipeline scripts (resolve, search, clean, check). Parallel ATS fetches via `fetch_all_parallel` with a Tokio semaphore for concurrency control.
+- **Reqwest with retry helpers** — shared HTTP client in `src/http.rs`, per-request exponential backoff (500ms × attempt), used by every ATS module via `common::get_with_retry` and `post_json_with_retry`.
+- **Serde + serde_json** — JSON deserialisation for ATS responses; per-provider types in each `src/ats/<provider>.rs` module.
+- **`toml = "0.8"`** — `preferences.toml` → typed config structs via `src/config.rs`. Loader is intentionally lenient (typos → defaults + stderr warning), guarded by 21 build-time integrity tests.
+- **Ratatui 0.29 + Crossterm** — TUI rendering and terminal/event handling. Responsive layout via custom `widgets/layout.rs::distribute()`.
+- **`chromiumoxide`** (Chrome DevTools Protocol) — used by both the broken autofill scaffold and the working `cernio snap` debug-screenshot CLI.
+- **axum** — embedded web server on localhost:7878 (added 2026-05-30).
+- **maud** — type-safe HTML templates; gotcha discovered: `selected=(false)` emits `selected="false"` and browsers treat any presence as truthy. Correct conditional-attribute syntax is `selected[bool_expr]` with brackets.
+- **tower-http** — middleware for the web layer.
+- **HTMX 1.9** — inline writes from the web UI; re-processed inside detail drawer body so Apply/Watch/Reject continue working post-swap.
+- **ECharts 5.4** — charts in the web UI; data delivered via JSON islands `<script type="application/json" id="data-<kind>">` written by handlers via `json_island(kind, &value)`.
+- **Testing crates** — `cargo test`, `assert_cmd` (CLI subprocess testing against tempdir DBs), `proptest`, `tempfile`, `predicates`.
 
 ### Runtimes / engines / platforms
 
-- **SQLite WAL** — concurrent reads (TUI) while writes (pipeline scripts) proceed without contention. Set on every connection open.
-- **Tokio** — async I/O multiplexing for HTTP-heavy pipeline work (resolve, search, check). Business logic stays sync; async is the I/O layer only (matches the LifeOS-cited Microsoft Rust training principle "Async Is an Optimization, Not an Architecture").
-- **Chrome (CDP)** — autofill subsystem; headed mode, real browser.
-- **Claude Code skills runtime** — 9 native skills auto-discovered via the Skill tool with YAML-frontmatter engineered triggers + negative-trigger clauses, plus `/skill-name` slash completion.
+- **SQLite (WAL mode)** — single-file local-first datastore; supports concurrent TUI reads while pipeline scripts write. Five tables, six idempotent migrations, the `companies.website` and `jobs.url` UNIQUE constraints are the dedup mechanism across all layers.
 
 ### Tools
 
-- **`cargo test`** — full suite runs sub-second once compiled. The slowest cases are CLI tests (each spawns a subprocess).
-- **`cargo` toolchain** — Rust edition 2024.
-- **`skill-creator` meta-skill** (upstream from `Capataina/.claude`) — used to audit and iterate every Cernio skill in session 9 (commits `319ed60` → `1c9ab85`).
-- **GitHub Actions** — referenced in the Cloud Deployment Work file as the proposed CI surface for the cloud-gap closure (not yet implemented).
-- **`gh` CLI** — runtime dependency of `populate-from-lifeos`.
+- **`gh` CLI** — cross-vault runtime dependency added in session 10 for `populate-from-lifeos`. Reads `Capataina/LifeOS` and `Capataina/Capataina` README; one-way flow.
+- **Native Claude Code skills** at `.claude/skills/` — 9 skills, all skill-creator-audited, YAML triggers with negative-trigger clauses, evidence-anchored mandatory-read tables, What-I-Did-Not-Do declarations between workflow steps.
+- **`cernio snap` CLI** — self-contained visual-debug tool driving headless Chrome over the web UI and writing per-pane PNGs.
 
 ### Domains and concepts
 
-- **ATS (applicant tracking system) integration** — 6 providers across REST/JSON APIs with provider-specific quirks (POST vs GET, pagination shapes, location format variability, `totalFound`-based false-positive guards, dual regional endpoints). Mature pattern of normalising heterogeneous provider responses into a unified `AtsJob` struct.
-- **Slug-candidate generation and probing** — ~10-20 candidates per company name across naming conventions (lowercase, hyphenated, no-spaces, first-word, first-two-words, stripped domain/corporate suffixes, acronyms, parenthetical content). Probes against all providers in parallel with no early termination (catches multi-ATS companies).
-- **Filter chain design with false-negative-aversion bias** — every filter stage treats empty data as pass (empty location list → KEEP; empty include list → pass-through). Validated against 2001 graded jobs that every exclusion keyword has 0 hits at B+.
-- **Idempotency as a load-bearing invariant** — the format pipeline runs silently on every TUI startup; non-idempotency would silently corrupt cleaned descriptions on every launch. Three invariant tests + an explicit realistic-payload idempotency test guard the property.
-- **Tiered archival lifecycle** — grade-tied active windows (SS 28d → C/F 3d), archive expiry, protection for SS/S/A and any job with a user decision. Lets re-discovery happen on future searches with potentially-updated profile.
-- **SQLite migration discipline** — manual table-rebuild for CHECK constraint changes (SQLite limitation); every migration idempotent (test before applying); FK temporarily disabled during rebuilds.
-- **Async I/O multiplexing with bounded concurrency** — `tokio::Semaphore` caps parallel provider calls in `fetch_all_parallel`; per-portal failures don't fail the batch.
-- **HTTP retry with exponential backoff** — `get_with_retry` / `post_json_with_retry` on timeout/connection/request errors; non-retryable 4xx returns immediately. Pattern enforced at the `common.rs` boundary; the audit's MEDIUM finding is standardising this across Ashby/Workable/Workday paths that don't yet route through it.
-- **Quote-aware HTML stripping** — handles `>` inside quoted attribute values (Graphcore `data-ccp-props` artefacts); divergence across four provider-side implementations is a HIGH-severity audit finding with a parity-test guard in place.
-- **Lib + bin testability split** — the smallest possible architectural change that unblocks Rust integration testing (binary-only crates cannot be tested via `tests/`).
-- **TUI architecture (modular)** — App struct as shared state, per-concern modules (state / navigation / actions / pipeline / cleanup) as methods on App; rendering separate from event handling; widgets reusable. The session-7 split at ~500 lines per file is the explicit threshold.
-- **Reactive dashboard polling** — 2s poll cycle, GitHub-style activity heatmap, freshness colours by age, multi-tier visa countdown urgency, smart grouping by company.
-- **Calibration-anchored grading** — instead of within-batch distribution, anchor to 2-3 real DB examples per tier. Realism-aware anchor selection (post-2026-04-29) excludes prestige-trap roles from SS calibration.
-- **Question-first reasoning rubric** — five questions for jobs, four for companies; dimensions are analytical support not primary scoring. Mandatory description citation prevents title-only grading. Five major iterations driven by production-data failure modes (dimension scoring inflated middle ranks → hard floors were too rigid → career-stage calibration was still mechanical → question-first stopped title-only grading → realism semantic stopped prestige leak).
-- **Reputation × selectivity decoupling (realism semantic)** — explicit independence of Q2 (CV value / brand reputation) from Q1 (realistic achievability / firm hiring pattern). The detection rule: when reasoning about Q1, ignore Q2's signal entirely. Operationalised through wide-funnel vs narrow-funnel firm calibration and worked-example pairs (Amazon SDE-1 New Grad as SS anchor; Jane Street SWE UK as A-stretch anchor with same FAANG-or-above CV signal but opposite Q1 reading).
-- **Lifestyle as same-tier grading modulator** — `lifestyle-preferences.md` moves grades across boundaries (Kings Cross / Nine Elms lift, Croydon push down), not just within-grade tiebreaking. The rationale: aesthetic-daily-environment compounds over years in a way pay or tax bracket do not.
-- **Status-based project weighting (Living System rule)** — replaces the retired Flagship/Notable/Minor Tier system. Per-project file `status` frontmatter (`active`, `complete`, `paused`, `scaffold`, `dormant`) drives evidence weight at grading time; no hardcoded project lists in rubrics.
-- **Mandatory-read protocol for skills** — every skill agent reads its SKILL.md, every reference file, and all relevant profile files on every invocation. Profile snapshots embedded in skills go stale silently and produce incorrect evaluations.
-- **Obligation-anchored skill design** — verifiable checklists with evidence outputs ("produce artefact X", "cite the last line of each reference") replace exhortation language ("be thorough"). Session-9 audit shifted every skill onto this footing across commits `319ed60`–`1c9ab85`.
-- **F12/F15 tool-action / script-obligation asymmetry** — a skill whose workflow does work a script could have done first will silently burn tokens. Step-0 patches added to `resolve-portals` (precursor `cernio resolve`), `grade-jobs` (precursor `cernio format`), and `prepare-applications` (precursor `cernio format`).
-- **One-way cross-repo sync architecture (LifeOS → Cernio)** — README-as-gatekeeper allow-list, pre/post-timestamp Cernio-native preservation check, autonomous 8-phase workflow, parallel per-project subagent dispatch with mandatory evidence-block returns.
-- **Anti-puffing principle in synthesis** — describe what the project demonstrates, not what its README pitches. LifeOS folder content is the evidence; the skill structures it, never inflates it. Operationalised through Tier-3 evidence anchors (file path, line count, verbatim last line) in subagent contracts.
-- **Three-layer reasoning rubric for cities** — 22 factors across Tier 1 / Tier 2 / Tier 3 weights, evaluated at city / country / hybrid level across current state and three trajectory horizons. Trajectory is first-class (a 10/10 declining is worse than a 7 rising). Mechanical constraints (visa, work history, degree, languages) cannot be overridden.
+- **Local-first architecture with zero infrastructure.** SQLite file, no Docker, no server, no API keys for the core system. AI layer runs through Claude Code sessions — no hosted inference.
+- **Scripts-for-volume / AI-for-judgment partitioning.** A Rust script can probe 5,000 ATS slug candidates in seconds; Claude can read 50 resulting job descriptions and assess fit against a nuanced profile. Neither could do the other's job economically; the entire architecture is built around this asymmetry.
+- **Three-layer architecture with SQLite as shared contract.** Conversation → scripts → DB ← TUI/web. Strictly downward dependencies; no layer reads upward.
+- **Idempotency as a structural property.** Every pipeline command safe to re-run; format `format(format(x)) == format(x)` is a tested invariant because the function runs silently on every TUI/web startup.
+- **Living-System Philosophy.** Profile, grades, preferences, and ATS slugs all change over time. No grade is permanently settled; the `check-integrity` skill compares profile modification dates against `graded_at` timestamps for staleness. Skills must never embed profile snapshots — every skill reads `profile/` fresh on every invocation. Hardcoded profile data goes stale silently and causes grading errors that are difficult to detect.
+- **Archival over deletion.** Companies and jobs are archived rather than deleted to preserve grading history, prevent re-discovery overhead, and allow reversibility via `cernio unarchive`. Refined on 2026-05-14: zero-signal Bucket 3 dead-entity rows (no jobs, no portals, no decisions) get hard-deleted; rows with accumulated signal still archive.
+- **Question-first grading rubric, evolved across five phases.** Dimension-weighted scoring → hard floors → career-stage calibration → question-first reasoning → realism semantic (reputation × selectivity decoupling). Each rewrite was driven by a concrete production failure: Amazon at B (Phase 1 inflation), Monzo at C (Phase 1 deflation), Thought Machine at SS with 3-5 year requirements (Phase 3 title-only-reading), 40 SS/S after clean sweep with prestige leakage (Phase 4 → Phase 5).
+- **Reputation-vs-selectivity decoupling (realism semantic).** A reputable name on a CV is a Q2 (CV-value) signal; it says nothing on its own about Q1 (realistic achievability). Wide-funnel reputable firms (Amazon SDE-1, Bloomberg, Cloudflare interns, Anthropic Fellows, HRT 2026 Grad SWE, Squarepoint Graduate) anchor SS; narrow-funnel reputable firms (Jane Street, Citadel, Anthropic London non-Fellows) cap at A-stretch despite identical Q2. Production validation: 12% S+ density vs the >20% pre-realism inflation; Jane Street pattern confirmed (18 roles → 0 SS, 0 S, 4 A-stretch).
+- **Lane-based-relativity grading (2026-05-29 refactor).** Eight active lanes (`big-tech`, `ai-ml`, `hft`, `crypto-mm`, `bank-strats`, `systems-infra`, `devtools`, `fintech`). Jobs graded SS-F within their primary lane, not on a single global axis. Cross-lane decisions happen at user-decision level, not rubric level. No hardcoded calibration anchors — calibration emerges from within-lane comparison during the grade-companies / grade-jobs Phase 2 relativity pass.
+- **Sponsor-only universe.** Every company must sponsor UK Skilled Worker visas; `sponsors_uk` mandatory verified-yes for retention; non-sponsors rejected at discovery.
+- **Calibration-anchored grading (vs batch-relative).** Pull 2-3 real examples per tier from the DB before grading begins; grade each job against those anchors. Replaces batch-relative deflation when prioritisation skews batches.
+- **Mandatory description citation.** Fit assessments must quote specific phrases from the job description; "entry-accessible" without citing what the description actually says about seniority requirements is banned.
+- **F12/F15 script-obligation asymmetry pattern.** A skill whose workflow does work a script could have done first silently burns tokens and produces inferior output. Three skills got mandatory step-0 script calls in commit `bee129a` (`resolve-portals` → `cernio resolve`; `grade-jobs` → `cernio format`; `prepare-applications` → `cernio format`).
+- **Inter-system contract surfacing.** Session-9 architecture rewrite formalised the cross-system contracts that "break loudest when violated" (e.g. ATS provider name is a shared string across 4 places; `ats_extra` JSON is provider-specific and unversioned; `preferences.toml` re-read at every pipeline invocation but cached for the TUI session). Hidden coupling is documented explicitly so nobody is surprised.
+- **Obligation-anchored over exhortation-anchored skills.** Vague "be thorough" / "carefully check" framing gets sycophantically absorbed; verifiable obligations ("produce artefact X", "quote the last line of each reference") cannot be satisficed without producing visibly-incomplete output.
+- **Self-driven visual verification.** On web UI work, the agent runs `cernio snap` itself, reads PNGs, and iterates rather than asking the user to verify visually.
 
 ## Key technical decisions
 
-LifeOS `Decisions.md` documents the following major design decisions with reasoning, alternatives considered, and consequences:
+**Collaborative, not automated.** Original README described daily `cernio refresh`; revised in first session. Every feature must support a conversational workflow; scripts are parameterised tools invoked by Claude during a session, not cron jobs.
 
-- **Collaborative, not automated.** The original README described `cernio refresh` as a daily automated pipeline; this was revised in the first design session. There is no single "run everything" command. Every feature must support a conversational workflow; scripts are parameterised tools invoked by Claude during a session, not cron jobs.
-- **Scripts for volume, AI for judgment.** A Rust script can check 5,000 ATS combinations in seconds; Claude can read 50 resulting job descriptions and assess fit; neither could do the other's job economically. Scripts must be generic, reusable, parameterised; intelligence lives in the conversation.
-- **SQLite as single source of truth.** Evaluated against markdown files, JSON/JSONL, and Postgres/MySQL. SQLite won on zero ops, single file, full SQL, WAL for concurrent access, trivial backup. Profile data stays in markdown (human-edited); companies/jobs/decisions/packages live in SQLite (machine-managed); discovery results land in markdown first, then migrate via import.
-- **Question-first grading over dimension-weighted scoring.** Four iterations to reach this point, each driven by production failures with real data. Questions force genuine reasoning; dimensions are analytical support.
-- **C-tier companies stay active.** Originally C companies were auto-archived. Changed in session 4: job grading handles quality filtering. A C company might have one genuinely good role; cost of extra jobs is grading time (cheap), cost of missing a good role is unrecoverable.
-- **False negatives are the enemy.** At every filtering stage, bias toward inclusion. Empty data → include, not exclude. A job with no location passes the location filter; a title that doesn't match exclusion keywords passes even without matching inclusion keywords.
-- **Mandatory-read protocol for all skills** (session 3). Every skill agent must read SKILL.md, all references/, all profile/. The reference documentation IS the quality bar. Added after agents skipped reference files and produced shallow output.
-- **TUI grade as primary metric, not evaluation_status.** `evaluation_status` is just a coarser bucketing of `grade`. The TUI displays grade only.
-- **Per-provider location patterns, not global.** Location formats differ dramatically across ATS providers (Greenhouse "Hybrid" or "Berlin; London; Munich"; SmartRecruiters supports server-side `?country=gb`); patterns live per-provider in `preferences.toml`.
-- **Profile scrape: built not planned** (session 6). Profile entries lead with implemented code, not README aspirations. Anti-puffing principle.
-- **Skills in this repo, not upstream.** Cernio's skills are tightly coupled to its data model and workflow. They live at `.claude/skills/` within the repo. The upstream `Capataina/.claude` has universal skills; project-specific skills don't generalise.
-- **Lib + bin split for testability** (session 9). Rust integration tests under `tests/` can only see public items from a library crate, not a binary-only crate. The split was the smallest change that unblocked `tests/cli.rs`, `tests/pipeline_*.rs`, and the 16-test CLI suite. Alternative: separate sibling crate (rejected as more change for the same outcome).
-- **`CERNIO_DB_PATH` env var for CLI testability** (session 9). Smallest change to make `tests/cli.rs` viable; each test sets the env var to a per-test tempdir. Alternative `--db-path` flag rejected (requires every test to pass it explicitly).
-- **Lifestyle fit as same-tier grading modulator, not Tier 3 tiebreaker** (session 8). Caner spends every day of his life in the environment the role is based in; aesthetic-daily-environment compounds over years in a way pay or tax bracket do not. Grades move across boundaries based on lifestyle fit, not just within-grade.
-- **Native Claude Code skills at `.claude/skills/`** (session 9). Skill tool auto-discovery, YAML engineered triggers, slash completion. Replaces the older "read SKILL.md when I tell you to" pattern.
-- **Obligation-anchored over exhortation-anchored** (session 9, cross-domain). Verifiable obligations ("produce artefact X", "emit section Y") replace vague "be thorough" / "carefully check" framing. Research-backed: RLHF absorbs exhortation sycophantically — agents produce the *appearance* of thoroughness while skipping actual work.
-- **LifeOS as canonical, Cernio as consumer** (session 10). LifeOS is human-curated and the existing source of truth for the candidate. Profile-scrape's GitHub-repo-scraping role moved upstream into LifeOS's `extract-project` skill. Cernio is now strictly the consumer side. Cernio-native files (`preferences.toml`, `portfolio-gaps.md`) explicitly off-limits to the sync; one-way data flow. Alternatives considered: keep manual mirror maintenance with periodic audits (rejected — drift was happening); make Cernio canonical (rejected — LifeOS's structural role is broader than career data); symlink (rejected — would expose private LifeOS contents to the public Cernio repo).
-- **README-as-gatekeeper for project sync** (session 10). The `Capataina/Capataina` GitHub README's Active / Other / OSS sections are the allow-list for which projects appear in `profile/projects/`. Private Projects section excluded by design. Alternative considered: include every LifeOS project (rejected — would surface private/in-flight work the user hasn't chosen to expose).
-- **Status-based project weighting replaces the Tier system** (session 10). Flagship/Notable/Minor retired. Status frontmatter (`active`, `complete`, `paused`, `scaffold`, `dormant`) now drives grading weight. Once the profile was split into per-project files (each a comprehensive evidence-anchored synthesis), every file became its own canonical evidence — no need to assign a tier label because the file's depth and status frontmatter carry the signal more honestly.
-- **Realism semantic — reputation × selectivity decoupling** (session 11, 2026-04-29, commit `389b1e8a`). Phase 5 grading rubric. Reputation (Q2 — CV value) and selectivity (Q1 — realistic achievability) are independent axes; do not infer one from the other. When reasoning about Q1, ignore Q2's signal entirely. Operationalised through worked examples (Amazon SDE-1 New Grad as SS anchor; Jane Street SWE UK as A-stretch anchor) and wide-funnel vs narrow-funnel firm calibration. Alternatives considered: tighten Phase 4 wording (rejected — failure mode was systematic prestige leakage, not wording problems); add hard "no SS at firms with intake < X" rules (rejected — too rigid).
+**Scripts for volume, AI for judgment.** Fundamental architectural split. Rust scripts must be generic, reusable, parameterised. Intelligence lives in the conversation, not in the scripts.
+
+**SQLite as single source of truth.** Evaluated against markdown files, JSON/JSONL, and Postgres/MySQL. SQLite won on zero ops, single file, full SQL, WAL for concurrency, trivial backup. Profile data stays in markdown (human-edited); companies/jobs/decisions/packages live in SQLite (machine-managed); discovery results land in markdown first then migrate via import.
+
+**Lib+bin split for testability (session 9).** Rust integration tests under `tests/` can only see public items from a library crate, not a binary-only crate. The split was the smallest change that unblocked `tests/cli.rs` (via `assert_cmd`), `tests/pipeline_*.rs` (via `test_support::open_in_memory_db`), and the 16-test CLI suite. Alternatives considered: keep binary-only and accept no integration tests; move logic into a separate sibling crate.
+
+**`CERNIO_DB_PATH` env var (session 9).** Smallest possible change to make CLI integration tests viable. Alternatives: `--db-path` CLI flag (every test passes it); hardcoded path with symlinking; sqlite in-memory via special mode. The env var means tests spawn real binaries via `assert_cmd::Command::cargo_bin("cernio")` and get isolated DBs without filesystem contention.
+
+**Question-first grading over dimension-weighted scoring.** Four iterations of the rubric driven by production failures; dimension-weighted scoring produced mechanical generic assessments because agents assigned middling scores to everything and arrived at B without reasoning. Questions force genuine reasoning; dimensions become analytical support.
+
+**False negatives are the enemy.** At every filter stage, bias toward inclusion. Empty data → include. A job with no location passes the location filter; a job that doesn't match exclusion keywords passes even with no inclusion match. False negatives are unrecoverable; false positives cost 30 seconds to grade as F.
+
+**Mandatory-read protocol for all skills.** Added session 3 after agents skipped reference files and produced shallow output. Every skill agent must read SKILL.md, all references/, all of profile/. The reference documentation IS the quality bar.
+
+**TUI grade as primary metric, not evaluation_status.** `evaluation_status` is just a coarser bucketing of `grade`; the TUI displays grade only. Future possibility: split into role-quality and accessibility as separate dimensions.
+
+**Per-provider location patterns, not global.** Location formats differ dramatically across providers (Greenhouse "Hybrid" or "Berlin; London", SmartRecruiters server-side `?country=gb`). Location patterns live per-provider in `preferences.toml`.
+
+**Lifestyle fit as same-tier grading modulator (session 8).** Not Tier 3 tiebreaker. Aesthetic-daily-environment compounds over years in a way pay or tax bracket do not; under-weighting it for neatness was the wrong trade-off. Borderline A/B role in Kings Cross lifts to A; same role in outer Croydon drops to B. Grades move across boundaries, not just within-grade.
+
+**Native Claude Code skills at `.claude/skills/` (session 9).** Migrated from `skills/` for Skill-tool auto-discovery, YAML engineered triggers with negative-trigger clauses, `/skill-name` slash completion. The legacy pattern required remembering to invoke; the native pattern surfaces skills automatically when triggers match.
+
+**Obligation-anchored over exhortation-anchored (session 9).** Replace "be thorough" / "carefully check" with verifiable obligations. Research-backed finding: RLHF absorbs exhortation sycophantically — agents produce the appearance of thoroughness while skipping actual work. Falsifiable checklist items cannot be satisficed without producing visibly-incomplete output.
+
+**LifeOS as canonical, Cernio as consumer (session 10).** Made `Capataina/LifeOS` the canonical source of truth for profile data. Alternatives rejected: (a) keep maintaining the duplication manually — drift was already happening; (b) make Cernio canonical — LifeOS's structural role is broader than career data; (c) symlink Cernio's `profile/` to LifeOS — Cernio is public, LifeOS is private, the symlink would expose the vault.
+
+**README-as-gatekeeper for project sync (session 10).** The `Capataina/Capataina` GitHub README's *Active* / *Other* / *Open Source Contributions* sections are the allow-list for which projects appear in `profile/projects/`. Private Projects section excluded by design. Adding a new project to the public-facing portfolio requires editing the README first, then re-syncing — a deliberate boundary, not a technical limitation.
+
+**Status-based project weighting replaces Tier system (session 10).** Retired Flagship / Notable / Minor labels. Once the profile was split into per-project files, every file became its own canonical evidence — there is no longer a need to assign a tier, because file depth, content, and `status` frontmatter carry the same signal more honestly.
+
+**Realism semantic — reputation × selectivity decoupling (session 11, commit `389b1e8a`).** Phase 5 of the grading rubric. When reasoning about Q1 (achievability), ignore Q2's (CV-value) signal entirely. The detection rule prevents prestige-trap inflation. Alternatives rejected: tighten Phase 4 wording (failure was systematic, not isolated); hard "no SS at firms with intake < X" rules (too rigid — would penalise wide-funnel reputable firms).
+
+**Hard-delete zero-signal Bucket 3 companies (2026-05-14, refines archival doctrine).** Archive-over-deletion still stands for rows with accumulated signal; rows that reach Bucket 3 with no jobs, no portals, no user_decisions get hard-deleted. 16 rows deleted on 2026-05-14 met the zero-signal condition. The DB should reflect the active universe of viable applications, not be a graveyard.
+
+**S-band calibration anchors required in grade-jobs agent prompts (2026-05-17).** Without an S-tier worked example, 7 Opus agents with the full rubric all produced 0 S grades from a corpus where 12 roles clearly qualified. Canonical worked S-tier examples (Graphcore Cambridge SWE, GSR Quant Developer Rust) must be embedded before grading starts.
+
+**Lane-based-relativity grading (2026-05-29).** Companies and jobs graded within-lane rather than on a single global SS/S/A/B/C/F scale. Eight lanes carry equal status during junior phase — no lane priority weighting. Strategy A (prestige exit then independent contracting at £1.5k-£3k/day) drives lane selection.
+
+**Role-truth-at-hire — function locked at day 1 (2026-05-29).** Role function (engineering / quant / research / strats) must already be destination function at hire. Vertical progression within function is normal; cross-function lateral hops are auto-downgraded (Solutions Architect hoping to become SWE, IBD Analyst hoping to lateral, etc.).
+
+**Sponsor-only universe (2026-05-29).** Every company must sponsor UK Skilled Worker visas. Non-sponsors rejected at discovery, never enter the DB. `sponsors_uk` mandatory verified-yes for retention.
+
+**No hardcoded calibration anchors (2026-05-29).** Calibration emerges from within-lane comparison during Phase 2 of grade-companies / grade-jobs, not from a hardcoded "Anthropic is SS in AI/ML" list. Hardcoded anchors decay silently as company positioning shifts.
+
+**Web frontend modularised into shared + per-page bundles (2026-05-30).** `static/style.css` + `static/app.js` were monolithic and grew too large to edit reliably. Split via `PageAssets::css_js` system in `src/web/templates.rs::page_with`.
+
+**Filter chips unified with type-based variants (2026-05-30).** Yes/no shouldn't be the same shape as 8 lanes. Coloured multi-select chips for axes (lane, grade); segmented controls for binary/ternary toggles (archive, sponsor, has-jobs).
 
 ## What is currently built
 
-The system is **operational** — not aspirational. The honest current scope:
+The Rust core, the database, the TUI, and the web UI are all production-shaped and operationally proven. ~14k lines of Rust across 56 source files. 346 tests passing (273 inline + 73 integration including the 21 preferences-integrity guards). 6 ATS provider fetchers (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday) plus Eightfold recorded as bespoke. 6 pipeline scripts (resolve, search, clean, check, import, format) plus stats/unarchive/pending. 9 native Claude Code skills, all skill-creator-audited.
 
-- **~14k lines Rust across 56 files, ~494KB.** Edition 2024. Lib + bin split.
-- **6 ATS provider fetchers** in code (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday) + Eightfold accepted by the CHECK constraint as bespoke (no fetcher module). All 6 fetchers normalise into a unified `AtsJob` struct.
-- **6 mainline pipeline commands** (resolve, search, clean, check, import, format) plus unarchive/stats/pending. All accept `--dry-run`; `resolve` and `search` accept `--company NAME`; `search` accepts `--grade G`.
-- **TUI v5 — 5 views, 26 source files, modular architecture.** Dashboard / Companies / Jobs / Pipeline kanban / Activity timeline. Mouse-first with keyboard accelerators. Responsive across three layout modes.
-- **DB schema — 5 tables, 6 migrations, 29 inline tests.** Tiered archival lifecycle. `application_packages` table feeds autofill.
-- **346 tests passing** (273 inline + 73 integration, including 21 in the session-10 preferences-integrity guard). Was 18 at session 7. The retroactive test pass surfaced two silent data-loss bugs immediately and the Workday UK-filter silent bypass when the integrity guard landed.
-- **9 native Claude Code skills** at `.claude/skills/`, all skill-creator-audited with obligation-anchored mandatory-read tables, Tier-3 evidence-anchored quality checklists, and What-I-Did-Not-Do declarations between workflow steps. Total skill documentation is ~290KB.
-- **DB state:** 456 total companies (318 resolved with ATS / 138 bespoke / 0 potential / 0 archived) and ~1,370 graded jobs. Post-realism non-archived pipeline distribution: 15 SS / 23 S / 90 A / 71 B / 214 C / 773 F (=1,186 graded as of 2026-04-29); incremental 2026-05-10 batch added 4 SS / 8 S / 18 A / 13 B / 40 C / 81 F.
-- **Companies by ATS provider** (pre-dad-list snapshot): Greenhouse 114 (40% of resolved), Ashby 70 (24%), Workable 31 (11%), Lever 26 (9%), Workday 20 (7%), SmartRecruiters 8 (3%), Eightfold 1 (<1%).
-- **34+ validated exclusion keywords** (Principal, Director, VP, Staff, Sr., Sr , Lead, Manager, Head of, Chief, Distinguished, Fellow, plus the "Senior" inclusion-to-exclusion flip in session 5 that caught 742 F/C with only 18 B+ in the firing line — 41:1 ratio).
-- **27 open code-health-audit findings** (4 high / 14 medium / 7 low / 2 triage) — none implemented yet; the audit explicitly modified no production code, only `context/plans/code-health-audit/*` plus the one new `tests/ats_strip_html_parity.rs` (6 tests).
-- **`portfolio-gaps.md` at 454 lines** — career-coaching output from `check-integrity`, accumulated across 1,370+ job evaluations.
-- **Autofill scaffolded but broken** — Chrome launches, navigates, the DB table works, the TUI integration works, the package cleanup works; only the actual form filling fails on React controlled components.
+The TUI v5 is fully operational across 5 views (Dashboard, Companies, Jobs, Pipeline kanban, Activity timeline) with mouse support, responsive layout across 3 modes, GitHub-style activity heatmap, semantic colour theme, focus mode, smart grouping, multi-select, export to markdown, grade-override picker, and a session welcome diff.
 
-The README's narrative may pitch features not yet realised — the per-project file leans on LifeOS's honest scope and grade distributions to surface current state. Aspirational items belong in the Direction section.
+The web UI added 2026-05-30 is also operational across 5 tabs over the same SQLite DB: chip-filter strips with type-based variants, clickable charts that cross-filter via URL navigation, detail drawer with URL persistence and HTMX re-processing, Cmd-K command palette with substring + prefix + grade ranking, g-leader keyboard shortcuts, LocalStorage saved searches capped at 30, ops menu (Clean + Format only), and a `cernio snap` CLI that drives headless Chrome over all 5 tabs and writes per-pane PNGs for self-driven visual debug.
+
+Database carries ~456 companies (318 resolved / 138 bespoke at the 2026-05-13 snapshot; expanded to ~706 companies + ~1,068 lane-tagged jobs in the 2026-05-29 lane-based-relativity refactor and sponsor-only universe scoping) and ~1,370 graded jobs. Grade distribution (combined post-realism + 2026-05-10 incremental): ~19 SS / ~31 S / ~108 A / ~84 B / ~254 C / ~854 F.
+
+The `populate-from-lifeos` skill has shipped and run end-to-end twice. First run synced 11 Professional/ files, synthesised 12 per-project files in parallel (203 LifeOS source files consumed, 3,413 lines of synthesised content), produced 1 aggregated OSS file, derived `skills.md` (six tables, four bands), wrote navigation `index.md`, and produced a `sync-summary.md` audit artefact. Second-run idempotency confirmed.
+
+The realism-semantic grade-jobs rewrite (Phase 5 of the rubric, commit `389b1e8a`) is in production. The lane-based-relativity refactor (2026-05-29, commit `0c9f296`) and sponsor-only universe scoping are in production.
+
+Code-health audit (session 9, commit `c7973e0`) surfaced 27 open findings across 8 systems — 4 high-severity (the four `strip_html` divergences with a latent Workable correctness bug, N+1 query in `pipeline::search::run_by_grade`, `fetch_stats` 16-query-per-2s-poll, SmartRecruiters pagination missing retry). The audit modified zero production code; it added 6 parity tests in `tests/ats_strip_html_parity.rs` that lock the target semantics for the strip_html consolidation. All 27 findings are still open at the LifeOS snapshot.
 
 ## Current state
 
-**Status: active**, slowed-cadence. HEAD is `aff9590` (2026-05-10 — portfolio-gaps batch findings). The most recent feature commit was 2026-04-29 (`50359b13` — timestamp format bug fix across 7 files). Post-2026-04-29 work has been grading-batch and documentation rather than structural feature commits — the system is operational; the bottleneck has shifted from build to throughput on the surfaced SS/S apply targets.
-
-Sessions 1–7 (April 7–10, 2026) built the core system in three days: ~14k lines Rust, 408 companies, 1184 graded jobs. Sessions 8–12 (April 10 → May 10) matured the project rather than growing it — 22-factor location rubric + lifestyle modulator (session 8), 316-test retroactive pass + skills migration + code-health audit (session 9), `populate-from-lifeos` shipped + `profile-scrape` retired + preferences-integrity guard (session 10), grade-jobs realism rewrite + full post-clean-slate re-grade of 583 jobs across two batches + timestamp bug fix + second LifeOS sync (session 11), and the first end-to-end `cernio-search` + 5-parallel-bespoke-subagent batch of 164 jobs (session 12).
-
-In-flight from LifeOS Work files: the `prepare-applications` skill needs to run against the 12 SS+S list from the 2026-05-10 batch (top SS: Amazon SDE-1 New Grad 2026 UK, Arm AI/ML Cambridge Graduate SWE, Apple Swift Compiler Backend Engineer, Apple Debugger Engineer (LLDB); top S: 5× Apple ASE wide-funnel + Squarepoint Trading Infrastructure Graduate Programme + Balyasny Tech Academy New Grad). Cloud / Kubernetes / Docker / Terraform on Cernio is the queued portfolio-gap-closure pass (containerise Rust binary → GitHub Actions CI → Lambda/Fargate deployment of `cernio search` preview → Terraform module). Vault refresh (Cernio LifeOS Overview / Gaps / Roadmap) for the session 11–12 work and the cloud-gap row is also queued.
+Status: active. Most recent meaningful work captured in LifeOS is the 2026-05-30 web-frontend redesign (5 commits) and the 2026-05-29 lane-based-relativity refactor with sponsor-only universe scoping (706 companies + 1068 jobs lane-tagged, prepare-applications skill deleted, all 7 deferred follow-ups closed). The Cernio repo is local-first and well-tested; the TUI and web UI both ship working; the AI layer is fully operational across 9 skills. In-flight work captured in LifeOS `Projects/Cernio/Work/`: drawer + Cmd-K + g-leader + presets interactive browser audit; prepare-applications batch run on the 12 SS+S list from 2026-05-10; Cloud / Kubernetes / Docker / Terraform deployment as portfolio-gap closer using Cernio itself; periodic vault refresh.
 
 ## Gaps and known limitations
 
-Drawn from LifeOS `Gaps.md`:
+**Autofill form filling broken (Priority 1).** Architecture in place — Chrome launches, navigates, `application_packages` table works, TUI `p` key works — but JS `el.value = ...` does not trigger React's controlled component state on Greenhouse forms. Fix path is documented (CDP `Input.insertText` or `nativeInputValueSetter`), but until it lands every application is manual copy-paste from prepared drafts.
 
-**Broken:**
-- **Autofill form filling (Priority 1)** — entire pipeline built and integrated except the actual form filling. Chrome launches and navigates, the DB table works, the TUI `p` key works, the package cleanup works — but JS value injection (`el.value = "..."`) does not trigger React controlled component state on Greenhouse forms. Fix: replace JS value-injection with CDP `Input.insertText` or `nativeInputValueSetter`; test against real Greenhouse DOM; update CSS selectors; add Lever + Ashby modules. The "Chrome is being controlled by automated test software" banner also needs `--disable-blink-features=AutomationControlled` evaluated.
+**Cloud / Kubernetes / Docker / Terraform / CI-CD portfolio evidence.** The densest gap evidence in the project. Confirmed across 5+ consecutive grading batches as the #1 employability gap. 2026-05-10 batch flagged it across 14 separate roles. The closure prescription is concrete and explicitly uses Cernio itself: a weekend on containerising the Rust binary, adding a GitHub Actions CI workflow, deploying a preview to AWS Lambda/Fargate, adding a Terraform module.
 
-**Not built:**
-- **Interview prep skill** — design exists in full at `context/notes/interview-prep-design.md`; implementation has not started. Would generate personalised curriculum from SS/S/A job descriptions + portfolio gaps including LeetCode-style TDD problems, multi-component systems practice, and company-specific prep materials.
-- **Markdown export CLI command** — TUI `e` key works, but there is no `cernio export` for batch markdown generation.
-- **Eightfold ATS fetcher** — listed in the CHECK constraint, no `src/ats/eightfold.rs` module. Only 1 company uses Eightfold; low ROI.
-- **Teamtailor fetcher** — higher-ROI than Eightfold. 4 of the 17 dad-list bespoke companies use Teamtailor; the provider has a clean public API at `{slug}.teamtailor.com/jobs.json`. Implementing would convert those 4 bespoke → resolved immediately.
-- **Cloud / Kubernetes / Docker / Terraform / CI-CD portfolio evidence** — the densest gap-evidence in the project. Confirmed across 5+ consecutive grading batches as the #1 employability gap. 2026-05-10 batch flagged it across 14 separate roles. Closure prescription: a weekend on Cernio itself — containerise the Rust binary, add GitHub Actions CI, deploy a preview to AWS Lambda or Fargate, write a Terraform module. Captured as a Work item in LifeOS.
-- **C++ proficiency Familiar → Proficient** — primary blocker on 7+ roles in the 2026-04-29 batch (Apple JDK × 2, Apple Kafka, Citadel C++ SWE, Tower Quant Developer, QRT Low Latency Market Data, Wayve Robot Software, Wintermute C++ Quant Trading Platform). Caner's C++ is self-rated Familiar; Nyquestro and Tectra demonstrate the concepts in Rust but the Rust-to-C++ translation is undemonstrated. Closure prescription: take Tectra past its Clock-interface scaffold into a working feed-handler + matching loop, OR finish Chrona's commit DAG to a working `chrona init / commit / log` MVP.
-- **Cybersecurity / cloud-security portfolio bridge** — newly named in 2026-04-29 batch 2. All 10 Wiz postings capped at C-or-below. Closure options: explicitly accept cybersecurity as a non-target sector and update `preferences.toml`, OR build a defensible security project (small CVE PoC, OSS fuzzer, CTF write-up portfolio).
-- **CUDA / GPU-systems / PTX / SASS / CUTLASS / Triton / NCCL** — newly named in 2026-04-29 batch 1 (Jane Street ML Performance Engineer). Distinct from "production-scale ML" — this is GPU-kernel engineering specifically. Closure prescription: a CUDA kernel project (custom GEMM / attention kernel / matmul tiling).
-- **Production-scale ML (petabyte / 10K-GPU / cloud-trained)** — confirmed A-vs-S boundary at Apple AiDP, Jane Street ML Engineer + ML Researchers, DRW ML. NeuroDrive is M2-MacBook-Air scale. Closure prescription: a one-time cloud-GPU experiment (Lambda Labs / Vast.ai).
-- **Distributed-database tenure (YugabyteDB / CockroachDB / TiDB / Cloud Spanner / Iceberg / Trino)** — newly observed gap from Wise Data Platform + Balyasny DB Platform + Spotify Data Platform. Caner's SQLite-only DB work is single-node.
-- **OCaml** — Jane Street uses OCaml as primary language; 8+ Jane Street roles in 2026-04-29 batch involve OCaml. Demonstrating some OCaml familiarity (typed expression tree, small interpreter, OSS contribution) would lift Jane Street from templated lottery to credible stretch.
+**C++ proficiency (Familiar → Proficient).** Primary blocker on 7+ roles in 2026-04-29 batch alone (Apple JDK, Apple Kafka, Citadel C++ SWE, Tower Quant Developer, QRT Low Latency Market Data, Wayve Robot Software, Wintermute C++ Quant). Self-rated "Familiar"; Nyquestro and Tectra demonstrate the concepts in Rust but the Rust-to-C++ translation is undemonstrated.
 
-**Incomplete:**
-- **Workday integration** — fetcher exists and works, but Workday's complex URL pattern (variable subdomain `wd1`–`wd12` + site name) means resolution requires manual identification or web search; no mechanical probing. 20 companies use Workday. The Workday UK-filter silent bypass was closed in session 10 (commit `86097a6`) when the `[search_filters.locations.workday]` subtable was added alongside the new `every_supported_ats_provider_has_a_location_subtable` build-time guard.
-- **Bespoke company coverage** — 138 companies are bespoke. The 2026-05-10 batch demonstrated the operational pattern (5 parallel bespoke subagents alongside `cernio search`) but coverage is still spotty.
-- **Dad-list jobs-search not yet scoped to the 48-company set** — the 48 dad-list companies (commit `bee129a`, 2026-04-21) were graded standalone; the grading half is closed but a scoped `cernio search` run against the 48 plus bespoke subagents for the 17 dad-list bespoke entries is the proper closure. Dassault Systèmes (id 471) needs revisiting when its careers page repopulates.
-- **Parent-company slug expansion in `cernio resolve`** — the dad-list AI fallback surfaced `LexisNexis → workday/relx` and DigitalOcean `digitalocean98` (numeric suffix). Parent-slug cases fall through to AI fallback every time, which is more expensive than a mechanical attempt.
-- **Code-health audit findings — 27 open items** with 4 high-severity. None implemented yet.
-- **Forward-Deployed-Engineer / Solutions-Architect title-disguise leak** — 6 F's per 2026-05-10 batch from customer-facing roles slipping through exclude_keywords.
-- **"Analyst" include-keyword too broad** — 12 F's per batch from pure compliance/finance/risk-ops analyst roles.
-- **Hardware/RTL/ASIC role filter not in place** — 22 F's in 2026-05-10 batch from hardware/RTL/ASIC/FPGA/MEMS/PCB/optical/mechanical/aviation roles.
-- **Empty-description grad postings** — ~10 jobs per pair of 2026-04-29 batches (Microsoft × 5, Cisco × 3, Darktrace, FNZ) where `search-jobs` captures the listing but misses body text. Closure: post-step that reports `LENGTH(raw_description) < 200` and prompts re-fetch.
-- **Smarkets mis-graded at company level** — self-described as "the future of betting"; three roles F'd on gambling sector but the company is still held at C. Should be archived under gambling-sector exclusion.
-- **Defence-prime visa-friction not flagged at company tier** — 17+ F's in 2026-04-29 batch 2 on UK-defence-prime companies (Helsing UK × 8, Faculty AI Defence × 2, Anduril London × 3, Arondite × 2) — all categorical F per visa.md SC/DV blocker for Turkish nationality.
-- **2:2-degree-class credential filter is a non-closable structural gap.** Luminance Cambridge's 5 graduate roles all hard-gate on "Top 200 Global University with First or 2:1." 2:2 from York fails categorically — opaque credential filter independent of technical fit. No technical closure; track as risk.
+**Cybersecurity / cloud-security portfolio bridge.** Wiz roles cap at C-or-below; portfolio absence (no CTF, no CVE, no security-tooling project) is the blocker, not visa.
 
-**Unknown / needs investigation:**
-- **Chrome automation detection** — the banner appeared during autofill testing; `--disable-blink-features=AutomationControlled` may or may not be effective.
-- **CSS selectors for Greenhouse forms** — selectors in `src/autofill/greenhouse.rs` were written from documentation, not real DOM inspection.
-- **Long-term ATS provider stability** — slugs can break when companies migrate providers (ClearBank: Workable → Ashby). `cernio check` detects this; re-resolution is manual.
-- **Company-level grades pre-date the realism semantic.** Session 7 company grades were assigned under the pre-realism rubric; some may need to re-grade to A-stretch or B under the realism lens.
+**CUDA / GPU-systems / PTX / SASS / CUTLASS / Triton / NCCL.** Distinct from "production-scale ML" — this is GPU-kernel-engineering. Currently absent from skills.md.
 
-**Technical debt:**
-- **Dashboard is the largest single file** — `src/tui/views/dashboard.rs` is 31.5KB / 946 lines and handles grade distributions, pipeline health, action items, top roles, activity heatmap, search pulse, visa countdown, top companies leaderboard, session diff. Modularisation candidate.
-- **Migration 003 has a complex fresh-DB path.** Separate code path for fresh databases that manually rebuilds the table.
+**Production-scale ML.** NeuroDrive is M2-MacBook-Air scale; A-vs-S boundary at Apple AiDP, Jane Street ML, DRW ML where 10K-GPU / petabyte scale is the divider.
+
+**Distributed-database tenure** (YugabyteDB / CockroachDB / TiDB / Cloud Spanner / Iceberg / Trino). Single-node SQLite work doesn't transfer.
+
+**OCaml.** Jane Street primary language. 8+ Jane Street roles in 2026-04-29 batch involve OCaml.
+
+**2:2-degree-class structural credential filter.** Non-closable. Luminance Cambridge and similar smaller-firm Top-200-University + First-or-2:1 filters categorically reject. Tracked as risk, no technical closure available.
+
+**27 open code-health findings.** 4 HIGH-severity (strip_html consolidation + Workable latent bug; N+1 in search::run_by_grade; fetch_stats 16-query-per-poll; SmartRecruiters pagination retry). None implemented yet.
+
+**Eightfold ATS fetcher not built.** Only 1 company uses it; ROI low; tracked but deprioritised.
+
+**Teamtailor ATS fetcher not built.** Higher ROI than Eightfold — 4 of the 17 dad-list bespoke companies are on Teamtailor with a clean public API at `{slug}.teamtailor.com/jobs.json`.
+
+**Parent-company slug expansion not in `cernio resolve`.** AI fallback surfaced `LexisNexis → workday/relx` and DigitalOcean → `greenhouse/digitalocean98` (numeric suffix). Mechanical resolver did not try parent-company path; falls through to AI fallback every time.
+
+**Workday integration is the most complex.** Variable subdomain + site name means resolution requires manual identification or AI fallback. 20 companies on Workday. Workday UK-filter bypass closed in session 10 (commit `86097a6`) but the resolver still has no mechanical Workday probing.
+
+**Dashboard is the largest single file** at 31.5KB / 946 lines. Flagged in the code-health audit for split.
+
+**Web frontend drawer + Cmd-K + g-leader + presets PNG-audited but not interactively browser-tested.** Action item: 30-min focused session driving everything via keyboard and clicking through drawer flows.
+
+**Activity event log empty most of the time** in the web UI — backfill/migration/raw.* triggers filtered out; real CLI/TUI/web activity is naturally sparse.
 
 ## Direction (in-flight, not wishlist)
 
-Drawn from LifeOS `Roadmap.md` — items that are actively being worked on or have a concrete near-term plan:
+**Apply to the wide-funnel SS/S targets (time-bound, Priority 1).** ~15 deep-customisation primary targets across the realism-semantic SS/S anchor cluster: Anthropic Fellows (next intake), HRT 2026 Grad SWE, Microsoft UK Graduate SWE + MAIDAP, Bloomberg 2026 SWE + Internship, Cloudflare grad-track interns × 4, Amazon SDE-1 New Grad 2026 UK, Apple London ASE pipeline (the strongest wide-funnel SS/S generator — 7 of 23 Apple roles in the 2026-05-10 batch landed SS/S), Arm AI/ML Cambridge Graduate SWE, B2C2 Graduate Quant Developer London, Graphcore Cambridge Drivers, Squarepoint Graduate, Stripe SWE Intern London, Palantir SWE New Grad, Tradeweb 2026 Tech Grad, Vocalink (Mastercard) Launch Graduate Program 2026.
 
-- **Apply to the wide-funnel SS/S targets (time-bound).** ~15 deep-customisation primary targets surfaced by the 2026-04-29 + 2026-05-10 batches: Anthropic Fellows (AI Safety / ML Systems & Performance / RL); HRT 2026 Grad SWE; Microsoft UK Graduate SWE Full-Time + MAIDAP; Bloomberg 2026 SWE + Internship London; Cloudflare grad-track interns × 4; Amazon SDE-1 New Grad 2026 UK; Apple London ASE pipeline (7/23 Apple roles SS or S in the 2026-05-10 batch); Arm AI/ML Cambridge Graduate SWE; B2C2 Graduate Quant Developer London; Graphcore Cambridge Drivers; Squarepoint Graduate; Stripe Software Engineer Intern London; Palantir SWE New Grad; Tradeweb 2026 Technology Graduate Programme; Vocalink (Mastercard) Launch Graduate Program 2026. Application work, not build work — but the highest-leverage thing Cernio's output is asking the user to do this week.
-- **Close the Cloud / Kubernetes / Docker / Terraform / CI-CD gap.** Densest gap evidence in the project; flagged across 14 separate roles in the 2026-05-10 batch alone. Closure prescription is a weekend on Cernio itself — containerise Rust binary, add GitHub Actions CI, deploy a preview to AWS Lambda or Fargate, write a Terraform module. Captured as a Work item.
-- **Fix Autofill (Priority 3).** Open a real Greenhouse form, inspect DOM, find actual CSS selectors. Replace JS `el.value =` with CDP `Input.insertText` or `nativeInputValueSetter`. Test on a job with a prepared package. Once Greenhouse works, add Lever and Ashby modules. Evaluate `--disable-blink-features=AutomationControlled` effectiveness.
-- **Search jobs for the 48 dad-list companies** as a scoped subset. Grading half closed; `cernio search` + bespoke subagents against the 48 specifically. Revisit Dassault Systèmes (id 471).
-- **Interview Prep Skill** (priority 5). Design exists in full. With the realism semantic in place the SS targets are well-calibrated — the curriculum input is sharper than it would have been pre-2026-04-29.
-- **Close the C++ proficiency gap** via Tectra past Clock-interface scaffold into a working feed-handler + matching loop, OR finish Chrona's commit DAG to a working `chrona init / commit / log` MVP.
-- **Code-health audit implementation batches** in the audit's recommended order: dead-code removal → `strip_html` consolidation (fixes Workable latent bug, removes 70 lines) → SQL consolidation (`fetch_stats` 16→4-6 queries + N+1 fix in `search::run_by_grade`) → retry standardisation across Ashby/Workable/Workday → `verify_ats_slugs` parallelisation + Lever probe swap → dashboard split → `fetch_jobs` list/detail split. Each batch independently testable against the 346-test baseline.
-- **Tighten the search-time filter on disguised non-engineering titles.** Add "Forward Deployed", "Deployed Engineer", "Solutions Architect", "Solutions Engineer" as title-pattern hard-excludes. Tighten "Analyst" include_keyword to require pairing with "Quant", "Quantitative", "Research", or "Software".
-- **Filter hardware/RTL/ASIC/FPGA roles at search time.** Extend preferences.toml exclude_keywords with `RTL`, `ASIC`, `FPGA`, `VLSI`, `Physical Design`, `Mechanical`, `Nanofabrication`, `Hardware Integration`, `Optical`, `Emulation`, `Aviation`, `Maintenance`. ~10-15% grading-load reduction with zero false-negative risk.
-- **Periodic integrity check + re-search.** The search pipeline is built for periodic re-runs (`last_searched_at` on companies; TUI shows which bespoke companies need searching). `check-integrity` maintains `portfolio-gaps.md` as a side effect.
+**Close the Cloud / Kubernetes / Docker / Terraform / CI-CD gap (Priority 2).** Single weekend using Cernio itself as the closer — containerise the Rust binary, add CI workflow, deploy `cernio search` preview to AWS Lambda or Fargate, add Terraform module. Highest-leverage portfolio investment available right now per the 2026-05-10 batch evidence.
+
+**Fix autofill (Priority 3).** CDP `Input.insertText` swap, verify Greenhouse CSS selectors against real DOM, then add Lever and Ashby modules.
+
+**Interview-prep skill (Priority 5).** Design exists in full at `context/notes/interview-prep-design.md`. Reads SS/S/A jobs + portfolio gaps to identify what to study; generates concept files, LeetCode-style TDD problems, multi-component systems practice, company-specific study briefs.
+
+**Code-health audit implementation batches (Priority 7).** 7-batch sequence: dead-code removal (unblocks ATS); strip_html consolidation (fixes Workable latent bug, removes 70 lines); SQL consolidation in `fetch_stats` + N+1 fix in `search::run_by_grade`; retry standardisation across Ashby/Workable/Workday; `verify_ats_slugs` parallelisation + Lever probe swap; dashboard split; `fetch_jobs` list/detail split. Each batch independently testable against the 346-test baseline.
+
+**Tighten search-time filter on disguised non-engineering titles (Priority 8).** Add "Forward Deployed", "Deployed Engineer", "Solutions Architect", "Solutions Engineer" as title-pattern hard-excludes; tighten "Analyst" include_keyword to require "Quant", "Quantitative", "Research", or "Software" pairing.
+
+**Filter hardware / RTL / ASIC / FPGA roles at search time (Priority 9).** Extend `preferences.toml exclude_keywords` with `RTL`, `ASIC`, `FPGA`, `VLSI`, `Physical Design`, `Mechanical`, `Nanofabrication`, `Hardware Integration`, `Optical`, `Emulation`, `Aviation`, `Maintenance`. ~10-15% grading-load reduction with zero false-negative risk.
+
+**Web frontend interactive audit and follow-ups.** Interactive browser audit of drawer + Cmd-K + g-leader + presets. Future HTMX-partial-swap for heatmap cross-filter to avoid page reload. Optional server-side sync for saved-searches presets.
 
 ## Demonstrated skills
 
-What this project specifically proves (anchored to the evidence in LifeOS):
+This project demonstrates that the candidate can:
 
-- **Architecting a three-layer system with strict dependency direction and SQLite as the shared contract** — explicit layer responsibilities, no upward dependencies, idempotency on every pipeline step, WAL for read/write concurrency between TUI and pipeline scripts.
-- **Implementing 6 production ATS integrations in Rust** (Greenhouse, Lever with dual US+EU endpoints, Ashby POST-based, Workable per-job detail fetch, Workday with variable subdomain + site stored in `ats_extra`, SmartRecruiters with `totalFound>0` false-positive guard) and unifying them behind a normalised `AtsJob` struct with shared retry helpers and slug normalisation.
-- **Designing a filter chain with documented false-negative-aversion bias** — empty data passes through; 34+ exclusion keywords validated against 2,001 graded jobs for zero B+ false-negatives.
-- **Tiered archival lifecycle design** — grade-tied active windows, archive expiry, protection for decisions and SS/S/A, archival-vs-deletion discrimination so re-discovery can happen with an updated profile.
-- **SQLite migration discipline including manual table-rebuild patterns for CHECK constraint changes** — 6 idempotent migrations.
-- **Building a 26-file Ratatui TUI with mouse + keyboard support, 5 views, responsive layout, GitHub-style activity heatmap, kanban pipeline, and modular widget architecture** — App-struct shared state, per-concern modules as methods, rendering separate from event handling.
-- **Retroactive 316-test pass on a real codebase that surfaced two silent data-loss bugs immediately** — lib+bin split, `CERNIO_DB_PATH`, in-memory DB fixture, offline JSON fixtures over HTTP mocking, CLI integration tests via `assert_cmd`, 346 tests passing sub-second.
-- **Build-time integrity guard design** that closed a multi-month silent UK-filter bypass (Workday) the moment it landed — `every_supported_ats_provider_has_a_location_subtable` invariant driving off a `SUPPORTED_ATS_PROVIDERS` constant kept in sync with `src/ats/` modules.
-- **Designing and iterating a grading rubric five times against production data** — dimension scoring → hard floors → career-stage calibration → question-first → realism semantic. Each iteration driven by a concrete production failure with named DB examples (Amazon at B / Monzo at C under dimensions; 120 demotions when descriptions were finally read; 40 SS/S after clean sweep under pure question-first).
-- **Operationalising the reputation × selectivity decoupling in a rubric — including worked-example pairs and detection rules** that produced 12% S+ density on a 300-job batch (vs >20% inflation pre-realism) and confirmed the Jane Street prestige-trap pattern (0 SS / 0 S / 4 A-stretch on 18 roles).
-- **Designing 9 obligation-anchored Claude Code skills** with mandatory-read protocols, evidence-anchored quality checklists, What-I-Did-Not-Do declarations, and engineered triggers with negative-trigger clauses — verifiable obligations replacing exhortation language, ~290KB of structured skill documentation.
-- **One-way cross-repo synchronisation architecture** (`populate-from-lifeos`, session 10) — 8-phase autonomous workflow, README-as-gatekeeper allow-list parsing, parallel per-project subagent dispatch, Tier-3 evidence-anchored synthesis contract (file path / line count / verbatim last line), pre/post-timestamp Cernio-native preservation check, never-writes-upstream invariant.
-- **Two-pass repository code-health audit** that surfaced 27 actionable findings (4 high / 14 medium / 7 low / 2 triage) across 8 systems, modified zero production code, added 6 parity tests locking target semantics for the highest-severity consolidation, and shipped a 7-batch implementation sequence each independently testable against a baseline.
-- **22-factor three-tier location-reasoning rubric** evaluating cities at city / country / hybrid level across current state and three trajectory horizons (1-3 / 5-7 / 10-15 years), integrated as a same-tier grading modulator that moves grades across boundaries — not just within-grade tiebreaking.
-- **Asynchronous I/O multiplexing with bounded concurrency** via `tokio::Semaphore` and per-provider retry with exponential backoff — business logic stays sync, async is the I/O layer only.
-- **Quote-aware HTML stripping with a 514-line idempotent format pipeline** that runs silently on every TUI startup, guarded by three invariants (no raw tags, no triple blank lines, no panics) plus an explicit realistic-payload idempotency test.
-- **Diagnosing a cross-cutting bug from a symptom pattern** — the timestamp-format mismatch (`%Y-%m-%dT%H:%M:%S` vs `%Y-%m-%d %H:%M:%S`) was found via tests, traced through 7 files (`pipeline/check.rs`, `clean.rs`, `search.rs`, `tui/app/actions.rs`, `cleanup.rs`, `pipeline.rs`, `tui/queries.rs`), fixed atomically, and locked behind regression coverage.
-- **Treating a profile as a living system with the Living System rule** — every skill reads the profile fresh on every invocation; profile snapshots embedded in skills are an architectural error caught at the rule layer.
-- **Career-coaching feedback loop** — `portfolio-gaps.md` (454 lines) accumulates market-pattern intelligence across 1,370+ job evaluations; gaps drive concrete project-level closure recommendations (cloud-on-Cernio weekend, Tectra feed-handler completion, Chrona MVP) that loop back into improving the profile that feeds future grading.
+- **Architect and ship a multi-layer Rust system end-to-end** — library + binary, CLI pipeline, terminal UI, embedded web server, AI orchestration layer, all over a single SQLite store, with strict downward dependency direction and clean inter-layer contracts.
+- **Design and integrate against six independent third-party JSON APIs** (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Workday) with provider-specific quirks (server-side filters, pagination shapes, dual US/EU endpoints, false-200 detection, variable subdomain+site, POST-based search). Shared retry layer with exponential backoff, unified `AtsJob` type, offline JSON fixtures as living documentation.
+- **Build a 26-file modular terminal UI** in Ratatui with mouse support, responsive layout across 3 width modes, semantic colour palette, GitHub-style activity heatmap, kanban view with proportional column sizing, multi-select, smart grouping, and a quick-peek floating popup pattern.
+- **Build an embedded server-rendered web interface** in axum + maud + HTMX + ECharts over the same SQLite store, with type-based filter chip variants, URL-persistent detail drawer, clickable charts that cross-filter via URL navigation, Cmd-K command palette with substring + prefix + grade ranking, g-leader keyboard shortcuts, LocalStorage saved searches.
+- **Run a Rust integration-test pass from 18 to 346 tests** spanning inline unit tests, integration tests against in-memory SQLite, CLI subprocess testing via `assert_cmd` against tempdir DBs, parity tests, and 21 build-time invariants on `preferences.toml` shape. Surfaced three silent production bugs (two data-loss in session 9, Workday UK-filter bypass in session 10, timestamp-format mismatch in session 11) directly via the test investment.
+- **Decide and execute a lib+bin split for testability** as a structural change — `main.rs` becomes a thin shim, `lib.rs` exports the library surface, integration tests can import public items.
+- **Author and iterate native Claude Code skills** with YAML engineered triggers, evidence-anchored mandatory-read tables, What-I-Did-Not-Do declarations, Tier 3 quality checklists, and ~290KB of reference documentation that IS the quality bar. Skills are obligation-anchored not exhortation-anchored — verifiable artefact production replaces "be thorough" framing.
+- **Design and ship a five-phase grading rubric** with concrete production-driven evolution: dimension-weighted → hard floors → career-stage calibration → question-first → realism semantic (reputation × selectivity decoupling). Each phase rewrite traceable to specific production failure data; the realism semantic produced 12% S+ density vs >20% pre-realism inflation, with the Jane Street prestige-trap pattern confirmed across 18 roles.
+- **Design a 22-factor three-tier location-evaluation reasoning framework** with city/country/hybrid level evaluation across current state plus three trajectory horizons (1-3 / 5-7 / 10-15 years). Ran a 10-agent parallel research pass producing 71KB of synthesis; integrated lifestyle preferences as a same-tier grading modulator that moves grades across boundaries.
+- **Design and ship a one-way cross-repository profile sync** (`populate-from-lifeos`): 8-phase workflow, autonomous start-to-finish, three subagent dispatches (parallel per-project + skills derivation), README-as-gatekeeper allow-list, pre/post-timestamp verification that aborts on Cernio-native file mutation, audit artefact written per run. First run consumed 203 LifeOS source files and produced 3,413 lines of synthesised content; second-run idempotency confirmed.
+- **Author a self-driven visual-debug CLI** (`cernio snap`) that spawns the embedded axum server, drives headless Chrome via chromiumoxide, captures full-page + per-pane + viewport-slice PNGs into a timestamped directory, optionally with `--temporal` 3s-gap diffs for animation/state debugging. Used by the agent itself rather than by the user.
+- **Run a code-health audit** with 27 actionable findings across 8 systems (4 HIGH-severity), backed by 6 added parity tests that lock target semantics, and 0 production code modified — every finding is a proposed change with evidence chain and effort estimate.
+- **Apply Living-System Philosophy enforcement** — grades, preferences, ATS slugs all change over time; no skill embeds profile snapshots; every skill reads `profile/` fresh on every invocation; profile mutations trigger staleness audits via `check-integrity`.
 
 ---
 
@@ -568,27 +378,29 @@ What this project specifically proves (anchored to the evidence in LifeOS):
 
 | Path | Lines | Verbatim last line |
 |---|---|---|
-| Projects/Cernio/_Overview.md | 79 | "> Session 8 added the 22-factor location-evaluation rubric + lifestyle modulator; session 9 added 316 tests (surfacing two silent data-loss bugs), a full code-health audit with 27 findings, and migrated all 9 skills to native Claude Code integration. Session 10 shipped `populate-from-lifeos` + retired `profile-scrape` + added a 21-test `preferences_integrity.rs` guard that surfaced the silently-bypassed Workday UK-location filter. Sessions 11-12 ran the post-clean-slate full re-grading under the new realism semantic (583 jobs in two 2026-04-29 batches) plus a 164-job 2026-05-10 search-and-grade batch. Velocity slowed because depth was the goal. See [[Cernio/Session History]] for the full breakdown." |
-| Projects/Cernio/Architecture.md | 254 | "**Session 11 grade-jobs realism rewrite (commit `389b1e8a`, 2026-04-29):** added reputation × selectivity decoupling, prestige-trap worked example, status enum cleanup. Search-jobs got a mini-iteration in commit `08bfa8b2`. See [[Cernio/Systems/Skills]] and [[Cernio/Systems/Grading#Phase 5 — Realism semantic 2026-04-29]]." |
-| Projects/Cernio/Data Composition.md | 187 | "- [[Cernio/Roadmap]] — apply targets and filter-tightening priorities surfaced by the 2026-04-29 + 2026-05-10 batches" |
-| Projects/Cernio/Decisions.md | 213 | "See [[Cernio/Systems/Grading#Phase 5 — Realism semantic 2026-04-29]] and [[Cernio/Data Composition#Batch 2026-04-29 batch 1]]." |
-| Projects/Cernio/Gaps.md | 254 | "- [[Cernio/Data Composition]] — the data backing the gap evidence" |
-| Projects/Cernio/Roadmap.md | 173 | "- [[Cernio/Data Composition]] — current grading state and batch composition" |
-| Projects/Cernio/Session History.md | 219 | "> 5th major rubric rewrite, driven by user observation that prestige was leaking into Q2-confirmed SS. The reputation × selectivity decoupling produced calibrated grades on 583 jobs across two same-day batches (12% S+ density vs the 20%+ inflation pre-realism) and the Jane Street prestige-trap pattern was concretely confirmed in production data. Every future grade-jobs run inherits the calibration. `[verified: commit 389b1e8a, portfolio-gaps.md §Batch 2026-04-29 batch 1]`" |
-| Projects/Cernio/Systems/_Overview.md | 41 | "- [[Projects/Cernio/Roadmap]] — direction-of-travel" |
-| Projects/Cernio/Systems/ATS Providers.md | 145 | "- [[Cernio/Systems/Code Health]] — 7 findings open against this subsystem" |
-| Projects/Cernio/Systems/Autofill.md | 90 | "- [[Cernio/Gaps]] — autofill is the #1 gap" |
-| Projects/Cernio/Systems/Code Health.md | 166 | "- [[Cernio/Roadmap]] — implementation batches are queued" |
-| Projects/Cernio/Systems/Config.md | 78 | "- [[Cernio/Architecture]] — no hardcoded configuration is a key architectural property" |
-| Projects/Cernio/Systems/Database.md | 157 | "- [[Cernio/Systems/Code Health]] — dashboard `fetch_stats` issues 16 queries per 2s poll; SQL consolidation is a HIGH-severity audit finding" |
-| Projects/Cernio/Systems/Grading.md | 195 | "- [[Cernio/Decisions#Realism semantic 2026-04-29]] — the design decision behind phase 5" |
-| Projects/Cernio/Systems/Location Evaluation.md | 117 | "- LifeOS canonical: `Profile/Professional/Lifestyle Preferences.md` — Cernio's `profile/lifestyle-preferences.md` is synced from here one-way via populate-from-lifeos (session 10)" |
-| Projects/Cernio/Systems/Pipeline.md | 159 | "- [[Cernio/Systems/Code Health]] — 10 open findings in this subsystem" |
-| Projects/Cernio/Systems/Profile.md | 121 | "- [[Cernio/Session History#Session 10]] — the migration session" |
-| Projects/Cernio/Systems/Skills.md | 167 | "- [[Cernio/Session History#Session 10]]" |
-| Projects/Cernio/Systems/TUI.md | 144 | "- [[Cernio/Systems/Testing]] — Phase 6 added 34 TUI helper tests" |
-| Projects/Cernio/Systems/Testing.md | 192 | "- [[Cernio/Session History#Session 11]] — timestamp format mismatch bug fixed across 7 files" |
-| Projects/Cernio/Work/Application Pipeline.md | 49 | "- Cernio _Overview / Gaps / Roadmap drift (last_verified 2026-04-24) — see `[[Projects/Cernio/Work/Vault Refresh.md]]`" |
-| Projects/Cernio/Work/Cloud Deployment.md | 54 | "- Related: prepare-applications follow-up on the 12 SS+S list — `[[Projects/Cernio/Work/Application Pipeline.md]]`" |
-| Projects/Cernio/Work/Profile Populate Skill.md | 152 | "- LifeOS commit `cf14e1d` — Phase 1 landing commit" |
-| Projects/Cernio/Work/Vault Refresh.md | 35 | "Orient on 2026-05-10 flagged this as a drift but the session that ran orient (Cernio session start) went on to search-jobs → grade-jobs → exhaustion-of-day pattern, then session wrap deferred this hygiene cut. Cheap-pass items get deferred routinely; the persistence-pin pattern would surface it in morning-brew anti-rec walk." |
+| Projects/Cernio/_Overview.md | 127 | "> Session 8 added the 22-factor location-evaluation rubric + lifestyle modulator; session 9 added 316 tests (surfacing two silent data-loss bugs), a full code-health audit with 27 findings, and migrated all 9 skills to native Claude Code integration. Session 10 shipped `populate-from-lifeos` + retired `profile-scrape` + added a 21-test `preferences_integrity.rs` guard that surfaced the silently-bypassed Workday UK-location filter. Sessions 11-12 ran the post-clean-slate full re-grading under the new realism semantic (583 jobs in two 2026-04-29 batches) plus a 164-job 2026-05-10 search-and-grade batch. Velocity slowed because depth was the goal. See [[Cernio/Session History]] for the full breakdown." |
+| Projects/Cernio/Architecture.md | 343 | "`selected=(false)` in maud emits `selected=\"false\"` — browsers treat any presence of the `selected` attribute as truthy, so the last `<option>` in the source order wins regardless of which was meant to be selected. **Correct conditional-attribute syntax is `selected[bool_expr]` (brackets, not parens).** Same applies to `checked`, `disabled`, etc. Detected this session when filter dropdowns reverted to the last value (fintech) after switching to \"All\". See `context/notes/maud-attribute-gotchas.md`." |
+| Projects/Cernio/Data Composition.md | 205 | "- [[Cernio/Roadmap]] — apply targets and filter-tightening priorities surfaced by the 2026-04-29 + 2026-05-10 batches" |
+| Projects/Cernio/Decisions.md | 413 | "**Consequence:** Future Cernio UI work uses snap as the verification loop. The image-reader hits per-pane PNGs at native resolution when full-page PNGs are too tall. Saved as a permanent feedback memory: [[feedback_self_driven_visual_verification]]." |
+| Projects/Cernio/Gaps.md | 296 | "How they got that way: likely a write that updated `status` to `resolved`/`bespoke` without the companion INSERT/UPDATE on `company_portals`/`careers_url`. Worth adding a Phase-0 invariant check to `populate-db` (cited as a \"Cov\" proposal in the 2026-05-14 populate-db skill log)." |
+| Projects/Cernio/Roadmap.md | 196 | "- [[Cernio/Data Composition]] — current grading state and batch composition" |
+| Projects/Cernio/Session History.md | 217 | "> 5th major rubric rewrite, driven by user observation that prestige was leaking into Q2-confirmed SS. The reputation × selectivity decoupling produced calibrated grades on 583 jobs across two same-day batches (12% S+ density vs the 20%+ inflation pre-realism) and the Jane Street prestige-trap pattern was concretely confirmed in production data. Every future grade-jobs run inherits the calibration. `[verified: commit 389b1e8a, portfolio-gaps.md §Batch 2026-04-29 batch 1]`" |
+| Projects/Cernio/Systems/_Overview.md | 49 | "- [[Projects/Cernio/Roadmap]] — direction-of-travel" |
+| Projects/Cernio/Systems/ATS Providers.md | 150 | "- [[Cernio/Systems/Code Health]] — 7 findings open against this subsystem" |
+| Projects/Cernio/Systems/Autofill.md | 104 | "- [[Cernio/Gaps]] — autofill is the #1 gap" |
+| Projects/Cernio/Systems/Code Health.md | 158 | "- [[Cernio/Roadmap]] — implementation batches are queued" |
+| Projects/Cernio/Systems/Config.md | 80 | "- [[Cernio/Architecture]] — no hardcoded configuration is a key architectural property" |
+| Projects/Cernio/Systems/Database.md | 185 | "- [[Cernio/Systems/Code Health]] — dashboard `fetch_stats` issues 16 queries per 2s poll; SQL consolidation is a HIGH-severity audit finding" |
+| Projects/Cernio/Systems/Grading.md | 204 | "- [[Cernio/Decisions#Realism semantic 2026-04-29]] — the design decision behind phase 5" |
+| Projects/Cernio/Systems/Location Evaluation.md | 151 | "- LifeOS canonical: `Profile/Professional/Lifestyle Preferences.md` — Cernio's `profile/lifestyle-preferences.md` is synced from here one-way via populate-from-lifeos (session 10)" |
+| Projects/Cernio/Systems/Pipeline.md | 176 | "- [[Cernio/Systems/Code Health]] — 10 open findings in this subsystem" |
+| Projects/Cernio/Systems/Profile.md | 158 | "- [[Cernio/Session History#Session 10]] — the migration session" |
+| Projects/Cernio/Systems/Skills.md | 191 | "- [[Cernio/Session History#Session 10]]" |
+| Projects/Cernio/Systems/TUI.md | 201 | "- [[Cernio/Systems/Testing]] — Phase 6 added 34 TUI helper tests" |
+| Projects/Cernio/Systems/Testing.md | 207 | "- [[Cernio/Session History#Session 11]] — timestamp format mismatch bug fixed across 7 files" |
+| Projects/Cernio/Systems/Web.md | 141 | "- `context/notes/maud-attribute-gotchas.md` — `selected[bool]` syntax + browser truthy-attribute lessons" |
+| Projects/Cernio/Work/Application Pipeline.md | 61 | "- Cernio _Overview / Gaps / Roadmap drift (last_verified 2026-04-24) — see `[[Projects/Cernio/Work/Vault Refresh.md]]`" |
+| Projects/Cernio/Work/Cloud Deployment.md | 66 | "- Related: prepare-applications follow-up on the 12 SS+S list — `[[Projects/Cernio/Work/Application Pipeline.md]]`" |
+| Projects/Cernio/Work/Profile Populate Skill.md | 197 | "- LifeOS commit `cf14e1d` — Phase 1 landing commit" |
+| Projects/Cernio/Work/Vault Refresh.md | 61 | "Orient on 2026-05-10 flagged this as a drift but the session that ran orient (Cernio session start) went on to search-jobs → grade-jobs → exhaustion-of-day pattern, then session wrap deferred this hygiene cut. Cheap-pass items get deferred routinely; the persistence-pin pattern would surface it in morning-brew anti-rec walk." |
+| Projects/Cernio/Work/Web Frontend.md | 39 | "- [project_web_frontend_redesign.md](../../.claude/projects/-Users-atacanercetinkaya-Documents-Programming-Projects-cernio/memory/project_web_frontend_redesign.md) — auto-memory snapshot" |

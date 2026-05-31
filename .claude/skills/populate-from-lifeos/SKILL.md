@@ -29,18 +29,22 @@ Instead of writing a single `profile/skills.md`, the skills-derivation subagent 
 - `profile/skills/tools-platforms.md` — Tools (Git/GitHub, Cargo, CMake, pnpm, etc.)
 - `profile/skills/concepts-domains.md` — Cross-cutting concepts (lock-free, DeFi microstructure, ECS, etc.)
 - `profile/skills/methodologies-soft.md` — Methodologies + soft skills
+- `profile/skills/lane-affinity.md` — **NEW.** Per-lane evidence pack for downstream grading agents. One section per active lane from `profile/career-goals.md` (currently 8: big-tech, ai-ml, hft, crypto-mm, bank-strats, systems-infra, devtools, fintech). Each lane section names pinnacle-evidence project(s) with specific technical hooks, supporting-evidence projects, strongest skills pulled from the other group files, and honest gap acknowledgement. This file is intended to be embedded verbatim in `grade-companies` and `grade-jobs` subagent prompts — it pre-resolves the "which projects evidence which lane" mapping so graders don't re-derive it on every call. Schema in `references/skills-derivation-rubric.md` §"Lane Affinity File".
 
-The group split is canonical because per-lane would duplicate (Rust appears in 5 lanes). The skills-derivation agent reads project files and bins each skill into the appropriate group with project-anchor evidence inline. Lane relevance is annotated in `_Overview.md`, not in per-skill rows.
+The group split is canonical because per-lane would duplicate (Rust appears in 5 lanes). The skills-derivation agent reads project files and bins each skill into the appropriate group with project-anchor evidence inline. Lane relevance is annotated in `_Overview.md` (high-level taxonomy map) AND in the dedicated `lane-affinity.md` file (grader-facing evidence pack); these are complementary, not redundant.
+
+**Lane list source:** the agent reads `profile/career-goals.md` (read-only — Cernio-native file, never written) to extract the canonical active-lane list. The list is currently 8 lanes but the file is the source of truth — agents must derive from it, not from a hardcoded enumeration.
 
 ### Phase 5 output contract
 
 Each group file has frontmatter (`title`, `parent`, `last_updated`) and inherits the table format from the legacy skills.md. The agent returns:
 
-- Output paths (8 files)
+- Output paths (**9 files** — 7 group files + `_Overview.md` + `lane-affinity.md`)
 - Per-project evidence block (path | line count | verbatim last line)
 - Per-category band distribution
+- **Per-lane evidence summary** (one line per lane: pinnacle project + count of supporting projects) confirming `lane-affinity.md` was derived from the project files, not invented
 
-Phase 8 summary lists each group file in the diff summary.
+Phase 8 summary lists each group file in the diff summary, including `lane-affinity.md` with a one-line per-lane pinnacle attribution.
 
 > [!important] Read this entire file before starting any work
 > Cernio doctrine requires reading every reference file in `references/` and every file in `profile/` (when referenced for evaluation tasks). For this skill specifically, also read `references/lifeos-source-map.md`, `references/project-synthesis-schema.md`, and `references/skills-derivation-rubric.md` end-to-end before Phase 0. The skill orchestrates parallel subagents and a final synthesis agent — incomplete reading means the dispatch prompts will be incomplete, which means the subagents work blind.
@@ -176,12 +180,13 @@ Each per-project agent prompt embeds verbatim:
 
 The skills-derivation agent prompt embeds verbatim:
 
-- **The full content of `references/skills-derivation-rubric.md`** — the multi-table approach (Languages, Frameworks, Libraries, Engines, Tools, Concepts/Domains), the dimensional rubric (depth-of-work, conceptual complexity, completion stage, cross-domain transfer, evidence specificity), the calibration anchors. Verbatim.
+- **The full content of `references/skills-derivation-rubric.md`** — the multi-table approach (Languages, Frameworks, Libraries, Engines, Tools, Concepts/Domains), the dimensional rubric (depth-of-work, conceptual complexity, completion stage, cross-domain transfer, evidence specificity), the calibration anchors, AND the §"Lane Affinity File" section defining the `lane-affinity.md` schema and standards. Verbatim.
 - **The list of every project file path** just generated in Phases 3 and 4: `cernio/profile/projects/<name>.md` for each project, plus `cernio/profile/projects/open-source-contributions.md`.
-- **The output target path:** `cernio/profile/skills.md`.
-- **The read protocol:** the agent reads every project file in full. No `head -N`, no `limit`, no offset. Per-file: line count and verbatim last line in the returned evidence block.
-- **Output contract:** the agent returns the written file path AND a structured evidence block listing every project file consumed with `path | line count | verbatim last line`, AND per-category band distribution counts.
-- **The anti-puffing reminder reproduced verbatim:** *"Proficiency reflects what the projects demonstrate, not what the user has been exposed to. A language used in one abandoned-early project is Familiar at most. A library named in passing is not a skill. Calibrate against the anchors in the rubric, not against intuition or generosity."*
+- **The full content of `profile/career-goals.md`** (read-only — never written by this skill or its agent) — required to extract the canonical active-lane list. The agent must not hardcode the 8 lanes; they are derived from the file. If the file lists 6 or 10 lanes on some future run, the `lane-affinity.md` output adapts.
+- **The output target paths:** the **9** files under `cernio/profile/skills/` (`_Overview.md`, `languages.md`, `frameworks.md`, `libraries.md`, `engines-runtimes.md`, `tools-platforms.md`, `concepts-domains.md`, `methodologies-soft.md`, `lane-affinity.md`).
+- **The read protocol:** the agent reads every project file in full AND `profile/career-goals.md` in full. No `head -N`, no `limit`, no offset. Per-file: line count and verbatim last line in the returned evidence block.
+- **Output contract:** the agent returns the **9** written file paths AND a structured evidence block listing every project file consumed with `path | line count | verbatim last line`, AND per-category band distribution counts, AND per-lane evidence summary (one line per lane).
+- **The anti-puffing reminder reproduced verbatim:** *"Proficiency reflects what the projects demonstrate, not what the user has been exposed to. A language used in one abandoned-early project is Familiar at most. A library named in passing is not a skill. Calibrate against the anchors in the rubric, not against intuition or generosity. For lane-affinity.md specifically: pinnacle-evidence assignments must cite specific architectural decisions or technical artefacts from the project file (matching engine + lock-free design + risk-controls for Nyquestro → hft), not generic tech-stack overlap (Rust → hft). Lanes for which the portfolio has no genuine pinnacle evidence still get a section, but it acknowledges the gap rather than inventing pinnacle attribution."*
 
 The failure mode this section defends against is dispatch prompts that embed a one-paragraph summary of the schema or rubric instead of the verbatim text. Summarised-context subagents produce content shaped by the summary's emphasis rather than the rubric's full structure — observed in prior production runs across other skills' subagents.
 
@@ -234,7 +239,8 @@ If a category genuinely has nothing to declare, state that explicitly per catego
 - [ ] **Professional/ files diffed** — for each of the 11 mapped files in `references/lifeos-source-map.md` §"Direct copy mapping", cite source path, target path, and verdict (unchanged / replaced / added).
 - [ ] **Per-project agents dispatched in parallel** — cite the count dispatched (one per `project_allow_list` entry), the count returned successfully, and the count failed with reason. Each agent's evidence block (per-source-file last-line quote) reproduced or linked from the summary.
 - [ ] **OSS aggregated** — cite the count of files read from `Projects/Open Source Contributions/`, the line count of the resulting `projects/open-source-contributions.md`, and per-source-file evidence.
-- [ ] **Skills agent dispatched and returned** — cite the count of project files the agent consumed with per-file last-line evidence, and the per-category band distribution from the agent's return.
+- [ ] **Skills agent dispatched and returned** — cite the count of project files the agent consumed with per-file last-line evidence, the per-category band distribution from the agent's return, the count of lanes extracted from `profile/career-goals.md`, AND the per-lane pinnacle attribution summary confirming `lane-affinity.md` is grounded in project evidence.
+- [ ] **Lane affinity file generated** — cite `profile/skills/lane-affinity.md` line count, the lane count it covers (must match the count from career-goals.md), and that every lane section names at least one specific project as pinnacle/supporting evidence OR explicitly acknowledges the gap if no genuine evidence exists.
 - [ ] **Index generated** — cite `projects/index.md` line count and the project count it indexes.
 - [ ] **Cleanup performed** — cite each deleted legacy file (`projects.md`, `volunteering.md` if present) and each orphan flagged (path + reason for orphan status).
 - [ ] **Cernio-native files preserved** — cite `preferences.toml` and `portfolio-gaps.md` modification timestamps from before and after the run, confirming both are unchanged.

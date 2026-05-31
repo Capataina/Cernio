@@ -12,6 +12,7 @@
 - [The Cross-Domain Transfer Lift](#the-cross-domain-transfer-lift)
 - [Evidence Reading Protocol](#evidence-reading-protocol)
 - [Output Schema for skills.md](#output-schema-for-skillsmd)
+- [Lane Affinity File](#lane-affinity-file)
 - [Anti-Puffing for the Skills File](#anti-puffing-for-the-skills-file)
 - [Worked Calibration Examples](#worked-calibration-examples)
 
@@ -293,6 +294,72 @@ For each candidate skill entry, the agent's reasoning trace (in its return summa
 ```
 
 The Evidence column is mandatory and substantive. *"Used in NeuroDrive"* fails the standard. *"Central to NeuroDrive — handwritten PPO with clipped surrogate objective and GAE, asymmetric actor-critic (2×64 actor, 2×128 critic), 8-subsystem Bevy ECS architecture, 43x performance fix via flat row-major weight storage"* is the standard.
+
+---
+
+## Lane Affinity File
+
+`profile/skills/lane-affinity.md` is the per-lane evidence pack for downstream grading agents (`grade-companies`, `grade-jobs`). The file's audience is **other agents that will embed it verbatim in their prompts** — it pre-resolves the "which projects + which skills evidence which lane" mapping so graders cite specific evidence instead of re-deriving it on every call.
+
+### Lane list source
+
+The agent reads `profile/career-goals.md` to extract the canonical active-lane list. Do NOT hardcode the 8 current lanes. If the file lists 6 or 10 on some future run, the output adapts. Lanes are identified by their key (e.g. `hft`, `bank-strats`) and full name in career-goals.md.
+
+### Per-lane section schema
+
+Each lane gets one section. The section has four required parts, in this order:
+
+```markdown
+## {lane-key} — {Full Lane Name}
+
+**Pinnacle evidence** (1–2 projects max): the project(s) that most directly demonstrate this lane. Each named project gets a sentence citing the specific architectural decision, technical artefact, or completion milestone from the project file — not generic tech-stack overlap. Example: *"Nyquestro — lock-free limit-order-book matching engine in safe Rust, multi-instrument routing, integrated risk controls (kill-switches, throttles, fat-finger protection), live Coinbase WebSocket integration."* If the portfolio has no genuine pinnacle for this lane, state *"No pinnacle evidence in current portfolio"* explicitly — do not promote a supporting project to fill the slot.
+
+**Supporting evidence** (any number, 0+): other projects with partial relevance, each with a one-line specific connection. *"Tectra — production-style trading infrastructure (feed handler, risk engine, backtesting). Aurix — Q64.96 fixed-point math, cross-DEX arb detection. Cernio — Tokio async runtime + SQLite WAL state engine."* If none, state *"No supporting evidence in portfolio."*
+
+**Strongest cross-cutting skills**: 3–8 entries pulled from the other group files (languages, concepts-domains, engines-runtimes, etc.) that are most relevant to this lane, with their proficiency band. Format: *"Rust [Proficient] (from languages.md), Lock-free concurrency [Comfortable] (concepts-domains.md), Tokio [Proficient] (frameworks.md), Market microstructure [Comfortable] (concepts-domains.md)."* These are the skills a grader would cite when assessing fit for a role in this lane.
+
+**Gaps for this lane**: honest negative-space acknowledgement. What does this lane typically expect that the portfolio does NOT demonstrate? Example for hft: *"No production kdb+/q experience. No FPGA / hardware-acceleration work. No published latency benchmarks (sub-microsecond claims). Order-book engine is single-venue, not multi-venue cross-routing yet."* This section is the most important for grading honesty — without it, graders over-rate pinnacle attribution. If no clear gaps surface from the project files (rare), state *"No obvious gaps surfaced from portfolio evidence — graders should verify against role-specific requirements."*
+```
+
+### Lane Affinity output template
+
+```markdown
+---
+title: Lane Affinity
+parent: Skills
+last_updated: <YYYY-MM-DD>
+---
+
+# Lane Affinity
+
+> Per-lane evidence pack derived from `profile/projects/*.md` and `profile/skills/*.md`.
+> Lane list source: `profile/career-goals.md`.
+> Audience: grading subagents (`grade-companies`, `grade-jobs`) embedding this file verbatim.
+
+---
+
+## {lane-key-1} — {Full Lane Name}
+
+**Pinnacle evidence**: …
+**Supporting evidence**: …
+**Strongest cross-cutting skills**: …
+**Gaps for this lane**: …
+
+---
+
+## {lane-key-2} — {Full Lane Name}
+
+…
+```
+
+### Standards for the Lane Affinity File
+
+1. **One section per active lane from `career-goals.md`.** No more, no less. Every active lane gets a section even if pinnacle evidence is absent (the section states the absence).
+2. **Pinnacle attribution requires specific evidence.** Generic *"Rust → hft"* fails. Specific *"Nyquestro — lock-free matching engine + risk controls + Coinbase WebSocket integration → hft"* passes. The third-party verifier is "can a reader open the cited project file and confirm the architectural decision named in pinnacle-evidence prose?"
+3. **No pinnacle-evidence inflation.** A supporting project is not promoted to pinnacle to fill an empty slot. Empty pinnacle is honest information; falsely-filled pinnacle silently distorts every downstream grade.
+4. **Cross-cutting skills cite their source group file.** Format: *"Rust [Proficient] (from languages.md)"*. Graders use this to find the full evidence column behind any cited skill.
+5. **Gaps section is mandatory.** The grading utility of this file collapses if pinnacles are stated without honest gaps. A grader trusting an unqualified pinnacle assignment over-rates fit; the gaps section is the calibration counter-weight.
+6. **No invented technologies.** If a project file does not surface a technology, the lane-affinity section cannot cite it as supporting evidence. The project files are the ceiling.
 
 ---
 

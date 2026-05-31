@@ -3,23 +3,23 @@ name: Zyphos
 status: dormant
 source_repo: https://github.com/Capataina/Zyphos
 lifeos_folder: Projects/Zyphos
-last_synced: 2026-05-13
-sources_read: 14
+last_synced: 2026-05-31
+sources_read: 13
 ---
 
 # Zyphos
 
 ## One-line summary
 
-Bottom-up HTTP/1.1 server in safe Rust built from raw `std::net` sockets — currently a thread-per-connection echo server with hand-written request-line parsing and a typed response pipeline, scaffolded as a 30-milestone networking-protocols learning ladder from TCP through QUIC.
+Network-programming learning laboratory in Rust: a `std`-only, thread-per-connection HTTP/1.1 server built bottom-up from raw TCP sockets, scaffolded against a 30-milestone ladder from sockets through QUIC.
 
 ## What it is
 
-Zyphos is a Rust network-programming learning laboratory whose stated mission is to learn sockets, HTTP, and modern network protocols end-to-end by implementing an HTTP server from raw TCP up, progressively layering in production techniques (thread pools, zero-copy, SIMD parsing, HTTP/2, QUIC). The design ambition is a 30-milestone ladder across 7 phases — Network Foundations, Concurrency and Performance, Advanced Parsing and Optimisation, Kernel Bypass and Advanced I/O, Security and Robustness, Modern Protocols, and UDP / Alternative Protocols. The deliberate constraint throughout the entire ladder is `std`-only plus `chrono` — no `hyper`, no `axum`, no `tokio`, no `mio` — so that every concept must be built from primitives rather than pulled in as a dependency. What it currently demonstrates is the first three discrete topics on that ladder (M1, M3, M5) implemented as a working thread-per-connection HTTP/1.1 echo server with three GET routes (`/hello`, `/time`, `/echo/{text}`), an inline `#[cfg(test)] mod tests` regression suite, and `panic::catch_unwind`-isolated request handling. The repo name is `Capataina/Zyphos` but the Cargo package is still `multithreaded_http_server` at version 0.2.0 — a vestigial naming artefact from before the 2025-11 README rewrite introduced the Zyphos brand. The project's natural rhythm is concentrated 1-3 day commit bursts punctuated by 1-4 month dormant periods, so a future session should treat the next milestone as something to finish in a single focused day rather than as a weekly cadence.
+Zyphos is Caner's structured Rust networking learning project. The stated mission is to learn sockets, HTTP, and modern network protocols end-to-end by implementing an HTTP server from raw TCP upward, progressively layering in production techniques (thread pools, zero-copy buffers, SIMD parsing, HTTP/2, QUIC). The README codifies this as a 30-milestone ladder across 7 phases — Network Foundations, Concurrency & Performance, Advanced Parsing & Optimisation, Kernel Bypass & Advanced I/O, Security & Robustness, Modern Protocols, and UDP & Alternative Protocols. The project is designed as a long-duration learning ladder; what it currently demonstrates is the first three rungs (M1, M3, partial M5) with M2 and M4 partially skipped. Repo identity vs Cargo identity diverge — GitHub repo is `Capataina/Zyphos` but the Cargo package name is still `multithreaded_http_server` v0.2.0, an artefact from before the 2025-11 "Zyphos" README rebrand.
 
 ## Architecture
 
-Single-binary Rust application with four-module dependency direction from `main.rs` to the response pipeline. The boundaries are sharp enough that a request crosses exactly four module boundaries on its way to a response, and each boundary has a well-defined type.
+Zyphos is a single Rust binary with one runtime dependency (`chrono` for date formatting). The codebase is ~500 LOC across 9 files in `src/`, organised as a strict layered pipeline with clean module boundaries:
 
 ```
 +-----------+       +---------+       +--------+       +--------------+
@@ -35,18 +35,18 @@ Single-binary Rust application with four-module dependency direction from `main.
                    +---------------+   +---------------+
 ```
 
-**Direction rules currently held:**
+**Dependency-direction rules that hold today:**
 
 1. `main.rs` is the only file that touches `std::net` and `std::thread`.
-2. `handler.rs` is the only file that sees the raw `&str` request.
+2. `handler.rs` is the only file that sees the raw string request.
 3. `router.rs` is the only file that maps `(method, path) → HttpResponse` builder.
 4. `routes/*.rs` produce typed `HttpResponse` values; they do not serialise.
 5. `response.rs` owns the `HttpResponse` struct and the wire-format serialiser.
 6. `create_responses.rs` is the factory layer — the only file that injects `Content-Type`, `Content-Length`, `Connection`, `Date`.
 
-**Request lifecycle on the wire:** `TcpListener::bind("localhost:3000")` accepts a stream → atomic `CONNECTION_COUNTER.fetch_add(1, SeqCst)` produces a monotonic connection ID → `thread::spawn(move || ...)` transfers ownership of the stream into a new OS thread → `panic::catch_unwind(AssertUnwindSafe(|| handle_connection(stream)))` wraps the work so a bad request cannot bring the server down → `stream.read(&mut [0; 1024])` performs one blocking read → `String::from_utf8_lossy` decodes the bytes (lossy: non-UTF-8 becomes `U+FFFD`) → `handle_request(&str)` finds the `\r\n\r\n` head/body separator, takes line 0 as the request line, `split_whitespace`-tokenises into `[method, path, version]`, validates three-token shape and `HTTP/` version prefix → `route(method, path)` performs exact-match dispatch (with `strip_prefix("/echo/")` for the one parametric route) → typed `HttpResponse` flows back → `format_response` writes the status line, ordered "important headers" (`Content-Type`, `Content-Length`, `Connection`, `Date`, `Server`), then any other headers from `HashMap` iteration, then the body → `stream.write_all` + `stream.flush` → thread exits, stream is RAII-closed.
+A request crosses exactly four module boundaries to become a response, each boundary with a well-defined type. The seams align with the README's milestone ladder: M4's full header parser slots naturally into handler.rs; M6's thread pool slots into main.rs; M8's keep-alive forces `handle_connection` to become a read-loop.
 
-**HttpResponse data shape:**
+**Core data shape:**
 
 ```rust
 pub struct HttpResponse {
@@ -57,176 +57,147 @@ pub struct HttpResponse {
 }
 ```
 
-Status code is signed `i32` rather than `u16` (a defensive-typing miss); headers are an unordered `HashMap` with deterministic wire order reconstructed by a hardcoded "important headers" list in `format_response`; body is `String` rather than `Vec<u8>`, which forecloses binary payloads without a future refactor.
-
-**Dependency surface:** one runtime dependency — `chrono = "0.4"` — used for the RFC 1123 `Date` header in `create_responses.rs` (`Utc::now()`) and the human-readable timestamp in `routes/time.rs` (`Local::now()`). Zero test dependencies. The `Cargo.lock` is almost entirely `chrono`'s transitive tree.
-
-**Architectural invariants currently enforced:** request must fit in 1024 bytes (anything larger is silently truncated); request bytes must decode as UTF-8 or become `U+FFFD`; `Connection: close` is hardcoded in every response, foreclosing keep-alive without a rewrite of `handle_connection`; one request per connection (consequence of `Connection: close` plus the handler returning a single `String`); the wire status line is always `HTTP/1.1` regardless of request version; thread spawning is unbounded with no concurrency limit.
+Headers are stored unordered in a `HashMap`; deterministic wire order is reconstructed by `format_response` via a hardcoded "important headers" list (`Content-Type`, `Content-Length`, `Connection`, `Date`, `Server`), then iterating the remainder. `body: String` constrains the project to text payloads; any binary milestone (sendfile, WebSocket frames) will force a refactor to `Vec<u8>` or a `Body` enum.
 
 ## Subsystems and components
 
 ### Connection Handling (`main.rs`)
 
-The entry point and the only file in the project that touches `std::net`, `std::thread`, or sync primitives. Owns the listener lifecycle, per-connection thread spawning, panic recovery, and logging. The pattern is textbook "naïve HTTP server" — `for stream_result in listener.incoming()` runs forever; each accepted stream gets its own OS thread; the thread wraps `handle_connection(stream)` in `panic::catch_unwind(AssertUnwindSafe(...))` and downcasts the panic payload to `&str` then `String` on failure, logging whichever matches. Per-connection cost: ~2MB default thread stack + OS thread. The accept loop has no shutdown signalling, no backpressure, and no concurrency limit. `handle_connection` itself is trivially blocking — one `stream.read` into a fixed `[0; 1024]` buffer, one `String::from_utf8_lossy` decode, one `handle_request` call, one `stream.write_all`, one `stream.flush`, no read-loop. Around 50 lines of actual logic.
+Owns the TCP listener lifecycle, per-connection thread spawning, panic recovery, and connection logging. Binds to `localhost:3000` (no `SO_REUSEADDR`, no `TCP_NODELAY`). Each accepted connection gets an atomic `connection_id` and a dedicated OS thread via `thread::spawn`. The thread body is wrapped in `panic::catch_unwind(AssertUnwindSafe(...))` so a panic in parsing or routing cannot kill the server; the panic payload is downcast through `&str` then `String` for logging, with a fallback for non-string payloads. `handle_connection` is trivially blocking — one `read` into a fixed `[0; 1024]` buffer, `String::from_utf8_lossy` for decoding, one `write_all`, one `flush`, no loop. One request per connection is the invariant.
 
 ### Request Parsing (`handler.rs`)
 
-Owns the transition from raw `&str` to a dispatched `HttpResponse`. "Parsing" is generous — what happens is: `find("\r\n\r\n")` to locate the head/body separator, `lines().collect()` to gather header lines, take `header_lines[0]` as the request line, `split_whitespace().collect()` to tokenise it, validate token count is 3, validate version token starts with `"HTTP/"`, call `route(method, path)`. Headers past the request line are collected into `Vec<&str>` but never interpreted. The body section is computed positionally but the binding (`let body_section = &raw_request[pos + HEAD_BODY_SEPARATOR.len()..];`) is commented out — bodies are silently discarded. Three structural-validation 400 paths plus the router's 404 path are the only failure shapes the handler emits. `split_whitespace` collapses whitespace runs, so `"GET  /hello  HTTP/1.1"` (double space) is tolerated — pinned by a test. Production logic is ~106 lines; the file totals 298 lines including the inline test module.
+The only file that sees raw request strings. Splits on `\r\n\r\n` to separate headers from body, then takes the request line and applies `split_whitespace()` to extract method, path, and version. Validates token count == 3 and that the version starts with `HTTP/`. The body slice is captured as a local but its assignment is commented out (`// let body_section = &raw_request[pos + ..];`) — request bodies are currently discarded. Headers beyond the request line are split into lines but never parsed into a key-value structure: `header_lines[0]` is used and `header_lines[1..]` is thrown away. Carries the largest inline test suite in the repo (19 `#[cfg(test)]` tests added in commit `694ff01`, December 2025).
 
 ### Routing (`router.rs`)
 
-Eighteen lines of hand-written if/else dispatch. Three routes: exact match for `/hello` (delegates to `hello::handle()`), exact match for `/time` (delegates to `time::handle()`), prefix strip via `strip_prefix("/echo/")` for `/echo/{text}` (delegates to `echo::handle(text)`). Every non-GET method falls through to the 404 path; every unknown GET path falls through to the same 404 path. No query-string parsing — `/echo/test?x=y` echoes `"test?x=y"` (pinned by test). No URL decoding — `%20` passes through verbatim (pinned by test). Case-sensitive method check — `"get"` 404s (pinned by test). Adding a new route requires three edits: `use` import in `router.rs`, branch in the `if/else` chain, re-export in `routes/mod.rs`. The route handler files (`routes/hello.rs`, `routes/time.rs`, `routes/echo.rs`) are each effectively one line — they build a body string and delegate to `create_text_response`.
+A 15-line if/else dispatch chain. Returns 404 for any method that is not `GET` — POST/PUT/DELETE/HEAD all 404 by construction. Exact match for `/hello` and `/time`; prefix-strip for `/echo/`. No path parameters, no query-string parsing, no URL decoding, no `HEAD` short-circuit.
 
 ### Response Pipeline (`response.rs` + `create_responses.rs`)
 
-Two files, the cleanest seam in the project. `response.rs` owns the `HttpResponse` struct and `format_response(HttpResponse) -> String` serialiser; `create_responses.rs` owns `create_text_response(body)` (200 OK factory), `create_error_response(code, text, body)` (400/404 factory), and `get_http_date()` (RFC 1123-formatted `chrono::Utc::now()`). Both factories populate an identical four-header set — `Content-Type: text/plain`, `Content-Length: body.len()` (Rust's `String::len()` returns bytes, which is exactly what HTTP wants), `Connection: close`, `Date: <RFC 1123>`. `format_response` walks a hardcoded `["Content-Type", "Content-Length", "Connection", "Date", "Server"]` ordering list before draining the remaining `HashMap` entries — recovers deterministic wire order from an unordered store. The `"Server"` slot is reserved in the ordering list but never populated by any factory. A latent off-spec quirk: the format string `"{}{}\r\n{}\r\n\r\n"` emits a trailing `\r\n\r\n` after the body, on top of the `\r\n` that terminates the last header — benign against real clients but will fail a strict validator. Response-side code has been stable for six months — all December 2025 activity was in `handler.rs`.
+`response.rs` owns the `HttpResponse` struct and `format_response`, which emits the status line as a hardcoded `HTTP/1.1 {code} {text}` regardless of the request's HTTP version, then writes "important headers" in fixed order, then remaining headers in HashMap iteration order, then the body. Trailing `\r\n\r\n` after the body is emitted (off-spec but benign against real clients). `create_responses.rs` is the factory layer: `create_text_response` and the error-response builder both hardcode `Connection: close` and set the `Date` header via `chrono::Utc::now()` in RFC 1123 format (`%a, %d %b %Y %H:%M:%S GMT`).
 
-### Testing (inline `#[cfg(test)] mod tests` in `handler.rs`)
+### Routes (`routes/{hello,time,echo}.rs`)
 
-19 unit tests (20 functions if counting one weak-assertion test) all inline in `src/handler.rs`, all added in the single commit `694ff01` (2025-12-13, "fixed handler", +197 LOC). Each test constructs a raw request `&str` and calls `handle_request` directly. No mocks, no fixtures, no setup/teardown. All assertions are `assert!(response.contains(...))` — substring-matching. Coverage is concentrated in the request-parsing layer: 5 tests on request-line validation, 3 on separator handling, 5 on routing dispatch, 4 on echo parameter extraction, 2 on method filtering. Zero tests touch `response.rs`, `create_responses.rs`, or the `main.rs` accept/spawn loop. No `tests/` directory. No `.github/workflows/` CI. No benchmarks. No fuzz tests. The tests are characterisation tests pinning current behaviour, not spec-driven tests asserting RFC compliance — several carry comments like "might be error or might work / depending on your implementation choice".
+Three typed response producers. `/hello` returns a static string; `/time` returns `chrono::Local::now()` formatted (note: `Local` here, `Utc` in the Date header — minor timezone inconsistency); `/echo/X` returns whatever follows the prefix.
+
+### Testing (`#[cfg(test)] mod tests` in handler.rs)
+
+19 unit tests inline in handler.rs covering request-line parsing variants, header/body splits, whitespace tolerance, malformed input, and edge cases. No `tests/` directory; no integration tests; `main.rs` has 0% coverage (the accept loop, thread spawning, and panic recovery are untested). No CI workflow runs the tests.
 
 ## Technologies and concepts demonstrated
 
 ### Languages
 
-- **Rust** — the sole implementation language. Used across 9 files / ~500 lines (including tests), exercising `std::net::TcpListener`/`TcpStream`, `std::thread::spawn`, `std::sync::atomic::AtomicUsize` with `SeqCst` ordering, `std::panic::{catch_unwind, AssertUnwindSafe}`, `String::from_utf8_lossy`, `split_whitespace`, `strip_prefix`, `HashMap`, ownership transfer via `move` closures, and RAII drop for socket close. The project's `std`-only discipline means every Rust primitive used here is the bare standard-library form, not a higher-level abstraction.
+- **Rust (package version 0.2.0)** — sole implementation language. Used across all 9 source files for socket I/O, thread management, parsing, and response serialisation. Stack-allocated fixed buffers, `String::from_utf8_lossy` for decoding, `HashMap` for header storage, `AtomicUsize` with `SeqCst` ordering for the connection counter, `panic::catch_unwind` with `AssertUnwindSafe` for panic recovery, ownership transfer via `move` closures for cross-thread stream handoff.
 
 ### Frameworks and libraries
 
-- **None.** No web framework, no async runtime, no HTTP library. This is deliberate — D1 in `Decisions.md` formalises the constraint: "The moment Zyphos depends on tokio or hyper, it stops teaching the thing it is for."
+- **`chrono = "0.4"`** — sole runtime dependency. Used for `Utc::now()` in the `Date` response header (`create_responses.rs`) and `Local::now()` in the `/time` route body (`routes/time.rs`). Zero test dependencies. The `Cargo.lock` is almost entirely chrono's transitive tree (iana-time-zone, windows-core).
 
 ### Runtimes / engines / platforms
 
-- **OS-thread runtime (`std::thread::spawn`)** — thread-per-connection model with no pool, no work-stealing, no scheduling. Each connection consumes the platform default stack (~2MB on Linux).
-- **Blocking I/O** — `TcpStream::read` and `write_all` block the calling thread; no epoll, no kqueue, no `io_uring`, no `mio`.
+- **Rust standard library `std::net` + `std::thread`** — the project deliberately avoids `tokio`, `hyper`, `axum`, `actix`, and `mio`. Per Decision D1, every networking concept must be built from std primitives so the project teaches sockets, parsing, and framing rather than hiding them behind a framework.
 
 ### Tools
 
-- **chrono 0.4** — date/time formatting (`Utc::now().format("%a, %d %b %Y %H:%M:%S GMT")` for the `Date` header; `Local::now().format("%d/%m/%Y %T")` for the `/time` route body).
-- **`cargo test`** — runs the inline `#[cfg(test)]` suite. No CI, no `cargo bench`, no `cargo fmt` config, no `cargo clippy` config.
+- **Cargo** — build, test, dependency management. No `rustfmt.toml`, no `clippy.toml`, no GitHub Actions workflow, no Criterion benchmark surface.
 
 ### Domains and concepts
 
-- **TCP socket programming from primitives** — `TcpListener::bind`, `listener.incoming()`, accepting streams, owning the listener lifecycle without a framework wrapper.
-- **Thread-per-connection concurrency** — the textbook "naïve HTTP server" baseline; OS-thread per accepted connection with `move`-ownership of the stream.
-- **Lock-free atomic counters** — `AtomicUsize::fetch_add(1, SeqCst)` for monotonic connection IDs. The only lock-free construct in the project.
-- **Panic isolation via `catch_unwind`** — wrapping per-request work in `panic::catch_unwind(AssertUnwindSafe(...))` so a bad request cannot kill the server; double-downcast of panic payload to `&str` then `String` is the standard Rust idiom for extracting the message.
-- **HTTP/1.1 wire-format serialisation by hand** — building status lines, header sections, and bodies as raw strings; ordering headers deterministically out of an unordered `HashMap` via a hardcoded "important headers" list.
-- **RFC 1123 / IMF-fixdate date formatting** — for the HTTP `Date` header.
-- **HTTP request-line parsing** — three-token validation (`method path version`), version prefix check, head/body separator on `\r\n\r\n`. Headers past line 0 are read but not interpreted; bodies are read but discarded.
-- **Exact-match routing with one prefix-strip parametric route** — closed-enumeration if/else dispatch over `(method, path)` pairs; `strip_prefix` extracts the parameter for `/echo/{text}`.
-- **Module-boundary discipline** — sharp seams between net I/O (`main.rs`), parsing (`handler.rs`), dispatch (`router.rs`), route logic (`routes/*.rs`), response factories (`create_responses.rs`), and wire serialisation (`response.rs`); each module has a single responsibility and the dependency direction is unidirectional.
-- **Inline `#[cfg(test)] mod tests` regression testing** — characterisation tests pinning current behaviour through `assert!(response.contains(...))` substring assertions.
+- **Raw TCP socket programming** — `TcpListener::bind` + `listener.incoming()` accept loop, `TcpStream::read`/`write_all`/`flush`, OS-default backlog.
+- **Thread-per-connection concurrency model** — naïve unbounded `thread::spawn` per accepted connection, the textbook baseline before introducing pools.
+- **Panic recovery in long-running servers** — `panic::catch_unwind` + payload downcast pattern (`&str` then `String` then fallback) to keep a server loop alive across bad requests.
+- **Atomic counters with explicit memory ordering** — `AtomicUsize::fetch_add(1, SeqCst)` for monotonic connection IDs.
+- **HTTP/1.1 wire-format generation** — hand-written status line, header ordering, CRLF framing, RFC 1123 date formatting.
+- **HTTP request-line parsing** — manual tokenisation via `split_whitespace`, prefix validation of the version string, header-body separation via `\r\n\r\n` search.
+- **Module boundary discipline** — strict layering where only one file touches a given concern (net I/O, raw strings, dispatch, serialisation).
+- **Inline `#[cfg(test)]` unit testing for parser logic** — 19 tests pinning request-line and header-split behaviour.
 
 ## Key technical decisions
 
-**D1 — Rust + `std` only, no web framework.** Chose to depend only on `chrono`. Rejected `hyper`/`reqwest` (would hide sockets, parsing, framing), `tokio` (would bypass the blocking-then-thread-pool-then-epoll progression), and `mio` (still skips writing the event loop from scratch). The constraint exists because the project's pedagogical contract is "every concept must be built, not pulled in"; pulling in `tokio` or `hyper` would defeat the entire learning intent. Flippable only if Caner ever wants a production-ready outcome — at that point a rewrite onto `tokio` for the production version is sensible, but the learning version stays `std`-only.
+The LifeOS folder captures 10 explicit design decisions, each with alternatives considered and the conditions that would flip the call:
 
-**D2 — Thread-per-connection, not thread-pool.** Every accepted connection gets its own OS thread via `thread::spawn`. Rejected thread pools (the M6 target — deferred until M5 lands), async runtimes (out of scope per D1), and event loops (M9 target). This is the textbook "naïve HTTP server" baseline — correct, simple, and exactly the shape M3 asks for. Costs already being paid: ~2MB stack per thread (scales poorly past ~1000-5000 connections), no ability to apply backpressure, thread startup latency on every connection. Flippable on reaching M6.
+**D1 — Rust + `std` only, no web framework.** Zyphos depends on `chrono` and nothing else. `hyper`, `axum`, `actix`, `tokio`, `mio` were all considered and rejected. Rationale: the project's core principle is bottom-up networking; the moment Zyphos depends on a framework it stops teaching the thing it exists for. This decision would not flip for the duration of the learning project.
 
-**D3 — `panic::catch_unwind` around request handling.** Wraps `handle_connection` inside `panic::catch_unwind(AssertUnwindSafe(...))` and logs the panic message without killing the server. Rejected: letting panics propagate (one bad request kills the process), `Result`-based propagation everywhere (correct but verbose), supervisor-pattern log-and-exit (out of scope; no process supervisor). The pragmatic choice for a learning project — Caner can iterate on the parser without re-starting. Will need to flip toward let-panic-kill-process behaviour around M21 (timeouts/backpressure), where production-shaped operation expects a panic to surface for a supervisor restart.
+**D2 — Thread-per-connection, not thread-pool.** Every accepted connection gets its own OS thread. Alternatives were a thread pool (the README's M6 target), async/await with a runtime (out of scope per D1), and an epoll/kqueue event loop (M9 target). Rationale: this is the textbook naïve baseline that M3 specifies; a pool is premature optimisation at this rung. Acknowledged costs: ~2MB stack per thread, no backpressure, thread startup latency per connection.
 
-**D4 — `HashMap` headers with deterministic serialisation order.** Headers stored in `HashMap<String, String>` (unordered); `format_response` reconstructs deterministic wire order by writing a hardcoded "important headers" list first, then iterating the remaining map. Rejected: `Vec<(String, String)>` (preserves insertion order but O(n) lookup), `IndexMap` (best of both, violates the `std`-only D1), `BTreeMap` (alphabetical sort, not spec-idiomatic). Pragmatic, not principled — adding a new "important" header requires editing two places. Flippable if M8 (keep-alive) or M23 (HTTP/2) makes the important-list unwieldy.
+**D3 — `panic::catch_unwind` around request handling.** Wraps `handle_connection` so a bug in parsing or routing cannot kill the server. Alternatives were letting panics propagate, full `Result`-based error propagation, or log-and-exit with a supervisor. Rationale: for learning, server liveness during iteration matters more than panic surfacing. Will flip when production-shaped operation arrives at M21.
 
-**D5 — Hardcoded if/else router over a trie.** Three routes dispatched via a 15-line if/else chain. Rejected: `HashMap` of `(method, path) → fn` (no prefix matching), trie / radix tree (the M13 target, overkill for 3 routes), regex routing. The minimum correct implementation for M5's exact-match exit criterion. Flippable at ~10+ routes or the introduction of multi-segment path parameters like `/users/{id}/posts/{postId}` — that is M13 territory.
+**D4 — `HashMap` headers with deterministic serialisation order.** Headers stored unordered; `format_response` reconstructs wire order via a hardcoded "important headers" list. Alternatives were `Vec<(String, String)>`, `IndexMap` (violates D1), or `BTreeMap`. Rationale: `HashMap` is the natural std primitive; explicit ordering in serialisation recovers determinism. Will flip if M8 or M23 makes the important-list unwieldy.
 
-**D6 — `body: String` in `HttpResponse`.** Response bodies typed as `String`; all routes produce `text/plain`. Rejected: `Vec<u8>` (binary-compatible from day one), `Body::Text | Body::Bytes | Body::File` enum (richest), `&'a [u8]` (avoids allocation, costs lifetime complexity). Simplest possible response type for M4-M5; UTF-8 text is the only payload in current routes; `String::len()` returning byte length means `Content-Length` is automatically correct. Will need to flip when M14 (caching), M16 (sendfile / static files), or M25 (WebSocket frames) arrives.
+**D5 — Hardcoded if/else router over a trie.** Three routes do not justify a trie or radix tree. Will flip at ~10 routes or when multi-segment path parameters (M13) arrive.
 
-**D7 — `Connection: close` on every response.** All factories hardcode `Connection: close`. Rejected: omitting the header (HTTP/1.1 default is keep-alive — would be a protocol violation given the one-shot handler), claiming `keep-alive` (false advertising without a connection-reuse loop). The correct shape for M4-M5. Flippable on arrival of M8 (HTTP/1.1 keep-alive), which requires restructuring `handle_connection` from one-request-per-call into a read-loop with connection-alive tracking.
+**D6 — `body: String` in HttpResponse.** Forecloses binary content. Chosen because UTF-8 text is the only payload today and `String::len()` makes Content-Length automatically correct. Will flip at M14 (caching), M16 (sendfile), or M25 (WebSocket frames).
 
-**D8 — `split_whitespace()` tolerance in request-line parsing.** Request line tokenised with `split_whitespace()`, which collapses runs and strips leading/trailing whitespace. Rejected: `split(' ')` (strictly spec-compliant; rejects `"GET  /hello HTTP/1.1"` with double space), byte-level state machine. Laziness with small upside — more robust to slightly malformed clients. Will need to become explicit-with-mode (strict vs lax) at M20 (parser security / differential testing).
+**D7 — `Connection: close` on every response.** Hardcoded in both factories. Without a connection-reuse loop, claiming keep-alive would be a protocol violation. Will flip at M8.
 
-**D9 — `String::from_utf8_lossy` for request bytes.** Bytes read from the socket decoded as UTF-8 with invalid sequences becoming `U+FFFD`. Rejected: `std::str::from_utf8` (returns `Result`; rejects non-UTF-8 with an error), `&[u8]`-throughout parsing. UTF-8 is the expected encoding for HTTP request lines and headers; lossy decode means a non-UTF-8 byte in a URL doesn't crash. Will need to flip to `&[u8]`-based parsing for the body section at minimum when M4 body reading lands.
+**D8 — `split_whitespace()` tolerance in request-line parsing.** Collapses runs and strips edges, accepting `"GET  /hello HTTP/1.1"` (double space) where a strict parser would reject. Will flip at M20 (parser security / differential testing).
 
-**D10 — Inline `#[cfg(test)]` tests, no integration tests.** 19 tests live in a `mod tests` block inside `src/handler.rs`. No `tests/` directory. Rejected: separate `tests/handler_integration.rs`, hybrid layout. Minimal test infrastructure, maximal locality — natural for `&str → String` pure functions. The missing integration tests reflect the fact that `main.rs` (accept loop, panic recovery, thread behaviour) is 0% covered.
+**D9 — `String::from_utf8_lossy` for request bytes.** Non-UTF-8 bytes become `U+FFFD`. Will flip when binary request bodies need exact byte handling — likely at M4 body-reading completion or M25.
+
+**D10 — Inline `#[cfg(test)]` tests, no integration tests.** Maximises locality for `&str → String` functions; leaves `main.rs` (accept loop, panic recovery, thread behaviour) entirely uncovered.
 
 ## What is currently built
 
-- **TCP listener and accept loop** on `localhost:3000`. No `SO_REUSEADDR`, no `TCP_NODELAY`, no `EINTR`/`EAGAIN` handling, no graceful shutdown.
-- **Thread-per-connection** via `thread::spawn` with ownership transfer through `move`.
-- **Monotonic atomic connection counter** (`AtomicUsize::fetch_add(1, SeqCst)`).
-- **Per-thread panic recovery** via `panic::catch_unwind(AssertUnwindSafe(...))` with `&str`/`String` payload downcast.
-- **HTTP request-line parsing** — three-token validation, `HTTP/` prefix check, two 400 paths.
-- **Head/body separator detection** on `\r\n\r\n` with a 400 fallthrough.
-- **Header / body line splitting** — header lines collected into `Vec<&str>` but only `[0]` (the request line) is used; body section computed positionally but assignment is commented out.
-- **`HttpResponse` struct** — `status_code: i32`, `status_text: String`, `headers: HashMap<String, String>`, `body: String`.
-- **Wire-format serialisation** via `format_response` with deterministic ordering of `Content-Type` / `Content-Length` / `Connection` / `Date` / `Server` headers ahead of the remaining `HashMap` entries.
-- **Two factories** — `create_text_response` (200 OK + four-header set) and `create_error_response` (400/404 + same headers).
-- **RFC 1123 `Date` header** from `chrono::Utc::now()`.
-- **Three GET routes** — `/hello` (returns `"Hello World!"`), `/time` (returns `Local::now().format("%d/%m/%Y %T")`), `/echo/{text}` (echoes the prefix-stripped tail).
-- **Catch-all 404** for unknown paths and any non-GET method.
-- **19 inline `#[cfg(test)]` regression tests** in `handler.rs` covering request-line validation, separator handling, routing dispatch, echo parameter extraction, method filtering, and HTTP version variations.
+The codebase is 9 Rust files, ~14.7KB (roughly 500 lines including tests). The README is 48KB (1788 lines) — bigger than all code combined by ~3.3x. Built and working at HEAD `694ff01` (2025-12-13):
 
-**Scale snapshot:** 9 Rust files, ~14.7KB of Rust (roughly 500 lines including tests), 48KB README (~3.3x the size of all code combined), 1 runtime dependency (`chrono`), 25 commits across the repo's lifetime spanning 2025-06-14 to 2025-12-13. The README grew ~2200 lines in November 2025 while the code barely moved — the project is currently overwhelmingly a detailed learning plan with a tiny demonstrator server attached. Of the README's 30-milestone ladder, roughly 3 milestones have meaningful code (10%); the remaining 27 exist only as plan text. None of the README's 30 checkboxes is marked complete.
+- TCP listener on `localhost:3000` with unbounded `thread::spawn` per connection.
+- Atomic connection counter (`AtomicUsize` with `SeqCst`).
+- Panic recovery via `panic::catch_unwind` with `&str`/`String` payload downcast.
+- HTTP request-line parsing (method, path, version extraction; token-count and `HTTP/` prefix validation).
+- Header/body separator split on `\r\n\r\n`.
+- Response serialisation with deterministic header ordering.
+- Response factories for text and error variants, with `Content-Type`, `Content-Length`, `Connection: close`, and RFC 1123 `Date` headers.
+- Three routes: `/hello` (static text), `/time` (`Local::now()` formatted), `/echo/X` (prefix echo).
+- 404 handler.
+- GET-only dispatch (non-GET methods 404 by construction).
+- 19 inline unit tests in `handler.rs` covering request-line parsing edge cases.
+
+**Explicitly not built**, despite README ambition: actual header key-value parsing (`header_lines[1..]` is thrown away), `Content-Length` handling, request body reading (the assignment is commented out), thread pool, keep-alive / persistent connections, epoll/kqueue, TLS, HTTP/2, WebSockets, SSE, UDP, QUIC, integration tests, CI, benchmarks, rate limiting, timeouts, graceful shutdown, `SO_REUSEADDR`, `TCP_NODELAY`, EINTR/EAGAIN handling, URL decoding, query-string parsing, vhosting (`Host` header is never read), `Server` header population (the slot is reserved in the ordering list but no factory inserts a value).
+
+Honest mapping to the README's 30-milestone ladder: M1 (Raw Sockets) started — 2/5 exit criteria plausibly met; M2 (TCP State Machine) not started; M3 (Thread-per-Connection) partial — 4/12 implementation items done, the most honestly-complete milestone; M4 (HTTP/1.0 Parser/Generator) started but with critical gaps (no header parsing, no body reading); M5 (Basic Routing) started — 3/12 items done; M6–M30 all not started. Approximately 3 of 30 milestones (10%) have meaningful code.
 
 ## Current state
 
-Status: dormant. Last meaningful commit `694ff01` (2025-12-13) added the 19-test handler suite plus minor logic tweaks; the previous active session was 2025-11-17 (added the `/echo/` route). No work has landed since 2025-12-13 — 4+ months of silence as of the LifeOS verification date. The project's documented natural rhythm is concentrated bursts of 1-3 days where 5-10 commits land, separated by 1-4 month dormant periods; no work is in flight at the moment LifeOS notes were last verified. The LifeOS notes themselves treat Zyphos as ranked below Cernio, Aurix, Flat Browser, and NeuroDrive in portfolio priority.
+Status: **dormant**. Last meaningful commit `694ff01` ("fixed handler", actually +197 LOC of unit tests) on 2025-12-13; no commits since (as of 2026-04-24 vault verification, ~4+ months of silence). The project's commit cadence is two-mode: concentrated 1–3 day bursts producing 5–10 commits (June 2025, July 2025, November 2025, December 2025), separated by 1–4 month dormant periods. 25 total commits across the repo's lifetime (2025-06-14 → 2025-12-13). No items currently in flight; the LifeOS folder has no `Work/` subdirectory. Cargo package name is still `multithreaded_http_server` v0.2.0 — `cargo run` boots a binary by that name despite the "Zyphos" README rebrand.
 
 ## Gaps and known limitations
 
-**Critical — latent bugs in shipped code:**
+LifeOS captures 26 explicit gaps organised by severity. Career-relevant highlights:
 
-- **Trailing CRLFs after response body.** `format_response` emits `"{}{}\r\n{}\r\n\r\n"`, producing `STATUS\r\nHDR1\r\nHDR2\r\n\r\nBODY\r\n\r\n`. The trailing `\r\n\r\n` after the body is off-spec — benign against real clients but will fail a strict HTTP validator. One-character fix.
-- **Fixed 1024-byte read buffer silently truncates large requests.** `let mut buffer = [0; 1024];` in `main.rs`. A realistic browser request with Host + User-Agent + Cookie + Accept can exceed 1024 bytes; truncated reads then fail the `\r\n\r\n` separator check and 400.
-- **Request body is discarded.** Line 63 of `handler.rs` has the body-section binding commented out. Any POST/PUT/PATCH body is lost. Harmless today because the router 404s all non-GET methods, but bites the moment POST is added.
-- **`stream.read().expect(...)` panics on any read error.** If the client closes mid-request or a network blip occurs, `read` returns `Err`, `expect` panics, and `catch_unwind` recovers but loses the error detail. Small fix — match on `Result`.
+**Critical latent bugs in shipped code:** trailing `\r\n\r\n` after response body (off-spec but benign against real clients); fixed 1024-byte read buffer silently truncates requests larger than that (a realistic browser request with Host + User-Agent + Cookie exceeds this); request body slice is captured but the assignment is commented out, so POST/PUT/PATCH bodies are discarded (currently harmless because the router 404s non-GET); `stream.read().expect(...)` panics on any read error including a client closing mid-request, with `catch_unwind` masking the detail.
 
-**High — structural gaps blocking milestone progress:**
+**Structural gaps blocking milestone progress:** no header parsing (`header_lines[1..]` thrown away); no `Content-Length` handling; only GET is supported; no URL decoding (`%20` passes through raw); no query-string parsing (`/echo/test?param=value` is treated as the path `test?param=value`); unbounded `thread::spawn` is DoS-trivial; `Connection: close` hardcoded forecloses keep-alive without rewriting `handle_connection`; no shutdown signalling (`for stream_result in listener.incoming()` loops forever, no SIGINT handling).
 
-- No header parsing — `header_lines[1..]` are thrown away.
-- No `Content-Length` handling (consequence of the above).
-- Only GET is supported — router 404s any non-GET method.
-- No URL decoding — `%20` passes through raw.
-- No query-string parsing — `/echo/test?param=value` treats `test?param=value` as the path argument.
-- Unbounded `thread::spawn` in the accept loop — DoS-trivial.
-- `Connection: close` hardcoded — forecloses HTTP/1.1 keep-alive without a `handle_connection` rewrite.
-- No shutdown signalling — `for stream_result in listener.incoming()` loops forever, no SIGINT/SIGTERM handling.
+**Correctness and consistency:** `Utc::now()` vs `Local::now()` timezone inconsistency between Date header and `/time` route; `status_code: i32` allows negative values (should be `u16`); response status line is hardcoded `HTTP/1.1` regardless of request version; `Server` header slot is reserved in the ordering list but no factory inserts a value; multi-threaded `println!` interleaves under load (no `tracing` crate, no log levels); peer address never logged despite `stream.peer_addr()` being available; `Host` header never read (vhosting impossible).
 
-**Medium — correctness and consistency:**
+**Tooling and process:** Cargo package name (`multithreaded_http_server`) does not match repo name; no GitHub Actions / CI; no `rustfmt.toml` or `clippy.toml`; commit messages of varying quality including `"latest changes, dont know what"`, `"test"`, `"nvim test"`, `"fixed handler"`.
 
-- Inconsistent timezones — `Date` header uses `Utc::now()` but `/time` route body uses `Local::now()`.
-- `status_code: i32` is the wrong type (should be `u16`; HTTP codes are 100-599 and `i32` allows negative).
-- Hardcoded `HTTP/1.1` status line regardless of request version — violates strict M4 interpretation.
-- `Server` header slot is reserved in `format_response`'s ordering list but never populated by any factory.
-- Logging is interleaved `println!` from multiple threads — produces tangled lines under concurrent load.
-- No client address logged on accept (`stream.peer_addr()` is available but unused).
-- `String::from_utf8_lossy` can mask invalid request bytes — silent corruption.
-- `Host` header is never read — vhosting is impossible; the server only works on `localhost:3000`.
-
-**Low — naming and maintenance:**
-
-- Cargo package name is `multithreaded_http_server` while the repo is `Zyphos` — vestigial.
-- No CI (`.github/workflows/` does not exist); `cargo test` is run manually.
-- No `rustfmt.toml` / `clippy.toml` configuration.
-- Several commit messages are weak (`"test"`, `"nvim test"`, `"fixed handler"`, `"latest changes, dont know what"`).
-
-**Testing gaps:** `main.rs` is 0% covered (accept loop, spawning, panic recovery untested); `response.rs` has no byte-format tests; `create_responses.rs` has no assertions that `Content-Length` matches body bytes; no concurrency tests; no fuzz tests; no integration tests (no `tests/` directory).
-
-**Milestone-level gaps:** Everything in README Phases 2-7 (M6-M30) is unbuilt — no thread pool, no memory pools, no HTTP/1.1 keep-alive, no epoll/kqueue, no SIMD parser, no lock-free metrics beyond the single counter, no trie router, no caching, no `io_uring`, no `sendfile`, no `SO_REUSEPORT`, no rate limiting, no parser-security work, no timeouts, no TLS, no HTTP/2, no WebSockets, no SSE, no UDP, no multicast, no QUIC.
+**Testing coverage:** `main.rs` is 0% covered (accept loop, thread spawning, panic recovery untested); `response.rs` has no byte-format tests; `create_responses.rs` has no Content-Length assertion; no concurrency tests; no fuzz tests; no `tests/` integration directory.
 
 ## Direction (in-flight, not wishlist)
 
-The pragmatic next-session ordering captured in LifeOS Roadmap.md, sized for single focused sessions of half-day to a full day each:
+There is no actively-in-progress work; the project is dormant. The LifeOS Roadmap names a concrete next-session plan ordered by leverage, but none of these is currently being executed:
 
-1. **Close M4 — header parsing + body reading.** Add a `Headers` type (`Vec<(String, String)>` or `HashMap<String, String>`), parse `header_lines[1..]` into it case-fold-keyed for lookup, extract and validate `Content-Length`, uncomment the body-section binding, read exactly `Content-Length` bytes of body, pass body into the router alongside method and path, add 5-10 new tests covering header parsing and body reading. This is the biggest single gap in the codebase and required for M8 keep-alive later.
-2. **Close M1 socket-option gaps.** Set `SO_REUSEADDR` on the listener and `TCP_NODELAY` on accepted streams, replace `expect()` on `read`/`write`/`flush` with `Result` handling, handle graceful shutdown via `Ctrl-C` (probably `ctrlc` crate, mildly violating D1, or raw signal handling), add a TCP-level integration test. ~30 lines plus a test file.
-3. **First method expansion (POST).** Now that Session 1 made body reading real, add a POST route that echoes the request body, extend router match to handle POST. Tests M4's body handling end-to-end.
-4. **Thread pool (M6).** Fixed-size pool with `std::sync::mpsc` channels replacing `thread::spawn` in `main.rs`; graceful shutdown via queue drain; metrics for queue depth and active workers. NOT in scope at this stage: work-stealing, per-thread local queues, task cancellation.
-5. **HTTP/1.1 keep-alive (M8).** Read the `Connection:` header in `handler.rs`, conditionally emit `Connection: keep-alive` in `create_text_response`, refactor `handle_connection` into a read-loop bounded by `Connection: close` or a max-requests counter, add idle timeout via `TcpStream::set_read_timeout`, new tests for multiple requests on one connection and timeout behaviour. The moment Zyphos stops being a toy.
+1. Close M4 — add a `Headers` type, parse `header_lines[1..]`, extract and validate `Content-Length`, re-enable the body slice, read exactly `Content-Length` bytes, pass the body into the router, add 5–10 new tests.
+2. Close the M1 socket-option gaps — `SO_REUSEADDR`, `TCP_NODELAY`, replace `expect()` on `read`/`write`/`flush` with `Result` handling, add a TCP-level integration test.
+3. Add POST routing — extend the router match, add `/echo-body`.
+4. Thread pool (M6) — `std::sync::mpsc`-coordinated fixed pool, graceful shutdown, queue-depth metrics.
+5. HTTP/1.1 keep-alive (M8) — read the `Connection` header, conditionally emit `keep-alive`, refactor `handle_connection` into a read-loop bounded by `Connection: close` or a max-requests counter, add idle timeouts via `TcpStream::set_read_timeout`.
 
-None of the above is actively being worked on at the moment LifeOS notes were last verified (2026-04-24) — this is the documented near-term plan, not in-flight scope. Anything past M10 is years out at the project's natural cadence; M11-M30 are treated by LifeOS as optional chapters.
+The next active session is expected on the quarterly-burst cadence the commit history establishes — weeks to months out, not days.
 
 ## Demonstrated skills
 
-- **Hand-rolled HTTP server in safe Rust with no framework dependency.** Demonstrates ability to build a working HTTP/1.1 server from `std::net` primitives, including listener lifecycle, accept loop, per-connection threading, request-line parsing, response serialisation, and three-route dispatch — all without `hyper`, `axum`, `tokio`, or `mio`. The discipline of building from primitives is a portfolio signal for systems-engineering roles where understanding the network stack matters more than wiring up frameworks.
-- **OS-thread concurrency with panic isolation.** Demonstrates safe Rust concurrency patterns: ownership transfer through `move` closures, `panic::catch_unwind(AssertUnwindSafe(...))` with `&str`/`String` payload downcast, lock-free atomic counters via `AtomicUsize::fetch_add(1, SeqCst)` — all using `std` primitives, no external crate.
-- **TCP socket programming from primitives.** Demonstrates direct work with `TcpListener::bind`, `listener.incoming()`, `TcpStream::read`/`write_all`/`flush`, awareness of the socket-option gaps (`SO_REUSEADDR`, `TCP_NODELAY`) that production code requires, and understanding of the trade-offs between blocking and event-driven I/O models.
-- **HTTP/1.1 wire-format authorship.** Demonstrates byte-level construction of HTTP responses — status line, ordered headers, RFC 1123 `Date` formatting, `Content-Length` byte-correctness, and deterministic header serialisation from an unordered `HashMap` via a hardcoded "important headers" list. Demonstrates awareness that `String::len()` in Rust returns bytes (the right answer for `Content-Length`), which is a Rust-specific correctness win that distinguishes the code from a hand-rolled HTTP server in Go or Python.
-- **Clean module-boundary discipline.** Demonstrates unidirectional dependency direction across four modules (`main.rs` → `handler.rs` → `router.rs` → `routes/*.rs`) plus a two-file response pipeline (`response.rs` + `create_responses.rs`), with each module owning exactly one responsibility and each request crossing four well-typed boundaries. Layering sharp enough that adding a future thread pool slots cleanly into `main.rs` and a future full header parser slots cleanly into `handler.rs` without ripple effects.
-- **Inline characterisation testing in Rust.** Demonstrates use of the idiomatic `#[cfg(test)] mod tests` pattern with `use super::*;` to access module internals, substring-matching assertions for HTTP response shape, and characterisation-style coverage of edge cases (whitespace tolerance, case sensitivity, version-string variations, query-string-as-path artefacts) that pin current behaviour ahead of a richer parser rewrite.
-- **Pragmatic decision-making with documented alternatives.** Demonstrates a habit of recording design decisions alongside the alternatives that were rejected and the conditions under which the decision would flip — the LifeOS Decisions.md captures ten such decisions (std-only stack, thread-per-connection, panic-catch, HashMap headers, if-else router, `String` body, hardcoded `Connection: close`, `split_whitespace` tolerance, `from_utf8_lossy`, inline tests) each with explicit "what would flip this" criteria.
-- **Honest self-assessment of project state vs ambition.** Demonstrates separation of design ambition (30-milestone README ladder) from implemented scope (3 milestones with meaningful code) — the LifeOS notes maintain a deliberate anti-puffing stance distinguishing what the project is designed to teach from what it currently demonstrates.
+- **Raw TCP socket programming in Rust without a networking framework** — implements the accept loop, per-connection lifecycle, panic recovery, and synchronous request/response handling using only `std::net`, `std::thread`, and `std::sync::atomic`.
+- **Thread-per-connection concurrency with panic isolation** — uses `panic::catch_unwind(AssertUnwindSafe(...))` with `&str`/`String` payload downcast to keep a server loop alive across handler panics; uses `AtomicUsize::fetch_add(SeqCst)` for monotonic connection IDs and `move` closures for cross-thread stream ownership transfer.
+- **Hand-written HTTP/1.1 parser and serialiser** — request-line tokenisation via `split_whitespace`, header/body framing via `\r\n\r\n` search, deterministic response header ordering reconstructed from an unordered `HashMap` via a hardcoded "important headers" list, RFC 1123 date formatting.
+- **Strict module-boundary design in a layered pipeline** — enforces a one-direction dependency graph (`main → handler → router → routes` and `routes → response ← create_responses`) where each file owns exactly one concern (net I/O, raw strings, dispatch, struct, factories).
+- **Inline unit testing for parser logic at the `&str → String` boundary** — 19 `#[cfg(test)]` tests in `handler.rs` pinning request-line parsing, whitespace tolerance, header/body splits, and malformed-input behaviour.
+- **Explicit, written design-decision discipline** — captures 10 numbered design decisions in LifeOS with alternatives considered, rationale, and flip conditions; demonstrates awareness of when each chosen tradeoff stops being correct (e.g. `body: String` flips at M14/M16/M25; if/else router flips at ~10 routes).
+- **Honest gap and limitation inventory** — maintains a 26-gap severity-ordered list distinguishing latent bugs in shipped code, structural blockers, correctness misses, and tooling gaps; resists the README's pitch language to keep the documented state aligned with the code state.
+- **Bottom-up systems learning discipline** — refuses framework dependencies (`tokio`, `hyper`, `axum`, `mio`) to preserve the project's teaching value, even at the cost of slower progress against the milestone ladder.
 
 ---
 

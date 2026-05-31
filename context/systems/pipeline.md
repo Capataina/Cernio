@@ -114,6 +114,10 @@ Counters are tallied at every stage (`total_fetched`, `total_after_location`, `t
 
 Each resolved portal also triggers an `UPDATE companies SET last_searched_at = now`, which the TUI dashboard surfaces as "search pulse" freshness.
 
+### `cernio clean` config rename
+
+The cleanup config field that selects job grades to archive was renamed `remove_job_grades` → `archive_job_grades` in commit `aebd701` (2026-05-29). The rename matches reality: `cernio clean` sets `evaluation_status = 'archived'` + `archived_at = now`; a separate 14-day expiry sweep later deletes archived jobs. The original name suggested deletion was happening on every clean.
+
 ### `cernio clean` tier ladder
 
 Jobs are archived when `discovered_at` falls more than N days behind today, where N depends on the job's grade:
@@ -180,7 +184,7 @@ Failure behaviour at each step:
 
 ### Contract with `config`
 
-`SearchFilters` holds `min_company_grade`, `include_keywords`, `exclude_keywords`, and `locations: HashMap<String, LocationConfig>`. The per-provider `LocationConfig` is looked up by provider string; an unknown provider passes all locations (empty-list passthrough, verified in `passes_location_unknown_provider_passthrough` test). `included_grades(min_grade)` returns a `Vec<&'static str>` starting from the threshold — used in `get_search_targets` to decide which companies make the cut.
+`SearchFilters` holds `min_company_grade`, `include_keywords`, `exclude_keywords`, and `locations: LocationConfig` (a single struct with a `patterns: Vec<String>` field). The per-provider `HashMap<String, LocationConfig>` was collapsed to a shared list in commit `f592ca2` (2026-05-29) — see `systems/ats.md` §"Contract with `config`" and `notes/lane-aware-universe-rebuild.md` §"Shared location list". `passes_location(&self, locations: &[String])` no longer takes the provider arg; an empty input slice passes (false-negative protection), an empty pattern list passes (no-filter default), otherwise any pattern matching any location wins. `included_grades()` returns a `Vec<&'static str>` starting from `min_company_grade` — used in `get_search_targets` to decide which companies make the cut.
 
 ### Contract with `db`
 

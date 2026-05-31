@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated:** 2026-04-26, session 10 (current upkeep). Testing now 346 tests (273 inline + 73 integration), up from 316 — the new 21 are the `tests/preferences_integrity.rs` safety net guarding `profile/preferences.toml` against silent loader-fallback corruption (commit `86097a6`). Profile schema migration completed end-to-end: `profile-scrape` retired, `populate-from-lifeos` added and successfully ran for the first time, producing 12 per-project files in `profile/projects/`, an aggregated `open-source-contributions.md`, a derived `skills.md`, and the per-run audit artefact `sync-summary.md`. Skills count steady at 9. Autofill remains scaffolded-but-broken (Chrome launches; React form filling unresolved).
+> **Last updated:** 2026-05-31 (upkeep-context pass). The last large session-class entry below is dated 2026-04-26 (session 10); since then the project has accreted three intertwined waves of change documented in §"Structural Notes / Current Reality" §"Lane-aware universe rebuild" and §"Web frontend redesign": (1) **preferences refactor** — `preferences.toml` slimmed from 335 → ~200 lines, `[hard]`/`[soft]` sections retired, location subtables collapsed to a shared list, `archive_job_grades` rename, 19 ethical-exclusion companies deleted, substance moved to `profile/career-goals.md` (now a Cernio-native file); (2) **web frontend redesign** — `handlers/{jobs,companies}.rs` split into 6-file submodules (`mod` / `filters` / `charts` / `table` / `page` / `lanes_view`), `components.css` (24 KB) split into 10 component-shaped files, lane-view (`?view=lanes`), decisions page rebuilt, `lane_pie` SVG filter, ambient lane-gradient rows, `no_cache_static` middleware, snap CLI `PAGES` expanded; (3) **lane-aware universe rebuild** — 9-agent parallel discovery (687 → 892 active companies), sparse lanes lifted, all 892 company grades wiped (`grade=NULL`) preserving lanes + sponsors_uk + ATS resolution for lane-aware regrade. Autofill remains scaffolded-but-broken.
 
 ---
 
@@ -293,7 +293,11 @@ Five relationships matter for understanding cross-system behaviour — they are 
 
 | A | B | Mechanism | What breaks if it fails |
 |---|---|-----------|-------------------------|
-| `ats/` (provider modules) | `config::SearchFilters::passes_location` | Shared identifier — provider name string (`"lever"`, `"greenhouse"`, ...) used as both a module name and a TOML key in `preferences.toml` | A new provider with no `[search_filters.locations.<provider>]` entry produces zero jobs post-filter. Mitigated by unknown-provider passthrough, but still a silent dropout for non-UK locations |
+| `ats/` (provider modules) | `config::SearchFilters::passes_location` | A **single shared** `[search_filters.locations].patterns` list (per-provider subtables retired May 2026, commit `f592ca2`). Provider name is no longer a parameter to `passes_location`. | Adding a new provider no longer requires a per-provider TOML entry — the shared list applies to all. Provider names are still a shared identifier via the `ats_provider` CHECK in `company_portals` and the `SUPPORTED_ATS_PROVIDERS` invariant in `tests/preferences_integrity.rs`. |
+| `src/data/lane.rs::lane_hex` | TUI theme + Web CSS chips + ECharts series + `ops.js` LANE_HEX const | Single source of truth for lane keys, labels, and hex colours. Consumed by 4 rendering surfaces. | A lane-hex change in `lane.rs` propagates everywhere automatically except `ops.js` which has a duplicate `LANE_HEX` const by necessity (loads on every page). If the two diverge, the ops menu chips will show different colours than the rest of the UI. |
+| `cernio import` markdown parser (`pipeline/import.rs::parse_potential_md`) | Discovery markdown files (`companies/discovery-*.md`) | The parser recognises `Website` / `What they do` / `Why relevant` / `Source` fields only. `Lane` and `Sponsor` fields are silently dropped. | Every import of discovery files leaves `lanes` + `sponsors_uk` NULL on the newly-imported rows. The 2026-05-31 discovery run had to backfill 226 companies via `/tmp/cernio-backfill-lanes.py`. Follow-up: extend the parser. |
+| `cernio web` static asset bundles | Browser cache | `no_cache_static` middleware (`src/web/mod.rs::no_cache_static`) sets `Cache-Control: no-cache, no-store, must-revalidate` on every `/static/*` response. | Without it, a stale cached CSS file would silently break the layout after a redesign and the user would see a broken page until a hard refresh. Acceptable cost in dev (localhost single-user); production would want different headers. |
+| `cernio snap` PAGES const | Web routes | `src/web/debug_snap.rs::PAGES` lists every URL the snap CLI captures. Current entries cover dashboard / companies / jobs / decisions / activity plus filtered variants (`?lane=hft`) and lane-columned view (`?view=lanes`). | A page or visual state not in PAGES cannot be snapped by `snap-all`. Forgetting to add a new page means visual regressions surface only when a human looks, defeating the self-driven verification loop. |
 | `pipeline/search` | `db` (`jobs` table) | `INSERT OR IGNORE INTO jobs` keyed on `url UNIQUE` | The unique constraint is the dedup mechanism. Dropping it would cause search to emit duplicates across runs. The `INSERT OR IGNORE` vs `INSERT` distinction is load-bearing — plain `INSERT` would error on every re-run |
 | `pipeline/format` | `tui/mod::run_silent` | Called on TUI startup via subprocess; must be idempotent | If `format` were not idempotent, every TUI launch would further mangle already-cleaned descriptions. The property is guarded by an explicit test (`idempotency_on_realistic_payload`) |
 | `db` (`application_packages`) | `autofill/` | JSON answers written by `prepare-applications` skill, read by the autofill binary at launch | Schema contract: `job_id` → `answers` (JSON) → consumed by provider-specific field mapper. If the JSON key set drifts, autofill produces partial forms silently |
@@ -303,9 +307,12 @@ Five relationships matter for understanding cross-system behaviour — they are 
 
 ### Hidden coupling
 
-- **Provider names are a shared string across `ats/`, `config.rs`, `preferences.toml`, and `db` (`ats_provider` CHECK constraint).** Renaming `smartrecruiters` anywhere requires touching all four. No single source of truth.
+- **Provider names are a shared string across `ats/`, `config.rs`, `preferences.toml` (`SUPPORTED_ATS_PROVIDERS` constant in the integrity test), and `db` (`ats_provider` CHECK constraint).** Renaming `smartrecruiters` anywhere requires touching all four. No single source of truth. (Note: the location-subtable layer was retired May 2026; provider names are no longer a key in `[search_filters.locations]`.)
 - **`ats_extra` JSON structure is provider-specific and unversioned.** Changing the Workday `{subdomain, site}` shape without migrating existing rows produces silent zero-job runs for Workday portals.
 - **`profile/preferences.toml` is read directly by `config.rs` at every pipeline invocation.** The TUI does not re-read it. If the user edits preferences while the TUI is running, the user keeps the stale config until restart. Acceptable trade-off — flagged here so nobody is surprised.
+- **`profile/career-goals.md` is the canonical home for everything that used to live in `preferences.toml [hard]`/`[soft]`** — the 8 active lanes, role-truth-at-hire hard rule, sponsor-only universe rule, ethical-exclusions hard rule, Tier 1/2/3 location table. Grading skills (`grade-companies`, `grade-jobs`, `check-integrity`) read it fresh; `populate-from-lifeos` is forbidden from touching it. The file is Cernio-native, not LifeOS-synced.
+- **Lane classification is a JSON-array string in `companies.lanes`** (and cached into `jobs.lanes` at insert). `src/data/lane.rs` parses it via `primary_lane` / `all_lanes`. The web frontend chip filters, TUI badges, grading skills, and analytics queries all key off the cached column rather than re-deriving from the company row each time.
+- **Codeplay (Intel) sponsor revocation (2026-05-31)** is the canonical example of the sponsor-only universe rule in action: a company already in the DB lost its UK Skilled Worker licence between Feb–Apr 2026, `sponsors_uk` flipped to `no`, and it was archived. Re-verifying sponsor status is part of the integrity check loop, not a one-time gate at discovery.
 
 ---
 
@@ -361,33 +368,91 @@ Today's session completed the profile-schema migration and added a build-time sa
 
 **Preferences integrity guard added** (commit `86097a6`). 21 new integration tests in `tests/preferences_integrity.rs` assert structural properties of `profile/preferences.toml` at build time — required sections, valid grade letters in `[cleanup]`, UK-pattern presence in every `[search_filters.locations.<provider>]` subtable, and most importantly the `every_supported_ats_provider_has_a_location_subtable` invariant which drives off a `SUPPORTED_ATS_PROVIDERS` constant kept in sync with modules in `src/ats/`. The Workday `[search_filters.locations.workday]` subtable was added in the same commit — it had been silently bypassing the UK location filter on every Workday-portal job since the fetcher shipped. Total test suite now 346.
 
+### Lane-aware universe rebuild (2026-05-29 → 2026-05-31)
+
+A coherent multi-commit move from a flat-grade universe to a sponsor-only, lane-tagged, lane-relatively-graded universe. The work spans four overlapping changes — captured in `notes/lane-aware-universe-rebuild.md` with the full commit trail and per-step rationale. Summary:
+
+- **Preferences refactor (`72006d3`, `f592ca2`, `aebd701`, `c3c9ca2`).** `preferences.toml` reduced 335 → ~200 lines. `[hard]` and `[soft]` sections deleted entirely (substance moved to `profile/career-goals.md` as prose: 8 active lanes, role-truth-at-hire, sponsor-only universe, ethical exclusions, Tier 1/2/3 locations). Six per-provider location subtables collapsed to a single shared `patterns` list. `LocationConfig` Rust struct flattened; `passes_location` no longer takes a provider arg. `remove_job_grades` → `archive_job_grades` rename for honesty. `no_hard_or_soft_sections_present` regression test added to prevent the anti-pattern returning.
+- **Ethical-exclusion deletions (`dc7d718`).** 19 companies (5 gambling, 7 adtech, 7 consumer-crypto) deleted from the DB per the new career-goals ethical-exclusions hard rule. Cascade-deleted 20 jobs + 11 portals. Zero user_decisions affected. **Explicit override of archival doctrine** — for ethical-exclusion companies, deletion was preferred so re-discovery is the default behaviour if policy ever changes. Only known intentional exception to "archive, never delete."
+- **9-agent parallel discovery (`d6256f6`, 2026-05-31).** 8 per-lane agents + 1 non-obvious-sources agent dispatched in parallel. Net 212 new companies after dedup. Universe: 687 → 892 active. Sparse lanes lifted (bank-strats 18 → ~46, crypto-mm 42 → ~69, devtools 56 → ~105, big-tech 66 → ~97). Codeplay (Intel) archived after losing UK Skilled Worker licence — sponsor-only universe rule in action. Discovery files preserved as research artefacts at `companies/discovery-{lane}-2026-05-31.md`. **Known follow-up:** `cernio import` markdown parser silently drops `Lane:` and `Sponsor:` fields; 226 companies were backfilled via `/tmp/cernio-backfill-lanes.py`.
+- **Grade wipe (`c8dc8e6`).** All 687 company grades cleared (`grade`, `grade_reasoning`, `graded_at`, `pinnacle_status_per_lane` set to NULL). Lanes, sponsors_uk, status, location, sector_tags, ATS resolution data all preserved. **Grade-wipe philosophy:** wipe only grade-derived columns; preserve expensive-to-rederive labour. Lane assignment (discovery-agent labour), sponsor verification, ATS slug probing all survive every regrade. Same principle as archival-not-deletion: preserve history, lose only what is fastest to regenerate from the new semantic.
+
+The next action across the rebuild is to run `grade-companies` against the 892 ungraded set — the first proper lane-relative calibration the system will produce.
+
+### Web frontend redesign (2026-05-29 → 2026-05-31)
+
+Five-phase redesign of the web frontend (commits `7e2e36c`, `a897359`, `44de517`, `60ce8d9`, `6b8f4c8`, `8c73dda`, `51fa15d`, `3baaea0`, `d6256f6` web-side):
+
+- **Modularisation (`7e2e36c`).** `handlers/jobs.rs` (864 lines) and `handlers/companies.rs` (900 lines) split into 6-file submodules each — `{mod, filters, charts, table, page, lanes_view}.rs`. Same template across both handlers (convention).
+- **CSS componentisation.** `components.css` (24 KB) split into `chips.css`, `buttons.css`, `rows.css`, `tables.css`, `filters.css`, `filters-pie.css`, `jobs-lanes.css`, `companies-lanes.css`, plus rebuilt `decisions.css`. Component-shaped siblings replace the alphabetised wall.
+- **Lane view (`?view=lanes`).** Both `/jobs` and `/companies` gain a lane-columned alternative view (8 lane columns; rows distributed by primary lane).
+- **Lane-pie SVG filter (`6b8f4c8`).** Per-axis filter visualisation rendered as inline SVG pies in the filter strip.
+- **Decisions rebuild (`60ce8d9`).** Funnel nav + next-actions pane.
+- **Ambient lane gradient (`51fa15d`, `3baaea0`).** Each row gets a soft localised halo over the lane-badge area, hex colour from `src/data/lane.rs::lane_hex`. The 2026-05-31 fix in `3baaea0` resolved three structural CSS bugs — `grid-area:1/1/-1/-1` containing-block trap, `.row-title-text { display:block }` hover-bar bug, variable-row-height accent geometry — captured in `notes/css-grid-absolute-positioning.md`.
+- **`no_cache_static` middleware.** New middleware in `src/web/mod.rs` forces `Cache-Control: no-cache, no-store, must-revalidate` on every `/static/*` response. Prevents stale cached CSS silently breaking the layout after a redesign.
+- **Snap CLI expansion.** `PAGES` const grew to include filtered variants and lane-view URLs. Discipline in `notes/snap-self-driven-debug.md`.
+
 ### Current project state
 
 | Artefact | State |
 |----------|-------|
-| Profile | Synced from LifeOS via `populate-from-lifeos` (first end-to-end run completed 2026-04-26); per-project files in `profile/projects/` with status frontmatter (no tier system); `skills.md` derived from projects with six-table / four-band rubric; `portfolio-gaps.md` actively maintained by `check-integrity`; `sync-summary.md` is the per-run audit artefact |
-| SQLite schema | 5 tables, 6 migrations, 29 inline tests (was 11 at session 7) |
-| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet); preferences-integrity test enforces a single shared `[search_filters.locations]` list (per-provider split retired May 2026 — was 100% duplicated content) |
-| Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug |
-| Testing | 346 tests (273 inline + 73 integration including 21 preferences-integrity), zero failing, runs under a second once compiled |
-| TUI | v5, 5 views, modular (26 source files), dashboard overhaul applied |
-| Autofill | Scaffolded, broken on React forms; fix approach documented |
-| Skills | 9 skills at `.claude/skills/`, all skill-creator-audited; `profile-scrape` retired, `populate-from-lifeos` added |
-| Skill-creator | Self-iterated in session 9; anti-compression + session-aware Pass 0 live |
+| Profile | Synced from LifeOS via `populate-from-lifeos`; per-project files in `profile/projects/` with status frontmatter; `skills.md` derived; `portfolio-gaps.md` actively maintained by `check-integrity`; three Cernio-native files preserved (`preferences.toml`, `career-goals.md`, `portfolio-gaps.md`). `career-goals.md` now owns the strategic frame moved out of `preferences.toml [hard]`/`[soft]` in May 2026. |
+| SQLite schema | Core 5 tables + `application_packages` + lane-aware additions (`companies.lanes`, `companies.sponsors_uk`, `companies.pinnacle_status_per_lane`, `jobs.lanes` cache) + append-only `events` table. See `systems/database.md` §"Lane-based-relativity schema additions". |
+| Companies | **892 active, sponsor-only, all ungraded post-wipe** (was 687 at end of session 10). 19 ethical-exclusion companies deleted as a one-off override of the archival doctrine. |
+| ATS fetchers | 6 providers in use, Eightfold recorded as bespoke (no fetcher yet). `passes_location` is now arg-less + reads a single shared `[search_filters.locations].patterns` list (per-provider split retired May 2026). |
+| Pipeline (`cernio` CLI) | 6 mainline commands + unarchive + stats + pending + ad-hoc lever debug. `cernio web` boots the web frontend. `cernio snap` drives self-driven visual debugging. |
+| Web frontend | Second user-facing surface (sister to TUI). axum + maud + HTMX + ECharts on `localhost:7878`. 22 Rust files (~5,165 LOC) + ~4,428 LOC of CSS + vanilla JS. Modular handler split for `/jobs` and `/companies`. Lane-view (`?view=lanes`) + decisions rebuild + lane-pie filter visualisation. **Currently documented in `notes/web-frontend-architecture.md`; a `systems/web.md` split is recommended for a future Restructure pass — the surface has outgrown notes-shape.** |
+| Testing | Test count drifted upward — commit `f592ca2` body cites "All 382 tests green". Most recent stable count: 346 at session 10. The growth came from preferences-refactor regression tests + the `no_hard_or_soft_sections_present` guard. |
+| TUI | v5, 5 views, modular (26 source files). Untouched in the 2026-05 web-redesign window (separate surface). |
+| Autofill | Scaffolded, broken on React forms; fix approach documented. Reuses the chromiumoxide dep that `cernio snap` also relies on. |
+| Skills | 9 skills at `.claude/skills/`, all skill-creator-audited. |
 
 ### Next priorities
 
-1. **Fix autofill React form filling** — `nativeInputValueSetter` or CDP `Input.insertText` (blocking applications at scale).
-2. **Eightfold fetcher** — currently recorded as bespoke; migration is straightforward once prioritised.
-3. **Interview prep skill** — designed in `notes/interview-prep-design.md`, not yet implemented.
-4. **Periodic integrity check** — ATS re-verification + grade drift detection after the next search cycle.
-5. **Resume + cover-letter refresh** — `profile/resume.md` and `cover-letter.md` rebuilt session 7 against the honest project tiers; next pass after the next significant project update.
+1. **Run `grade-companies` against the 892 ungraded post-wipe set** — the first proper lane-relative calibration the system has ever produced. Blocks portfolio-gap re-derivation and reordering the web dashboard's top-companies pane.
+2. **Extend `cernio import` to recognise `Lane:` and `Sponsor:` fields** (`src/pipeline/import.rs::parse_potential_md`) — would eliminate the backfill-script step from every future discovery import.
+3. **Promote `notes/web-frontend-architecture.md` to `systems/web.md`** — the web surface has 22 Rust files + ~4,428 LOC of CSS + vanilla JS + its own filter system + drawer + cmdk + snap CLI; it has outgrown the notes-shape. Recommend in a future Restructure pass; do not silently rewrite this Upkeep.
+4. **Reconcile `context/plans/cernio-full-refactor.md` against current state** — substantial parts of the lane-based-relativity refactor have shipped (DB schema, grade wipe, preferences refactor); the plan file should reflect what is and isn't done so the next session knows what remains.
+5. **Fix autofill React form filling** — `nativeInputValueSetter` or CDP `Input.insertText` (blocking applications at scale).
+6. **Eightfold fetcher** — currently recorded as bespoke; migration is straightforward once prioritised.
+7. **Interview prep skill** — designed in `notes/interview-prep-design.md`, not yet implemented.
+8. **Periodic integrity check** — ATS re-verification + grade drift detection after the next search cycle.
 
 ---
 
 ## Coverage
 
-This upkeep pass (2026-04-26, session 10) inspected:
+This upkeep pass (2026-05-31) inspected:
+
+- All files under `context/` end-to-end via the per-file staleness pass; see `context/_staleness-report.md` for the verdict + evidence on each of the 47 markdown files walked.
+- `git log --format=fuller --since='2026-05-29'` (14 commits) plus `git show <hash>` body inspection of `72006d3`, `f592ca2`, `c3c9ca2`, `aebd701`, `dc7d718`, `c8dc8e6`, `7e2e36c`, `8c73dda`, `51fa15d`, `3baaea0`, `d6256f6` — the rationale-rich commits whose bodies drove the content of `notes/lane-aware-universe-rebuild.md`, `notes/css-grid-absolute-positioning.md`, and the new architecture sections.
+- Source: `src/config.rs` (full read — confirmed `LocationConfig` flattening + `passes_location` signature change), `src/data/lane.rs` (full read — single source of truth for lane keys/colours), `src/web/mod.rs` + `src/web/handlers/{jobs,companies}/mod.rs` + `src/web/debug_snap.rs` (the split structure + `no_cache_static` middleware + `PAGES` const + `CHROME_PATH`), `src/pipeline/import.rs:130-230` (parse_potential_md — confirmed the Lane/Sponsor field omission), `profile/preferences.toml` + `profile/career-goals.md` (canonical homes of the moved content).
+- Connection-discovery probes (six categories from `references/cross-system-analysis.md`): see "Inter-system relationships" probe results section below.
+- Rationale-capture grep across `src/` for `WHY|HACK|IMPORTANT|SAFETY|FIXME` — no matches outside doc-comments. The `git log --format=fuller --since='2026-05-29'` commit-body inspection was the higher-yield rationale source (the Cernio project maintains rich commit bodies as durable rationale capture).
+- `scripts/scan_repo.py` output: confirmed 87 Rust + 14 JS + 6 Python source files; 47 markdown files under `context/`; existing `context/` structure (architecture.md, notes.md + 18 notes, 4 systems, 2 plans-tree, 6 references).
+
+### Connection-discovery probe results (2026-05-31)
+
+| Probe | Outcome |
+|---|---|
+| Shared data structures | `AtsJob` / `SlugProbeResult` (ats↔pipeline) — documented in `systems/ats.md`. `lanes` JSON-array string is shared across `companies` table, cached `jobs.lanes` column, `events` table — documented in `systems/database.md` §"Lane-based-relativity schema additions". |
+| Shared configuration | `profile/preferences.toml` read by `src/config.rs` at every pipeline invocation; `profile/career-goals.md` read by every grading skill. Documented in `systems/ats.md` + `notes/profile-system.md`. |
+| Parallel evolution | `src/data/lane.rs::lane_hex` is the single source of truth for lane colours — consumed by TUI theme + Web CSS chips (`style="--lane-color: <hex>"`) + ECharts series + `ops.js` LANE_HEX const. `ops.js` const is a deliberate duplicate (loads on every page); flagged in §"Hidden coupling". No silent parallel implementations found. |
+| Hidden coupling via global state | None new since session 10. The `profile/preferences.toml` read-on-every-invocation pattern remains as the documented session-state issue (TUI does not re-read until restart). |
+| Event producers/consumers | New `events` table (lane-aware refactor) is producer-consumer: writers from pipeline / decisions / search; consumers TUI Activity view + Web `/activity` route. The `raw.*` prefix convention separates migration events from user-visible activity — captured in `systems/database.md`. |
+| Common external deps | All 6 ATS providers depend on the shared `reqwest` client + `common::get_with_retry` (documented in `systems/ats.md`). `chromiumoxide` is shared between `src/autofill/` and `src/web/debug_snap.rs` — both depend on `CHROME_PATH` resolution, currently macOS-hardcoded in `debug_snap.rs`. |
+
+### Convention-capture probe results (2026-05-31)
+
+| Convention | Captured where |
+|---|---|
+| `handlers/{jobs,companies}/` 6-file template (`mod` / `filters` / `charts` / `table` / `page` / `lanes_view`) | New text in §"Module structure (under `src/web/`)" — explicitly named as a convention. |
+| Per-feature CSS file split (rather than monolithic `style.css`) | `notes/web-frontend-architecture.md` + new architecture §"Asset bundles" expansion. |
+| JSON-island naming (`chart-<kind>` + `data-<kind>` + `bootEchart(<kind>, …)`) | `notes/web-frontend-architecture.md` §"JSON islands". Existing capture, still current. |
+| `?view=lanes` URL convention for lane-columned alternative views | New text in handler table; cross-referenced in `notes/snap-self-driven-debug.md` PAGES list. |
+| Maud `attr[bool]` brackets for HTML boolean attributes | `notes/maud-attribute-gotchas.md`. Existing capture, still current. |
+
+This pass (2026-05-31) inspected (pre-existing scope retained):
 
 - All files under `context/` end-to-end (architecture.md, notes.md, 16 notes files, 4 system files, 3 references touched at folder level).
 - `git log --format=fuller -8` plus `git show` body inspection of all four commits made today (`86097a6`, `3cd1910`, `d907ee8`, `9f19f73`) — these contain the design rationale for today's changes and were the primary source for the Inter-System Relationships additions and the new Structural Notes section.
@@ -444,27 +509,46 @@ axum (router) + maud (HTML macros) + HTMX 1.9 (inline writes) + ECharts 5.4 (cha
 
 | File | Role |
 |---|---|
-| `mod.rs` | axum router + `AppState` |
+| `mod.rs` | axum router + `AppState` + `no_cache_static` middleware (forces fresh `/static/*` fetches on every request — prevents stale cached CSS silently breaking the layout after a redesign) |
 | `templates.rs` | chrome (topbar, tabs, lane-legend popover, drawer, ops menu, preset menu, cmdk palette, snap button) + `PageAssets::css_js` loader + `lane_legend(page)` + `json_island(kind, value)` |
-| `debug_snap.rs` | `cernio snap` CLI + POST `/debug/snap-all` handler |
+| `debug_snap.rs` | `cernio snap` CLI + POST `/debug/snap-all` handler. `PAGES` const lists every URL to snap (dashboard, companies, jobs, decisions, activity, plus filtered + lane-view variants) |
 | `handlers/dashboard.rs` | Action queue + companies×lane donut + jobs×lane×grade stacked bar + 7d activity + recent decisions |
-| `handlers/companies.rs` | 6-axis chip filter strip + analytics recomputed from filtered list |
-| `handlers/jobs.rs` | 7-axis chip filter strip + heatmap + freshness + funnel + table |
-| `handlers/decisions.rs` | Watched/Applied/Interview/Rejected pipeline |
+| `handlers/companies/` (mod + filters + charts + table + page + lanes_view, 6 files) | 6-axis chip filter strip + analytics recomputed from filtered list + lane-columned `?view=lanes` view. Split from the previous 900-line single file in commit `7e2e36c`. |
+| `handlers/jobs/` (mod + filters + charts + table + page + lanes_view, 6 files) | 7-axis chip filter strip + heatmap + freshness + funnel + table + lane-columned `?view=lanes` view. Same 6-file template as `companies/`. Split from the previous 864-line single file in commit `7e2e36c`. |
+| `handlers/decisions.rs` | Watched/Applied/Interview/Rejected pipeline. Rebuilt 2026-05-30 with funnel nav + next-actions pane. |
 | `handlers/activity.rs` | 7d/30d/90d timeframe toggle + raw-events toggle |
 | `handlers/detail.rs` | drawer HTML fragments for `GET /detail/job/:id` + `GET /detail/company/:id` |
 | `handlers/ops.rs` | Clean + Format preview + run |
 | `handlers/api.rs` | stats.json + search-index.json |
 
+**The 6-file split is a convention.** Both `handlers/jobs/` and `handlers/companies/` follow the same template: `mod.rs` re-exports, `filters.rs` chip-strip + query parsing, `charts.rs` JSON-island builders, `table.rs` row-rendering, `page.rs` top-level assembly, `lanes_view.rs` the `?view=lanes` lane-columned alternative. Adding a third page with this much surface would be expected to follow the same split.
+
 ### Asset bundles (under `static/`)
 
-Split into shared bundles (loaded on every page) + per-page bundles (loaded via `PageAssets::css_js`). Full inventory in `context/notes/web-frontend-architecture.md`. The key structural decision: each major feature (filters, drawer, cmdk, presets, ops) gets its own CSS+JS file rather than a monolithic `style.css` + `app.js`. Loaded via:
+Split into shared bundles (loaded on every page) + per-page bundles (loaded via `PageAssets::css_js`). Each major feature (filters, drawer, cmdk, presets, ops) gets its own CSS+JS file rather than a monolithic `style.css` + `app.js`. Loaded via:
 
 ```rust
 PageAssets::css_js("/static/css/jobs.css", "/static/js/jobs.js")
 ```
 
 Shared bundles in chrome always; per-page bundle conditionally appended.
+
+**2026-05-30 CSS modular split.** `components.css` (24 KB) was decomposed into component-shaped siblings to make styles findable by feature rather than alphabetised in one wall:
+
+| File | Role |
+|---|---|
+| `chips.css` | Filter chip variants (lane / grade / plain / segmented) |
+| `buttons.css` | Apply / Watch / Reject + ops controls |
+| `rows.css` | `.row-clickable` + lane-accent strip + ambient glow + hover state (the file commit `3baaea0` fixed structurally) |
+| `tables.css` | Table grid declarations |
+| `components.css` | Panels, KPI strips, charts (everything that did not split out) |
+| `filters.css` | Filter strip layout |
+| `filters-pie.css` | Lane-pie SVG filter visualisation (new) |
+| `jobs-lanes.css` | Lane-columned jobs view |
+| `companies-lanes.css` | Lane-columned companies view |
+| `decisions.css` | Rebuilt decisions page styling (funnel nav + next-actions pane) |
+
+Full inventory + per-file roles in `context/notes/web-frontend-architecture.md`. The CSS-Grid + absolute-positioning trap fixed in commit `3baaea0` (and its two companion bugs) is captured in `context/notes/css-grid-absolute-positioning.md`.
 
 ### Cross-cutting features
 
@@ -479,7 +563,9 @@ Shared bundles in chrome always; per-page bundle conditionally appended.
 
 Self-contained: spawns ephemeral server → drives headless Chrome → captures full-page + per-pane + viewport-slice PNGs into `/tmp/cernio-debug/<ts>/` → tears down. Optional `--temporal` re-captures with 3s gap. Used both as a CLI command and triggered from the floating `snap all` button.
 
-This enables Claude to do its own visual observation pass on UI work — fix → snap → read PNGs → iterate without asking the user to verify.
+This enables Claude to do its own visual observation pass on UI work — fix → snap → read PNGs → iterate without asking the user to verify. The discipline is captured in `context/notes/snap-self-driven-debug.md`.
+
+`PAGES` const expanded in commit `d6256f6` to include filtered variants and the lane-columned view: `/`, `/companies`, `/jobs`, `/jobs?lane=hft`, `/companies?lane=hft`, `/jobs?view=lanes`, `/companies?view=lanes`, `/decisions`, `/activity`. Adding a new page or visual state requires extending PAGES — otherwise `snap-all` cannot cover it.
 
 ### Maud gotcha
 
