@@ -280,13 +280,63 @@
     padding: 9px 12px;
     border-bottom: 1px solid var(--bg-3);
     color: var(--text-1);
-    transition: background var(--t-fast) var(--easing),
-                transform var(--t-base) var(--easing);
+    transition: background var(--t-fast) var(--easing);
 }
-.job-row:hover,
-.company-row:hover {
-    background: var(--bg-2);
-    transform: translateX(2px);
+/* Hover: NO row-wide background fill, NO row-shift. Only the thin
+ * left-edge accent strip lights up (::after below). Keeps the table
+ * clean and minimal. */
+/* Override .row-clickable:hover (which sets background+translateY on every
+ * clickable row) for these data-table rows specifically. We don't want the
+ * row-wide background bar or the translate — just the thin left accent
+ * strip from ::before below. Specificity (.company-row.row-clickable:hover
+ * = 30) beats .row-clickable:hover (= 20). */
+.job-row.row-clickable:hover,
+.company-row.row-clickable:hover,
+.decision-list-row.row-clickable:hover,
+.next-action-row.row-clickable:hover {
+    background: transparent;
+    transform: none;
+}
+
+/* Thin accent strip at the very LEFT BORDER edge of the row on hover.
+ * left: -12px (or -16px for decision rows) cancels the row's horizontal
+ * padding so the strip reaches the actual row boundary, not the grade
+ * pill's inside edge. */
+.job-row::before,
+.company-row::before {
+    content: "";
+    position: absolute;
+    grid-area: 1 / 1 / -1 / -1;
+    left: -12px;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    transition: width var(--t-fast) var(--easing);
+    pointer-events: none;
+    z-index: 3;
+}
+.decision-list-row::before,
+.next-action-row::before {
+    content: "";
+    position: absolute;
+    grid-area: 1 / 1 / -1 / -1;
+    left: -16px;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    transition: width var(--t-fast) var(--easing);
+    pointer-events: none;
+    z-index: 3;
+}
+.job-row:hover::before,
+.company-row:hover::before,
+.decision-list-row:hover::before,
+.next-action-row:hover::before {
+    width: 3px;
 }
 .job-row > *,
 .company-row > * {
@@ -302,34 +352,46 @@
  * around the leftmost badges (the earlier 150px / 0.55 opacity made the
  * badges sit inside a saturated zone, making it look like the colour
  * emitted from the grade pill rather than the row itself). */
-.row-lane-accent {
+/* Ambient lane glow — soft LED-style accent positioned at the row's
+ * actual left BORDER edge (not the inside-padding edge). Heavy blur for
+ * diffuse falloff so it reads as ambient light, not as a stripe.
+ * grid-area span prevents grid-track consumption; left:-12 / -16
+ * cancels each row's horizontal padding to reach the true left edge. */
+.job-row > .row-lane-accent,
+.company-row > .row-lane-accent {
     position: absolute;
-    /* Span the whole grid so this absolutely-positioned child does NOT
-     * consume an auto-placed grid track. Universal across grid-parented rows. */
     grid-area: 1 / 1 / -1 / -1;
-    /* Ambient glow — like the soft LED accent lighting in car interiors.
-     * Positioned OVER the lane-badge area (~80–280px from left, past the
-     * grade pill so the glow doesn't appear to "start from the grade") with
-     * heavy blur to diffuse all hard edges. No mask-image needed — the blur
-     * provides natural falloff in every direction so the colour fades into
-     * the row content rather than stopping at a hard line. */
-    left: 80px;
+    left: -12px;
     top: 4px;
     bottom: 4px;
-    width: 200px;
+    width: 140px;
     pointer-events: none;
-    opacity: 0.3;
-    filter: blur(26px);
+    opacity: 0.32;
+    filter: blur(28px);
     border-radius: 50%;
     z-index: 0;
-    transition: opacity var(--t-fast) var(--easing),
-                filter var(--t-base) var(--easing);
+    transition: opacity var(--t-fast) var(--easing);
+}
+.decision-list-row > .row-lane-accent,
+.next-action-row > .row-lane-accent {
+    position: absolute;
+    grid-area: 1 / 1 / -1 / -1;
+    left: -16px;
+    top: 4px;
+    bottom: 4px;
+    width: 140px;
+    pointer-events: none;
+    opacity: 0.32;
+    filter: blur(28px);
+    border-radius: 50%;
+    z-index: 0;
+    transition: opacity var(--t-fast) var(--easing);
 }
 .job-row:hover .row-lane-accent,
 .company-row:hover .row-lane-accent,
 .decision-list-row:hover .row-lane-accent,
 .next-action-row:hover .row-lane-accent {
-    opacity: 0.48;
+    opacity: 0.45;
 }
 
 /* ── Click-to-filter affordances ─────────────────────────────────────────

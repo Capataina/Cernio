@@ -219,7 +219,8 @@
                 transform var(--t-base) var(--easing);
 }
 .next-action-row:last-child { border-bottom: none; }
-.next-action-row:hover { background: var(--bg-2); transform: translateX(2px); }
+/* Hover: row-wide background + translate removed (per user feedback) —
+ * minimal hover state is the thin accent strip from rows.css ::before. */
 .next-action-row > * {
     position: relative;
     z-index: 1;
@@ -333,7 +334,7 @@
                 transform var(--t-base) var(--easing);
     cursor: pointer;
 }
-.decision-list-row:hover { background: var(--bg-2); transform: translateX(2px); }
+/* Hover handled by .decision-list-row::before in rows.css. */
 .decision-list-row:last-child { border-bottom: none; }
 .decision-list-row > * {
     position: relative;
