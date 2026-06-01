@@ -1,52 +1,68 @@
 ---
 title: Portfolio Gaps
-last_updated: 2026-05-29
+last_updated: 2026-06-01
 maintained_by: grade-jobs (per cernio-full-refactor.md §5.6 Phase 3)
-seeded_from: legacy profile/portfolio-gaps.md (576 lines, append-only batch log)
+last_run: 2026-06-01 grade-jobs full pass (1460 jobs, all 8 lanes regenerated)
 ---
 
 # Portfolio Gaps — Per-Lane Folder
 
-> Replaces the legacy single `profile/portfolio-gaps.md` flat file per the
-> lane-based-relativity refactor (cernio-full-refactor.md §5.6 Phase 3).
-> Maintained by `grade-jobs` Phase 3 — each per-lane file is rewritten in
-> place at the end of every grade-jobs batch (NOT append-only).
+> Per-lane files rewritten in place by `grade-jobs` Phase 3. Each file is the
+> current snapshot of what the lane wants vs what the profile shows, derived
+> from the graded jobs in that lane. NOT append-only — re-running `grade-jobs`
+> replaces each lane's content from scratch.
+
+## Last full regeneration
+
+| Lane | Jobs graded | SS | S | A | B | C | F |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| big-tech | 85 | 8 | 7 | 19 | 11 | 8 | 32 |
+| ai-ml | 358 | 0 | 25 | 87 | 55 | 81 | 110 |
+| hft | 217 | 0 | 10 | 9 | 42 | 85 | 71 |
+| crypto-mm | 33 | 0 | 10 | 3 | 3 | 7 | 10 |
+| bank-strats | 82 | 4 | 4 | 14 | 12 | 23 | 25 |
+| systems-infra | 400 | 6 | 14 | 38 | 71 | 91 | 180 |
+| devtools | 97 | 0 | 4 | 3 | 14 | 13 | 63 |
+| fintech | 187 | 0 | 4 | 28 | 26 | 25 | 104 |
+
+(Counts as of 2026-06-01; rerun grade-jobs to refresh.)
 
 ## Per-lane files
 
 | File | Lane | Maintenance source |
 |---|---|---|
-| `big-tech.md` | big-tech | grade-jobs Phase 3, jobs tagged big-tech |
-| `ai-ml.md` | ai-ml | grade-jobs Phase 3, jobs tagged ai-ml |
-| `hft.md` | hft | grade-jobs Phase 3, jobs tagged hft |
-| `crypto-mm.md` | crypto-mm | grade-jobs Phase 3, jobs tagged crypto-mm |
-| `bank-strats.md` | bank-strats | grade-jobs Phase 3, jobs tagged bank-strats |
-| `systems-infra.md` | systems-infra | grade-jobs Phase 3, jobs tagged systems-infra |
-| `devtools.md` | devtools | grade-jobs Phase 3, jobs tagged devtools |
-| `fintech.md` | fintech | grade-jobs Phase 3, jobs tagged fintech |
-| `closed.md` | (lane-agnostic) | dated archive of closed gaps; lane-tagged entries |
+| `big-tech.md` | big-tech | grade-jobs Phase 3 |
+| `ai-ml.md` | ai-ml | grade-jobs Phase 3 |
+| `hft.md` | hft | grade-jobs Phase 3 |
+| `crypto-mm.md` | crypto-mm | grade-jobs Phase 3 |
+| `bank-strats.md` | bank-strats | grade-jobs Phase 3 |
+| `systems-infra.md` | systems-infra | grade-jobs Phase 3 |
+| `devtools.md` | devtools | grade-jobs Phase 3 |
+| `fintech.md` | fintech | grade-jobs Phase 3 |
+| `closed.md` | (lane-agnostic) | dated archive of closed gaps |
 
-## File shape (canonical)
+## File shape
 
-Each per-lane file has a fixed shape, rewritten in place per batch:
+Each per-lane file follows the template:
 
-1. **Open gaps** — technologies / domains the lane wants that Caner doesn't have
-2. **Confirmed strengths** — what Caner has that the lane explicitly values
-3. **Closure prescriptions** — concrete portfolio investments per gap
-4. **Last-updated timestamp** + grade-jobs batch identifier
+- Open Gaps (what the lane wants that the profile lacks; cited, counted, prescription-attached)
+- Confirmed Strengths (what the profile has that the lane values)
+- Pinnacle Anchors (what would land SS at the lane's pinnacle firms; what's missing for that)
+- Lane Internal Calibration (current pool placement; biggest single-addition lever)
 
-## Initial seed (2026-05-29)
+## Cross-lane patterns
 
-These files were seeded by extracting patterns from the legacy
-`profile/portfolio-gaps.md` (576 lines of append-only batch log from
-2026-04-09 through 2026-05-17) and re-organising them per lane. The next
-canonical `grade-jobs` Phase 3 run will overwrite each file with fresh
-agent-derived content. The seed serves as a useful starting state; treat
-the content as best-effort until the next grade-jobs run.
+Most-cited closures that span multiple lanes:
+- **Kubernetes operator + Terraform IaC artefact** — surfaces in big-tech, systems-infra, fintech, devtools. One closure unlocks ~20+ A-band rows.
+- **FIX protocol literacy + adapter on Nyquestro** — unlocks hft + crypto-mm + bank-strats pinnacle-band roles.
+- **C++ at production band** — hft #1, crypto-mm #1, systems-infra adjacent.
+- **kdb+/q literacy** — bank-strats + hft (Squarepoint, Goldman, Citi).
+- **RLHF + interpretability paper** — ai-ml pinnacle gating for Anthropic Research-Engineer track.
 
-## Legacy file disposition
+## Closure prescriptions (top 5 by leverage)
 
-The legacy `profile/portfolio-gaps.md` is preserved in the repo for historical
-reference (576 lines, append-only batch log; not maintained going forward).
-It can be deleted once `grade-jobs` Phase 3 has run end-to-end against the
-new folder structure.
+1. **k3s + observability artefact** — closes Kubernetes/Terraform across 4 lanes.
+2. **FIX 4.4 adapter on Nyquestro** — closes the hft/crypto-mm pinnacle gap with a single ~3-week build.
+3. **C++ port of one Nyquestro module + criterion benchmark** — dual-lane unlock + signals C++ portability.
+4. **kdb+/q micro-project** — bank-strats + hft credibility, ~1-week investment.
+5. **RLHF reproduction on HH-RLHF via TRL** — ai-ml Research-Engineer track unlock, ~2 weeks.
